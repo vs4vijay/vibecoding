@@ -1,0 +1,30 @@
+{
+  "name": "crowdcode",
+  "version": "1.0.0",
+  "description": "Automated crowdsourced coding system powered by Claude Code",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "start": "bun run index.ts",
+    "dev": "bun run --watch index.ts"
+  },
+  "bin": {
+    "crowdcode": "./index.ts"
+  },
+  "keywords": [
+    "crowdcode",
+    "automation",
+    "github",
+    "ai",
+    "claude"
+  ],
+  "author": "Vijay Soni",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "dependencies": {
+    "@octokit/rest": "^20.0.2",
+    "simple-git": "^3.22.0"
+  }
+}

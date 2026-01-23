@@ -1,0 +1,39 @@
+name: CrowdCode Daily Run
+
+on:
+  schedule:
+    # Run daily at 12:00 UTC
+    - cron: '0 12 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  crowdcode:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run CrowdCode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPO: ${{ github.event.repository.name }}
+        run: bun run index.ts
+
+      - name: Upload workspace logs (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crowdcode-logs
+          path: workspace/
+          if-no-files-found: ignore
