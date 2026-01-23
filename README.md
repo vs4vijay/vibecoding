@@ -2,4 +2,4 @@
 
 ---
 
-Some vibed coded projects
+Some of my vibed coded projects
