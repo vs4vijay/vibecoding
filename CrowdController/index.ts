@@ -336,7 +336,10 @@ Please proceed with the implementation now.`;
     console.log(`⏱️  Timeout: ${config.timeoutMinutes} minutes`);
     console.log("─".repeat(60));
 
-    const claudeProcess = Bun.spawn(["claude", "-p", prompt], {
+    const claudeProcess = Bun.spawn([
+        "agency", 
+        "claude", "--allowedTools", "Edit,Write",
+         "--print", prompt], {
       cwd: workspaceDir,
       stdout: "inherit", // Stream directly to console
       stderr: "inherit", // Stream directly to console
