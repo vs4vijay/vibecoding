@@ -72,23 +72,23 @@ const octokit = new Octokit({ auth: config.githubToken });
 // ============================================================================
 
 async function fetchTopIssue(): Promise<Issue | null> {
-  console.log(`🔍 Fetching issues with label "${config.issueLabel}"...`);
+  console.log(`🔍 Fetching issues...`);
 
   // Fetch open issues with the specified label
   const { data: issues } = await octokit.issues.listForRepo({
     owner: config.owner,
     repo: config.repo,
-    labels: config.issueLabel,
+    // labels: config.issueLabel,
     state: "open",
     per_page: 100,
   });
 
   if (issues.length === 0) {
-    console.log(`ℹ️  No issues found with label "${config.issueLabel}"`);
+    console.log(`ℹ️  No issues found`);
     return null;
   }
 
-  console.log(`📋 Found ${issues.length} issue(s) with label "${config.issueLabel}"`);
+  console.log(`📋 Found ${issues.length} issue(s)`);
 
   // Fetch reactions for each issue and filter by age
   const issuesWithReactions: Issue[] = [];
@@ -98,10 +98,10 @@ async function fetchTopIssue(): Promise<Issue | null> {
   for (const issue of issues) {
     const issueAge = now.getTime() - new Date(issue.created_at).getTime();
 
-    if (issueAge < minAgeMs) {
-      console.log(`⏳ Skipping issue #${issue.number}: too new (${Math.round(issueAge / 3600000)}h old, need ${config.minIssueAgeHours}h)`);
-      continue;
-    }
+    // if (issueAge < minAgeMs) {
+    //   console.log(`⏳ Skipping issue #${issue.number}: too new (${Math.round(issueAge / 3600000)}h old, need ${config.minIssueAgeHours}h)`);
+    //   continue;
+    // }
 
     const { data: reactions } = await octokit.reactions.listForIssue({
       owner: config.owner,
@@ -244,14 +244,14 @@ async function createPullRequest(
 
 async function createTrackingIssue(): Promise<void> {
   const now = new Date().toISOString();
-  await octokit.issues.create({
-    owner: config.owner,
-    repo: config.repo,
-    title: `[CrowdCode] No eligible issues for ${new Date().toDateString()}`,
-    body: `🤖 **CrowdCode Automated Report**\n\n**Date**: ${now}\n\n**Status**: No eligible issues found\n\n**Criteria**:\n- Label: \`${config.issueLabel}\`\n- Minimum reactions: ${config.minReactions} 👍\n- Minimum age: ${config.minIssueAgeHours} hours\n\n**Action**: No implementation performed today.\n\n---\n\nTo submit an issue for CrowdCode:\n1. Create an issue with clear requirements\n2. Add the \`${config.issueLabel}\` label\n3. Wait ${config.minIssueAgeHours} hours\n4. Get community votes (👍 reactions)`,
-    labels: ["crowdcode", "status-report"],
-  });
-  console.log("📝 Created tracking issue for no eligible issues");
+  // await octokit.issues.create({
+  //   owner: config.owner,
+  //   repo: config.repo,
+  //   title: `[CrowdCode] No eligible issues for ${new Date().toDateString()}`,
+  //   body: `🤖 **CrowdCode Automated Report**\n\n**Date**: ${now}\n\n**Status**: No eligible issues found\n\n**Criteria**:\n- Label: \`${config.issueLabel}\`\n- Minimum reactions: ${config.minReactions} 👍\n- Minimum age: ${config.minIssueAgeHours} hours\n\n**Action**: No implementation performed today.\n\n---\n\nTo submit an issue for CrowdCode:\n1. Create an issue with clear requirements\n2. Add the \`${config.issueLabel}\` label\n3. Wait ${config.minIssueAgeHours} hours\n4. Get community votes (👍 reactions)`,
+  //   labels: ["crowdcode", "status-report"],
+  // });
+  // console.log("📝 Created tracking issue for no eligible issues");
 }
 
 // ============================================================================
@@ -337,7 +337,6 @@ Please proceed with the implementation now.`;
     console.log("─".repeat(60));
 
     const claudeProcess = Bun.spawn([
-        "agency", 
         "claude", "--allowedTools", "Edit,Write",
          "--print", prompt], {
       cwd: workspaceDir,
