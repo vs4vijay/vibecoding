@@ -1,0 +1,12 @@
+[package]
+name = "keyspace"
+version = "0.1.0"
+edition = "2021"
+description = "SSH vanity key generation tool"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+ssh-key = { version = "0.6", features = ["std", "crypto"] }
+rand = "0.8"
+anyhow = "1.0"
+dirs = "5.0"
