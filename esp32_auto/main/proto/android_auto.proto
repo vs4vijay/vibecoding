@@ -1,0 +1,73 @@
+syntax = "proto2";
+option optimize_for = LITE_RUNTIME;
+
+// WiFi Start Request message
+message WifiStartRequest {
+    required string ip_address = 1;
+    required int32 port = 2;
+}
+
+// WiFi Security Mode enumeration
+enum SecurityMode {
+    UNKNOWN_SECURITY_MODE = 0;
+    OPEN = 1;
+    WEP_64 = 2;
+    WEP_128 = 3;
+    WPA_PERSONAL = 4;
+    WPA2_PERSONAL = 8;
+    WPA_WPA2_PERSONAL = 12;
+    WPA_ENTERPRISE = 20;
+    WPA2_ENTERPRISE = 24;
+    WPA_WPA2_ENTERPRISE = 28;
+}
+
+// Access Point Type enumeration
+enum AccessPointType {
+    STATIC = 0;
+    DYNAMIC = 1;
+}
+
+// WiFi Info Response message
+message WifiInfoResponse {
+    required string ssid = 1;
+    required string key = 2;
+    required string bssid = 3;
+    required SecurityMode security_mode = 4;
+    required AccessPointType access_point_type = 5;
+}
+
+// Connection Status enumeration
+enum ConnectionStatus {
+    DISCONNECTED = 0;
+    CONNECTING = 1;
+    CONNECTED = 2;
+    ERROR = 3;
+}
+
+// Device Info message
+message DeviceInfo {
+    required string manufacturer = 1;
+    required string model = 2;
+    required string description = 3;
+    required string version = 4;
+    required string serial = 5;
+}
+
+// Protocol message wrapper
+message AndroidAutoMessage {
+    enum MessageType {
+        UNKNOWN = 0;
+        WIFI_START_REQUEST = 1;
+        WIFI_INFO_RESPONSE = 2;
+        DEVICE_INFO = 3;
+        CONNECTION_STATUS = 4;
+        HEARTBEAT = 5;
+    }
+    
+    required MessageType type = 1;
+    optional WifiStartRequest wifi_start_request = 2;
+    optional WifiInfoResponse wifi_info_response = 3;
+    optional DeviceInfo device_info = 4;
+    optional ConnectionStatus connection_status = 5;
+    optional uint64 timestamp = 6;
+}
