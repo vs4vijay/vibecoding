@@ -1,0 +1,77 @@
+{
+  "wifi": {
+    "ssid": "YOUR_WIFI_SSID",
+    "password": "YOUR_WIFI_PASSWORD"
+  },
+  "location": {
+    "latitude": 37.7749,
+    "longitude": -122.4194,
+    "name": "San Francisco, CA"
+  },
+  "modules": {
+    "satelliteImageClock": {
+      "enabled": true,
+      "updateInterval": 3600000,
+      "apiKey": "YOUR_SATELLITE_API_KEY"
+    },
+    "paxCounter": {
+      "enabled": true,
+      "updateInterval": 60000
+    },
+    "planesNearby": {
+      "enabled": true,
+      "updateInterval": 30000,
+      "apiKey": "YOUR_PLANES_API_KEY"
+    },
+    "weather": {
+      "enabled": true,
+      "updateInterval": 1800000,
+      "apiKey": "YOUR_OPENWEATHERMAP_API_KEY"
+    },
+    "airQuality": {
+      "enabled": true,
+      "updateInterval": 3600000,
+      "apiKey": "YOUR_WAQI_API_KEY"
+    },
+    "traffic": {
+      "enabled": true,
+      "updateInterval": 300000,
+      "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+    },
+    "news": {
+      "enabled": true,
+      "updateInterval": 3600000,
+      "apiKey": "YOUR_NEWSAPI_KEY"
+    },
+    "soundAlerts": {
+      "enabled": true,
+      "buzzerPin": 25,
+      "thresholds": {
+        "planeDistanceKm": 5.0,
+        "weatherSeverity": 3,
+        "aqiThreshold": 150
+      }
+    },
+    "calendar": {
+      "enabled": true,
+      "updateInterval": 3600000,
+      "apiKey": "YOUR_GOOGLE_CALENDAR_API_KEY"
+    },
+    "astronomicalEvents": {
+      "enabled": true,
+      "updateInterval": 86400000,
+      "apiKey": "YOUR_ASTRONOMY_API_KEY"
+    }
+  },
+  "display": {
+    "width": 240,
+    "height": 240,
+    "rotation": 0,
+    "pins": {
+      "cs": 5,
+      "rst": 17,
+      "dc": 16
+    },
+    "timeFormat24h": true
+  }
+}

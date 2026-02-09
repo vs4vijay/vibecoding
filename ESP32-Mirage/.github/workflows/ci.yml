@@ -1,0 +1,152 @@
+---
+name: CI Build
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "include/**"
+      - "platformio.ini"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build_all_boards:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # NOTE: When adding a new board, update this list in all three workflow files:
+        # - pr-gate.yml
+        # - ci.yml  
+        # - release.yml
+        board:
+          - esp32dev
+          - lilygo-t-display
+          - esp32-geek
+          - m5stack-core-esp32
+          - m5stack-cores3
+          - m5stack-cardputer
+          - m5stick-c-plus
+          - m5stick-c-plus2
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio-${{ matrix.board }}-${{ hashFiles('**/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-${{ matrix.board }}-
+            ${{ runner.os }}-pio-
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO Core
+        run: pip install -U platformio
+
+      - name: Build Firmware for ${{ matrix.board }}
+        run: |
+          set -x
+          pio run -e ${{ matrix.board }}
+
+      - name: List build artifacts
+        if: always()
+        continue-on-error: true
+        run: |
+          set -x
+          pwd
+          ls -lah .pio/build/${{ matrix.board }}/
+          tree .pio/build/${{ matrix.board }}/ || true
+
+      - name: Get version info
+        id: version
+        run: |
+          set -x
+          
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            version=${{ github.ref_name }}
+          else
+            version="${GITHUB_SHA::7}"
+          fi
+          
+          echo "version=${version}" >> $GITHUB_OUTPUT
+
+      - name: Rename firmware with version
+        run: |
+          set -x
+          cp .pio/build/${{ matrix.board }}/firmware.bin \
+             ESP32-Mirage-${{ steps.version.outputs.version }}-${{ matrix.board }}.bin
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.board }}
+          path: ESP32-Mirage-${{ steps.version.outputs.version }}-${{ matrix.board }}.bin
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  validate_and_summary:
+    runs-on: ubuntu-latest
+    needs: build_all_boards
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List all firmware files
+        run: |
+          set -x
+          pwd
+          ls -lah artifacts/
+          tree artifacts/ || find artifacts -type f
+
+      - name: Validate and generate summary
+        run: |
+          set -x
+          echo "## 🎉 Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Board | Status | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|------|" >> $GITHUB_STEP_SUMMARY
+          
+          boards=("esp32dev" "lilygo-t-display" "esp32-geek" "m5stack-core-esp32" "m5stack-cores3" "m5stack-cardputer" "m5stick-c-plus" "m5stick-c-plus2")
+          
+          all_valid=true
+          for board in "${boards[@]}"; do
+            firmware_file=$(find artifacts/firmware-${board}/ -name "*.bin" | head -1)
+            if [ -f "$firmware_file" ]; then
+              size=$(stat -f%z "$firmware_file" 2>/dev/null || stat -c%s "$firmware_file")
+              size_kb=$((size / 1024))
+              # Validate firmware is larger than 100KB
+              if [ "$size" -lt 102400 ]; then
+                echo "| ${board} | ❌ Too small | ${size_kb} KB |" >> $GITHUB_STEP_SUMMARY
+                all_valid=false
+              else
+                echo "| ${board} | ✅ Success | ${size_kb} KB |" >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              echo "| ${board} | ❌ Missing | - |" >> $GITHUB_STEP_SUMMARY
+              all_valid=false
+            fi
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$all_valid" = false ]; then
+            echo "❌ Some builds failed validation" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "✅ All builds validated successfully" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,117 @@
+---
+name: PR Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "include/**"
+      - "platformio.ini"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build_all_boards:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # NOTE: When adding a new board, update this list in all three workflow files:
+        # - pr-gate.yml
+        # - ci.yml  
+        # - release.yml
+        board:
+          # - esp32dev
+          - lilygo-t-display
+          # - esp32-geek
+          # - m5stack-core-esp32
+          # - m5stack-cores3
+          - m5stack-cardputer
+          # - m5stick-c-plus
+          # - m5stick-c-plus2
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio-${{ matrix.board }}-${{ hashFiles('**/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-${{ matrix.board }}-
+            ${{ runner.os }}-pio-
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO Core
+        run: pip install -U platformio
+
+      - name: Build Firmware for ${{ matrix.board }}
+        run: |
+          set -x
+          pio run -e ${{ matrix.board }}
+
+      - name: List build artifacts
+        if: always()
+        continue-on-error: true
+        run: |
+          set -x
+          pwd
+          ls -lah .pio/build/${{ matrix.board }}/
+          tree .pio/build/${{ matrix.board }}/ || true
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.board }}
+          path: .pio/build/${{ matrix.board }}/firmware.bin
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  validate:
+    runs-on: ubuntu-latest
+    needs: build_all_boards
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List all firmware files
+        run: |
+          set -x
+          pwd
+          ls -lah artifacts/
+          tree artifacts/ || find artifacts -type f
+
+      - name: Validate artifacts
+        run: |
+          set -x
+          # Check that all expected board artifacts are present
+          boards=("esp32dev" "lilygo-t-display" "esp32-geek" "m5stack-core-esp32" "m5stack-cores3" "m5stack-cardputer" "m5stick-c-plus" "m5stick-c-plus2")
+          
+          for board in "${boards[@]}"; do
+            if [ -f "artifacts/firmware-${board}/firmware.bin" ]; then
+              size=$(stat -f%z "artifacts/firmware-${board}/firmware.bin" 2>/dev/null || stat -c%s "artifacts/firmware-${board}/firmware.bin")
+              echo "✓ ${board}: ${size} bytes"
+              # Validate firmware is larger than 100KB (typical minimum)
+              if [ "$size" -lt 102400 ]; then
+                echo "✗ ERROR: ${board} firmware is too small (${size} bytes)"
+                exit 1
+              fi
+            else
+              echo "✗ ERROR: Missing firmware for ${board}"
+              exit 1
+            fi
+          done
+          
+          echo "✓ All firmware builds validated successfully"
