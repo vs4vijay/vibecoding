@@ -1,0 +1,2 @@
+# Syncthing binaries are downloaded during build
+# Run ./scripts/download-syncthing.sh to download binaries
