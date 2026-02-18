@@ -60,3 +60,5 @@ transformers_cache/
 
 # uv
 .uv/
+
+tmpclaude-*/
