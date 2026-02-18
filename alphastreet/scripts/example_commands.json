@@ -1,0 +1,20 @@
+{
+  "commands": [
+    {
+      "command": "start",
+      "description": "Start the bot and get a welcome message"
+    },
+    {
+      "command": "help",
+      "description": "Display help information"
+    },
+    {
+      "command": "settings",
+      "description": "View and modify your settings"
+    },
+    {
+      "command": "status",
+      "description": "Check bot status"
+    }
+  ]
+}

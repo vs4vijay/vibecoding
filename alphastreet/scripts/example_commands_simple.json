@@ -1,0 +1,7 @@
+{
+  "start": "Start the bot",
+  "help": "Show help",
+  "settings": "View settings",
+  "about": "About this bot",
+  "cancel": "Cancel current operation"
+}
