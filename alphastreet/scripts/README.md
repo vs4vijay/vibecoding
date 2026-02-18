@@ -8,7 +8,7 @@ Update your Telegram bot's command list programmatically. Works with any Telegra
 
 ### Features
 
-- ✅ Standalone - no dependencies on alphastreet project
+- ✅ Standalone - no dependencies on marketpulse project
 - ✅ Works with any Telegram bot token
 - ✅ Multiple input methods (CLI, JSON file, environment variable, presets)
 - ✅ Preset command lists for common bot types
@@ -50,8 +50,8 @@ python telegram_update_commands.py --token "token" --commands example_commands.j
 # List available presets
 python telegram_update_commands.py --list-presets
 
-# Use alphastreet preset
-python telegram_update_commands.py --token "token" --preset alphastreet
+# Use marketpulse preset
+python telegram_update_commands.py --token "token" --preset marketpulse
 
 # Use basic preset
 python telegram_update_commands.py --token "token" --preset basic
@@ -110,7 +110,7 @@ Two supported formats:
 - `/settings` - View settings
 - `/cancel` - Cancel current operation
 
-**alphastreet** - Stock sentiment analysis bot:
+**marketpulse** - Stock sentiment analysis bot:
 - `/start` - Register and get started
 - `/help` - Show help message
 - `/analyze` - Run sentiment analysis
@@ -127,7 +127,7 @@ Two supported formats:
 ```bash
 cd scripts
 export TELEGRAM_BOT_TOKEN="your_token_here"
-python telegram_update_commands.py --preset alphastreet
+python telegram_update_commands.py --preset marketpulse
 ```
 
 #### For Custom Bot
@@ -183,7 +183,7 @@ python telegram_update_commands.py --add "start:Get started"
   env:
     TELEGRAM_BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
   run: |
-    python scripts/telegram_update_commands.py --preset alphastreet
+    python scripts/telegram_update_commands.py --preset marketpulse
 ```
 
 ### Troubleshooting

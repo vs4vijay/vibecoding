@@ -36,13 +36,13 @@ python fetch_stock_symbols.py --manual-only
 Update stock symbols daily at 6 AM:
 
 ```cron
-0 6 * * * cd /path/to/alphastreet/scripts && python fetch_stock_symbols.py
+0 6 * * * cd /path/to/marketpulse/scripts && python fetch_stock_symbols.py
 ```
 
 Update weekly on Sunday at 8 AM:
 
 ```cron
-0 8 * * 0 cd /path/to/alphastreet/scripts && python fetch_stock_symbols.py
+0 8 * * 0 cd /path/to/marketpulse/scripts && python fetch_stock_symbols.py
 ```
 
 ## stock_symbols.json Format

@@ -175,7 +175,7 @@ Examples:
   python fetch_stock_symbols.py --manual-only
 
 Cron example (update daily at 6 AM):
-  0 6 * * * cd /path/to/alphastreet/scripts && python fetch_stock_symbols.py
+  0 6 * * * cd /path/to/marketpulse/scripts && python fetch_stock_symbols.py
         """
     )
 

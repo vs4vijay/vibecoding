@@ -10,7 +10,7 @@ logger = get_logger(__name__)
 def main():
     print("""
     ╔═══════════════════════════════════════╗
-    ║      AlphaStreet v0.1.0               ║
+    ║      MarketPulse v0.1.0               ║
     ║  Indian Stock Sentiment Analysis      ║
     ╚═══════════════════════════════════════╝
     """)
@@ -19,12 +19,12 @@ def main():
     logger.info("Database initialized")
 
     print("\nAvailable interfaces:")
-    print("1. Telegram Bot (alphastreet-bot)")
-    print("2. Terminal TUI (alphastreet-tui)")
+    print("1. Telegram Bot (marketpulse-bot)")
+    print("2. Terminal TUI (marketpulse-tui)")
     print("\nOr use this CLI:")
-    print("  alphastreet         - Show this menu")
-    print("  alphastreet-bot     - Start Telegram bot")
-    print("  alphastreet-tui     - Start Terminal UI")
+    print("  marketpulse         - Show this menu")
+    print("  marketpulse-bot     - Start Telegram bot")
+    print("  marketpulse-tui     - Start Terminal UI")
 
     print("\n" + "="*40)
     print(f"Configuration:")
@@ -44,7 +44,7 @@ def main():
             tui_main()
         else:
             print(f"\nUnknown command: {command}")
-            print("Use 'alphastreet-bot' or 'alphastreet-tui'")
+            print("Use 'marketpulse-bot' or 'marketpulse-tui'")
     else:
         print("\n💡 Choose an interface to get started!")
 

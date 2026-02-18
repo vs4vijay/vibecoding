@@ -83,7 +83,7 @@ class TelegramBot:
             db_user = repo.get_or_create_user(telegram_id, user.username)
 
         welcome_message = f"""
-👋 Welcome to AlphaStreet, {user.first_name}!
+ 👋 Welcome to MarketPulse, {user.first_name}!
 
 I analyze Indian stock market sentiment from multiple news sources and suggest stocks based on recent news.
 
@@ -107,7 +107,7 @@ Your account has been created! Use /analyze to get started.
             return
 
         help_text = """
-📊 AlphaStreet Bot Commands:
+📊 MarketPulse Bot Commands:
 
 /analyze - Run sentiment analysis now and get stock suggestions
 /recent - Get the most recent analysis (instant, no re-analysis)
@@ -399,7 +399,7 @@ Use the set commands to update your preferences:
             return
 
         status_text = f"""
-🤖 AlphaStreet Bot Status:
+🤖 MarketPulse Bot Status:
 
 ✅ Bot: Online
 📡 Sentiment Provider: {settings.sentiment_provider}

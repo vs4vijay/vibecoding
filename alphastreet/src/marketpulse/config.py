@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     )
 
     database_url: str = Field(
-        default="sqlite:///./data/alphastreet.db",
+        default="sqlite:///./data/marketpulse.db",
         description="Database connection URL"
     )
 
@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     )
     
     log_file: str = Field(
-        default="./data/alphastreet.log",
+        default="./data/marketpulse.log",
         description="Log file path"
     )
 

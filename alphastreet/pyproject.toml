@@ -1,5 +1,5 @@
 [project]
-name = "alphastreet"
+name = "marketpulse"
 version = "0.1.0"
 description = "Indian Stock Sentiment Analysis Bot with Telegram and TUI interfaces"
 readme = "README.md"
@@ -28,9 +28,9 @@ dependencies = [
 ]
 
 [project.scripts]
-alphastreet = "alphastreet.main:main"
-alphastreet-bot = "alphastreet.interfaces.telegram_bot:main"
-alphastreet-tui = "alphastreet.interfaces.tui:main"
+marketpulse = "marketpulse.main:main"
+marketpulse-bot = "marketpulse.interfaces.telegram_bot:main"
+marketpulse-tui = "marketpulse.interfaces.tui:main"
 
 [build-system]
 requires = ["uv_build>=0.8.6,<0.9.0"]

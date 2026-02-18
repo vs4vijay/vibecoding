@@ -103,7 +103,7 @@ DEFAULT_COMMANDS = {
         ("settings", "View settings"),
         ("cancel", "Cancel current operation"),
     ],
-    "alphastreet": [
+    "marketpulse": [
         ("start", "Register and get started"),
         ("help", "Show help message"),
         ("analyze", "Run sentiment analysis and get stock suggestions"),
@@ -140,7 +140,7 @@ Examples:
     --add "settings:View settings"
 
   # Use preset commands
-  python telegram_update_commands.py --token "token" --preset alphastreet
+  python telegram_update_commands.py --token "token" --preset marketpulse
 
   # Clear all commands
   python telegram_update_commands.py --token "token" --clear
@@ -229,11 +229,9 @@ JSON file format:
             cmd, desc = cmd_str.split(":", 1)
             commands.append((cmd.strip(), desc.strip()))
     else:
-        # Default: use alphastreet commands
-        print("[INFO] No commands specified, using 'alphastreet' preset")
-        print("      Use --help to see other options")
-        print()
-        commands = DEFAULT_COMMANDS["alphastreet"]
+        # Default: use marketpulse commands
+        print("[INFO] No commands specified, using 'marketpulse' preset")
+        commands = DEFAULT_COMMANDS["marketpulse"]
 
     # Run update
     asyncio.run(update_bot_commands(args.token, commands))

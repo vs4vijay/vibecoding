@@ -1,18 +1,18 @@
 # Quick Usage Guide
 
-## For AlphaStreet Project
+## For MarketPulse Project
 
-If you need to update the bot commands for AlphaStreet:
+If you need to update the bot commands for MarketPulse:
 
 ```bash
 cd scripts
 
 # Option 1: Use environment variable
 export TELEGRAM_BOT_TOKEN="your_token"
-python telegram_update_commands.py --preset alphastreet
+python telegram_update_commands.py --preset marketpulse
 
 # Option 2: Direct token
-python telegram_update_commands.py --token "your_token" --preset alphastreet
+python telegram_update_commands.py --token "your_token" --preset marketpulse
 ```
 
 ## For Other Projects

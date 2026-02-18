@@ -42,7 +42,7 @@ class StockSuggestionsTable(Static):
             )
 
 
-class AlphaStreetTUI(App):
+class MarketPulseTUI(App):
     CSS = """
     Screen {
         background: $surface;
@@ -116,7 +116,7 @@ class AlphaStreetTUI(App):
         yield Header()
 
         yield Container(
-            Static(f"AlphaStreet - Indian Stock Sentiment Analysis | {datetime.now().strftime('%Y-%m-%d %H:%M')}", id="status"),
+            Static(f"MarketPulse - Indian Stock Sentiment Analysis | {datetime.now().strftime('%Y-%m-%d %H:%M')}", id="status"),
             Horizontal(
                 Vertical(
                     Label("📊 Stock Suggestions"),
@@ -144,7 +144,7 @@ class AlphaStreetTUI(App):
     async def on_mount(self):
         init_db()
         log = self.query_one(Log)
-        log.write_line("✅ AlphaStreet TUI started")
+        log.write_line("✅ MarketPulse TUI started")
         log.write_line(f"📡 Sentiment Provider: {settings.sentiment_provider}")
         log.write_line(f"🗃️ Database: {settings.database_url}")
         log.write_line(f"📰 Active Sources: {len([s for s in self.news_sources if s.is_configured()])}")
@@ -266,7 +266,7 @@ class AlphaStreetTUI(App):
 
 
 def run_tui():
-    app = AlphaStreetTUI()
+    app = MarketPulseTUI()
     app.run()
 
 

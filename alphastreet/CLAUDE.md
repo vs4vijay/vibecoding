@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AlphaStreet is an Indian stock sentiment analysis bot that fetches news from multiple sources, performs sentiment analysis using FinBERT or LLM APIs, and suggests stocks based on positive sentiment. It provides both a Telegram bot interface and a Terminal UI (TUI).
+MarketPulse is an Indian stock sentiment analysis bot that fetches news from multiple sources, performs sentiment analysis using FinBERT or LLM APIs, and suggests stocks based on positive sentiment. It provides both a Telegram bot interface and a Terminal UI (TUI).
 
 ## Key Commands
 
@@ -14,40 +14,40 @@ AlphaStreet is an Indian stock sentiment analysis bot that fetches news from mul
 uv sync
 
 # Run Telegram bot
-uv run alphastreet-bot
+uv run marketpulse-bot
 
 # Run Terminal UI
-uv run alphastreet-tui
+uv run marketpulse-tui
 
 # Run main CLI
-uv run alphastreet
+uv run marketpulse
 ```
 
 ### Database
 ```bash
 # Database is auto-initialized on first run
-# Location: ./data/alphastreet.db (SQLite)
-# To reset: rm -f data/alphastreet.db
+# Location: ./data/marketpulse.db (SQLite)
+# To reset: rm -f data/marketpulse.db
 ```
 
 ## Architecture
 
 ### Multi-Layer Design
 
-1. **Data Layer** (`src/alphastreet/data/`)
+1. **Data Layer** (`src/marketpulse/data/`)
    - `models.py`: SQLAlchemy ORM models (User, NewsArticle, SentimentAnalysis, StockSuggestion)
    - `database.py`: DB connection management with context manager
    - `repository.py`: Data access layer - **ALL database operations go through Repository**
    - Design is **database-agnostic** via SQLAlchemy - can switch from SQLite to PostgreSQL/MongoDB by changing DATABASE_URL
 
-2. **News Sources** (`src/alphastreet/sources/`)
+2. **News Sources** (`src/marketpulse/sources/`)
    - All sources inherit from `NewsSource` base class
    - Each source implements `fetch_news()` and `is_configured()`
    - **Always active** (no API key): RSSNewsSource, GNewsSource (free Google News scraper), WebScraperSource
    - **Optional** (needs API key): NewsAPISource
    - When adding new sources: inherit from `NewsSource`, implement async `fetch_news()`, add to interfaces
 
-3. **Core Logic** (`src/alphastreet/core/`)
+3. **Core Logic** (`src/marketpulse/core/`)
    - `sentiment.py`: Multi-provider sentiment analysis
      - **Local**: FinBERT (ProsusAI/finbert) - downloads ~500MB on first run
      - **LLM**: OpenAI GPT or Anthropic Claude (optional, costs money)
@@ -59,7 +59,7 @@ uv run alphastreet
      - Aggregates sentiment scores per stock across multiple articles
    - `scheduler.py`: Task scheduling (currently not integrated in bot - manual trigger only)
 
-4. **Interfaces** (`src/alphastreet/interfaces/`)
+4. **Interfaces** (`src/marketpulse/interfaces/`)
    - `telegram_bot.py`: Telegram bot with user access control
      - **Access Control**: Set ALLOWED_TELEGRAM_IDS in .env (comma-separated user IDs)
      - Leave empty to allow all users (logs warning)
@@ -174,12 +174,12 @@ Optional:
 
 #### ❌ WRONG - Will cause errors:
 ```
-Edit(file_path: "S:/GitHub/vibecoding/alphastreet/file.py", ...)
+Edit(file_path: "S:/GitHub/vibecoding/marketpulse/file.py", ...)
 ```
 
 #### ✅ CORRECT - Always works:
 ```
-Edit(file_path: "S:\GitHub\vibecoding\alphastreet\file.py", ...)
+Edit(file_path: "S:\GitHub\vibecoding\marketpulse\file.py", ...)
 ```
 
-**Note:** The codebase is on Windows at `S:\GitHub\vibecoding\alphastreet\`. Always use backslashes when editing files.
+**Note:** The codebase is on Windows at `S:\GitHub\vibecoding\marketpulse\`. Always use backslashes when editing files.
