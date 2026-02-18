@@ -1,4 +1,6 @@
 import re
+import json
+from pathlib import Path
 from typing import List, Dict, Set
 from datetime import datetime
 from collections import defaultdict
@@ -12,21 +14,69 @@ logger = get_logger(__name__)
 
 
 class StockSuggester:
-    # Known Indian companies - add more as needed
-    KNOWN_COMPANIES = {
-        "RELIANCE", "TCS", "INFOSYS", "INFY", "HDFCBANK", "HDFC", "ICICIBANK", "ICICI",
-        "BHARTIARTL", "BHARTI", "AIRTEL", "ITC", "SBIN", "SBI", "KOTAKBANK", "KOTAK",
-        "LT", "LARSENTOUBRO", "AXISBANK", "AXIS", "HINDUNILVR", "HUL", "MARUTI",
-        "ASIANPAINT", "ASIANPAINTS", "ASIAN", "BAJFINANCE", "BAJAJ", "TITAN",
-        "TATAMOTORS", "TATA", "TATASTEEL", "SUNPHARMA", "ULTRACEMCO", "ULTRATECHCEM",
-        "NESTLEIND", "NESTLE", "HCLTECH", "HCL", "WIPRO", "TECHM", "POWERGRID",
-        "NTPC", "ONGC", "TATACONSUMER", "ADANIPORTS", "ADANI", "ADANIGREEN",
-        "ADANIPOWER", "ADANITRANS", "JSWSTEEL", "HINDALCO", "INDUSINDBK", "INDUSIND",
-        "DIVISLAB", "BAJAJFINSV", "DRREDDY", "EICHERMOT", "EICHER", "CIPLA",
-        "GODREJCP", "GODREJ", "BPCL", "GRASIM", "COALINDIA", "SHREECEM", "VEDL",
-        "VEDANTA", "TATACHEM", "TATAPOWER", "ZOMATO", "PAYTM", "NYKAA", "DMART",
-        "DELHIVERY", "POLICYBZR", "POLICYBAZAAR", "STATEBANK",
-    }
+    def __init__(self):
+        self.sentiment_analyzer = SentimentAnalyzer()
+        self._load_stock_symbols()
+
+    def _load_stock_symbols(self):
+        """Load valid stock symbols from JSON file."""
+        # Look for stock_symbols.json in data directory
+        stock_file = Path(__file__).parent.parent.parent / "data" / "stock_symbols.json"
+
+        if not stock_file.exists():
+            logger.warning(f"Stock symbols file not found: {stock_file}")
+            logger.warning("Using fallback manual list. Run scripts/fetch_stock_symbols.py to generate.")
+            self._use_fallback_stocks()
+            return
+
+        try:
+            with open(stock_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            self.valid_stocks = set(data.get("stocks", {}).keys())
+            self.stock_names = {
+                symbol: info.get("name", symbol)
+                for symbol, info in data.get("stocks", {}).items()
+            }
+
+            # Create reverse mapping: company name variations -> ticker symbol
+            self.name_to_symbol = {}
+            for symbol, info in data.get("stocks", {}).items():
+                # Add the symbol itself
+                self.name_to_symbol[symbol] = symbol
+
+                # Add company name words
+                name = info.get("name", "")
+                if name:
+                    # Extract key words from company name
+                    words = re.findall(r'\b[A-Z][a-z]+\b', name)
+                    for word in words:
+                        if word.upper() not in ["LTD", "LIMITED", "COMPANY", "CORPORATION", "INDUSTRIES", "GROUP"]:
+                            self.name_to_symbol[word.upper()] = symbol
+
+            logger.info(f"Loaded {len(self.valid_stocks)} valid stock symbols from {stock_file}")
+            logger.info(f"Last updated: {data.get('last_updated', 'unknown')}")
+
+        except Exception as e:
+            logger.error(f"Error loading stock symbols: {e}")
+            self._use_fallback_stocks()
+
+    def _use_fallback_stocks(self):
+        """Fallback to a minimal manually curated list."""
+        self.valid_stocks = {
+            "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR",
+            "ITC", "SBIN", "BHARTIARTL", "KOTAKBANK", "LT", "AXISBANK",
+            "ASIANPAINT", "MARUTI", "TATAMOTORS", "SUNPHARMA", "ULTRACEMCO",
+            "TITAN", "BAJFINANCE", "NESTLEIND", "WIPRO", "HCLTECH", "TECHM",
+            "POWERGRID", "NTPC", "ONGC", "TATASTEEL", "ADANIPORTS", "JSWSTEEL",
+            "HINDALCO", "INDUSINDBK", "DIVISLAB", "BAJAJFINSV", "DRREDDY",
+            "EICHERMOT", "CIPLA", "GODREJCP", "BPCL", "GRASIM", "COALINDIA",
+            "SHREECEM", "VEDL", "TATACHEM", "TATAPOWER", "TATACONSUM",
+            "ZOMATO", "PAYTM", "NYKAA", "DMART", "POLICYBZR", "DELHIVERY",
+        }
+        self.stock_names = {symbol: symbol for symbol in self.valid_stocks}
+        self.name_to_symbol = {symbol: symbol for symbol in self.valid_stocks}
+        logger.info(f"Using fallback list with {len(self.valid_stocks)} stocks")
 
     # Patterns to extract stock mentions with better context
     STOCK_PATTERNS = [
@@ -192,7 +242,9 @@ class StockSuggester:
             return top_suggestions
 
     def extract_stock_mentions(self, text: str) -> Set[str]:
+        """Extract stock mentions and validate against known ticker symbols."""
         mentioned_stocks = set()
+        potential_matches = set()
 
         # Extract using patterns
         for pattern in self.STOCK_PATTERNS:
@@ -216,14 +268,26 @@ class StockSuggester:
                 if len(stock) > 20:
                     continue
 
-                # Accept known companies
-                if stock in self.KNOWN_COMPANIES:
-                    mentioned_stocks.add(stock)
-                    continue
+                potential_matches.add(stock)
 
-                # Accept if appears with stock-related context in original text
-                stock_context_pattern = rf"\b{re.escape(stock)}\b.*?\b(?:stock|share|equity|Ltd|Limited|scrip)\b"
-                if re.search(stock_context_pattern, text, re.IGNORECASE):
+        # Validate against known symbols
+        for stock in potential_matches:
+            # Direct match with valid ticker
+            if stock in self.valid_stocks:
+                mentioned_stocks.add(stock)
+                continue
+
+            # Try to map company name to ticker
+            if stock in self.name_to_symbol:
+                ticker = self.name_to_symbol[stock]
+                mentioned_stocks.add(ticker)
+                continue
+
+            # Check if it appears with stock-related context
+            stock_context_pattern = rf"\b{re.escape(stock)}\b.*?\b(?:stock|share|equity|Ltd|Limited|scrip)\b"
+            if re.search(stock_context_pattern, text, re.IGNORECASE):
+                # Still validate it's a known symbol
+                if stock in self.valid_stocks:
                     mentioned_stocks.add(stock)
 
         return mentioned_stocks
