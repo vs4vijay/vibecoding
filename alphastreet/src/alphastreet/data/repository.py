@@ -139,3 +139,36 @@ class Repository:
                 StockSuggestion.avg_sentiment_score >= min_score
             )
         ).order_by(desc(StockSuggestion.avg_sentiment_score)).limit(limit).all()
+
+    def get_recent_suggestions(
+        self,
+        hours: int = 24,
+        limit: int = 10
+    ) -> List[StockSuggestion]:
+        """Get the most recent stock suggestions within the specified hours."""
+        since_time = datetime.utcnow() - timedelta(hours=hours)
+
+        return self.session.query(StockSuggestion).filter(
+            StockSuggestion.created_at >= since_time
+        ).order_by(desc(StockSuggestion.created_at)).limit(limit).all()
+
+    def get_latest_analysis_batch(self) -> List[StockSuggestion]:
+        """Get the most recent complete analysis batch (all suggestions from the same run)."""
+        # Get the most recent suggestion's timestamp
+        latest = self.session.query(StockSuggestion).order_by(
+            desc(StockSuggestion.created_at)
+        ).first()
+
+        if not latest:
+            return []
+
+        # Get all suggestions created within 1 minute of the latest (same batch)
+        batch_start = latest.created_at - timedelta(minutes=1)
+        batch_end = latest.created_at + timedelta(minutes=1)
+
+        return self.session.query(StockSuggestion).filter(
+            and_(
+                StockSuggestion.created_at >= batch_start,
+                StockSuggestion.created_at <= batch_end
+            )
+        ).order_by(desc(StockSuggestion.avg_sentiment_score)).all()

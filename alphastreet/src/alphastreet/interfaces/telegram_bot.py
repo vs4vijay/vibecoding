@@ -56,6 +56,7 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("start", self.start_command))
         self.application.add_handler(CommandHandler("help", self.help_command))
         self.application.add_handler(CommandHandler("analyze", self.analyze_command))
+        self.application.add_handler(CommandHandler("recent", self.recent_command))
         self.application.add_handler(CommandHandler("settings", self.settings_command))
         self.application.add_handler(CommandHandler("setfrequency", self.set_frequency_command))
         self.application.add_handler(CommandHandler("settime", self.set_time_command))
@@ -88,6 +89,7 @@ I analyze Indian stock market sentiment from multiple news sources and suggest s
 
 Available commands:
 /analyze - Run immediate analysis
+/recent - Get last analysis (instant)
 /settings - View your current settings
 /setfrequency <daily|twice_daily|hourly|weekly> - Set analysis frequency
 /settime <HH:MM> - Set analysis time (IST)
@@ -108,6 +110,7 @@ Your account has been created! Use /analyze to get started.
 📊 AlphaStreet Bot Commands:
 
 /analyze - Run sentiment analysis now and get stock suggestions
+/recent - Get the most recent analysis (instant, no re-analysis)
 /settings - View your current preferences
 /setfrequency <frequency> - Set how often to receive updates
   • daily - Once per day (default)
@@ -120,6 +123,7 @@ Your account has been created! Use /analyze to get started.
 
 The bot analyzes news from:
 • RSS feeds (MoneyControl, ET, Mint, BS)
+• Google News (free scraper)
 • NewsAPI (if configured)
 • Web scraping
 
@@ -203,6 +207,58 @@ Sentiment analysis powered by FinBERT (local) with optional LLM support.
         except Exception as e:
             logger.error(f"Error in analyze command: {e}", exc_info=True)
             await update.message.reply_text(f"❌ Error during analysis: {str(e)}")
+
+    async def recent_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        telegram_id = update.effective_user.id
+
+        if not self.is_user_allowed(telegram_id):
+            await update.message.reply_text("❌ Access Denied")
+            return
+
+        with get_db_session() as session:
+            repo = Repository(session)
+            recent_suggestions = repo.get_latest_analysis_batch()
+
+            if not recent_suggestions:
+                await update.message.reply_text(
+                    "No recent analysis found. Run /analyze to generate new stock suggestions."
+                )
+                return
+
+            # Get the timestamp of the analysis
+            analysis_time = recent_suggestions[0].created_at
+
+            # Build comprehensive single message
+            message = f"📈 *Recent Stock Analysis*\n"
+            message += f"⏰ Analyzed at: {analysis_time.strftime('%Y-%m-%d %H:%M IST')}\n"
+            message += f"📊 Found {len(recent_suggestions)} stocks\n"
+            message += "━━━━━━━━━━━━━━━━━━━━\n\n"
+
+            for i, suggestion in enumerate(recent_suggestions, 1):
+                score_emoji = "🟢" if suggestion.avg_sentiment_score > 0.7 else "🟡"
+
+                message += f"{i}. {score_emoji} *{suggestion.stock_symbol}*\n"
+                message += f"   Sentiment: {suggestion.avg_sentiment_score:.1%} | Articles: {suggestion.article_count}\n\n"
+
+                # Get article details from stored JSON
+                article_details = suggestion.article_details or {}
+                articles = article_details.get("articles", [])
+
+                if articles:
+                    message += "   *📰 Why Pick This:*\n"
+                    for idx, article in enumerate(articles[:3], 1):
+                        sentiment_text = "Positive" if article["sentiment_score"] > 0.6 else "Neutral"
+                        message += f"   • {sentiment_text} ({article['sentiment_score']:.1%})\n"
+                        message += f"     _{article['title'][:80]}{'...' if len(article['title']) > 80 else ''}_\n"
+                        message += f"     {article['source']} | [Link]({article['url']})\n"
+
+                message += "\n"
+
+        await update.message.reply_text(
+            message,
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
 
     async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         telegram_id = update.effective_user.id

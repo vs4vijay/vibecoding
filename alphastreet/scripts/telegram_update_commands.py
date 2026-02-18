@@ -107,6 +107,7 @@ DEFAULT_COMMANDS = {
         ("start", "Register and get started"),
         ("help", "Show help message"),
         ("analyze", "Run sentiment analysis and get stock suggestions"),
+        ("recent", "Get the most recent analysis instantly"),
         ("settings", "View your current preferences"),
         ("setfrequency", "Set analysis frequency (daily/twice_daily/hourly/weekly)"),
         ("settime", "Set analysis time in IST (HH:MM format)"),

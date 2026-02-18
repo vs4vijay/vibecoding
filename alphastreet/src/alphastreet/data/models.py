@@ -67,15 +67,16 @@ class StockSuggestion(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     stock_symbol: Mapped[str] = mapped_column(String(50), index=True)
     stock_name: Mapped[str] = mapped_column(String(200))
-    
+
     avg_sentiment_score: Mapped[float] = mapped_column(Float, index=True)
     article_count: Mapped[int] = mapped_column(Integer)
-    
+
     is_unlisted: Mapped[bool] = mapped_column(Boolean, default=False)
     sector: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    
+
     reasoning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     related_news_ids: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    
+    article_details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
     suggested_for_date: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

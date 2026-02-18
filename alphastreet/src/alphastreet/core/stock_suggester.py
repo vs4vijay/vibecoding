@@ -182,6 +182,7 @@ class StockSuggester:
                         avg_sentiment_score=suggestion["avg_sentiment"],
                         article_count=suggestion["article_count"],
                         related_news_ids=",".join(map(str, suggestion["related_articles"])),
+                        article_details={"articles": suggestion.get("article_details", [])},
                         suggested_for_date=datetime.utcnow()
                     )
                 except Exception as e:
