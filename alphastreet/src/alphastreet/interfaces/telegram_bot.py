@@ -173,40 +173,31 @@ Sentiment analysis powered by FinBERT (local) with optional LLM support.
                 )
                 return
 
-            # Send summary first
-            summary = f"📈 Top {len(suggestions)} Stock Suggestions:\n\n"
-            for i, suggestion in enumerate(suggestions, 1):
-                score_emoji = "🟢" if suggestion["avg_sentiment"] > 0.7 else "🟡"
-                summary += f"{i}. {score_emoji} *{suggestion['stock_symbol']}* - {suggestion['avg_sentiment']:.1%} ({suggestion['article_count']} articles)\n"
+            # Build comprehensive single message
+            message = f"📈 *Top {len(suggestions)} Stock Suggestions*\n"
+            message += f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M IST')}\n"
+            message += "━━━━━━━━━━━━━━━━━━━━\n\n"
 
-            await update.message.reply_text(summary, parse_mode="Markdown")
-
-            # Send detailed analysis for each stock
             for i, suggestion in enumerate(suggestions, 1):
                 score_emoji = "🟢" if suggestion["avg_sentiment"] > 0.7 else "🟡"
 
-                detail_msg = f"{score_emoji} *{suggestion['stock_symbol']}*\n"
-                detail_msg += f"Average Sentiment: {suggestion['avg_sentiment']:.1%}\n"
-                detail_msg += f"Mentioned in {suggestion['article_count']} articles\n\n"
-                detail_msg += "*📰 Why Pick This Stock:*\n"
+                message += f"{i}. {score_emoji} *{suggestion['stock_symbol']}*\n"
+                message += f"   Sentiment: {suggestion['avg_sentiment']:.1%} | Articles: {suggestion['article_count']}\n\n"
+                message += "   *📰 Why Pick This:*\n"
 
                 # Show top 3 articles as reasons
-                for idx, article in enumerate(suggestion.get("article_details", []), 1):
+                for idx, article in enumerate(suggestion.get("article_details", [])[:3], 1):
                     sentiment_text = "Positive" if article["sentiment_score"] > 0.6 else "Neutral"
-                    detail_msg += f"\n{idx}. {sentiment_text} ({article['sentiment_score']:.1%})\n"
-                    detail_msg += f"   _{article['title'][:100]}{'...' if len(article['title']) > 100 else ''}_\n"
-                    detail_msg += f"   Source: {article['source']}\n"
-                    detail_msg += f"   [Read more]({article['url']})\n"
+                    message += f"   • {sentiment_text} ({article['sentiment_score']:.1%})\n"
+                    message += f"     _{article['title'][:80]}{'...' if len(article['title']) > 80 else ''}_\n"
+                    message += f"     {article['source']} | [Link]({article['url']})\n"
 
-                await update.message.reply_text(
-                    detail_msg,
-                    parse_mode="Markdown",
-                    disable_web_page_preview=True
-                )
+                message += "\n"
 
-            # Final timestamp
             await update.message.reply_text(
-                f"⏰ Analysis completed at {datetime.now().strftime('%Y-%m-%d %H:%M IST')}"
+                message,
+                parse_mode="Markdown",
+                disable_web_page_preview=True
             )
 
         except Exception as e:
