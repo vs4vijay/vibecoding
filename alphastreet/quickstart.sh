@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "╔═══════════════════════════════════════╗"
-echo "║   AlphaStreet Quick Start Script     ║"
+echo "║   MarketPulse Quick Start Script     ║"
 echo "╚═══════════════════════════════════════╝"
 echo ""
 
@@ -25,7 +25,7 @@ echo ""
 
 # Initialize database
 echo "Initializing database..."
-uv run python -c "from alphastreet.data import init_db; init_db(); print('✅ Database initialized')"
+uv run python -c "from marketpulse.data import init_db; init_db(); print('✅ Database initialized')"
 echo ""
 
 echo "╔═══════════════════════════════════════╗"
@@ -34,6 +34,6 @@ echo "╚═══════════════════════�
 echo ""
 echo "Next steps:"
 echo "1. Edit .env file with your API keys"
-echo "2. Run: uv run alphastreet-tui  (for Terminal UI)"
-echo "3. Run: uv run alphastreet-bot  (for Telegram Bot)"
+echo "2. Run: uv run marketpulse-tui  (for Terminal UI)"
+echo "3. Run: uv run marketpulse-bot  (for Telegram Bot)"
 echo ""

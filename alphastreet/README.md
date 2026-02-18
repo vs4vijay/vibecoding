@@ -1,4 +1,4 @@
-# AlphaStreet
+# MarketPulse
 
 Indian Stock Sentiment Analysis Bot with Telegram and Terminal UI interfaces.
 
@@ -28,8 +28,8 @@ Indian Stock Sentiment Analysis Bot with Telegram and Terminal UI interfaces.
 ### Quick Start
 
 ```bash
-# Clone or navigate to the alphastreet directory
-cd alphastreet
+# Clone or navigate to the marketpulse directory
+cd marketpulse
 
 # Install dependencies using uv
 uv sync
@@ -45,7 +45,7 @@ Edit `.env` file with your settings:
 
 ```env
 # Database (SQLite by default)
-DATABASE_URL=sqlite:///./data/alphastreet.db
+DATABASE_URL=sqlite:///./data/marketpulse.db
 
 # Telegram Bot (Required for Telegram interface)
 TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
@@ -79,7 +79,7 @@ TIMEZONE=Asia/Kolkata
 Launch the interactive terminal interface:
 
 ```bash
-uv run alphastreet-tui
+uv run marketpulse-tui
 ```
 
 **Keyboard Shortcuts:**
@@ -93,7 +93,7 @@ uv run alphastreet-tui
 Start the Telegram bot:
 
 ```bash
-uv run alphastreet-bot
+uv run marketpulse-bot
 ```
 
 **Bot Commands:**
@@ -111,14 +111,14 @@ uv run alphastreet-bot
 Show available options:
 
 ```bash
-uv run alphastreet
+uv run marketpulse
 ```
 
 ## Architecture
 
 ```
-alphastreet/
-├── src/alphastreet/
+marketpulse/
+├── src/marketpulse/
 │   ├── config.py              # Configuration management
 │   ├── main.py                # Entry point
 │   ├── core/
@@ -219,7 +219,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 ### SQLite (Default)
 
 ```env
-DATABASE_URL=sqlite:///./data/alphastreet.db
+DATABASE_URL=sqlite:///./data/marketpulse.db
 ```
 
 Perfect for single-instance deployment.
@@ -227,7 +227,7 @@ Perfect for single-instance deployment.
 ### PostgreSQL
 
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/alphastreet
+DATABASE_URL=postgresql://user:password@localhost:5432/marketpulse
 ```
 
 Better for production with multiple instances.
@@ -235,7 +235,7 @@ Better for production with multiple instances.
 ### MongoDB
 
 ```env
-DATABASE_URL=mongodb://localhost:27017/alphastreet
+DATABASE_URL=mongodb://localhost:27017/marketpulse
 ```
 
 Flexible schema for varying data structures.
@@ -258,7 +258,7 @@ Flexible schema for varying data structures.
 
 - For local models: Check disk space (~500MB needed)
 - For LLM APIs: Verify API keys and credits
-- Check logs in `data/alphastreet.log`
+- Check logs in `data/marketpulse.log`
 
 ### Database Errors
 
