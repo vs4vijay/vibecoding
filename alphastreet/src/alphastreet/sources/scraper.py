@@ -12,9 +12,9 @@ class WebScraperSource(NewsSource):
     SCRAPE_TARGETS = [
         {
             "url": "https://www.moneycontrol.com/news/business/stocks/",
-            "title_selector": "h2 a",
+            "title_selector": "li h2 a, article h2 a, .news_title a",
             "link_attr": "href",
-            "date_selector": "span.article-time",
+            "base_url": "https://www.moneycontrol.com",
         },
     ]
 
@@ -22,7 +22,9 @@ class WebScraperSource(NewsSource):
         super().__init__("Web Scraper")
 
     def is_configured(self) -> bool:
-        return True
+        # Disabled: MoneyControl blocks scraping with 403 Forbidden
+        # TODO: Find alternative sources or use API-based approach
+        return False
 
     async def fetch_news(
         self,
@@ -32,37 +34,66 @@ class WebScraperSource(NewsSource):
     ) -> List[NewsArticle]:
         articles = []
 
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=headers) as client:
             for target in self.SCRAPE_TARGETS:
                 try:
+                    logger.info(f"Scraping {target['url']}...")
                     response = await client.get(target["url"])
                     response.raise_for_status()
 
                     soup = BeautifulSoup(response.text, "html.parser")
+
+                    # Try multiple selectors
                     title_elements = soup.select(target["title_selector"])
+                    logger.debug(f"Found {len(title_elements)} elements with selector: {target['title_selector']}")
+
+                    if not title_elements:
+                        # Try finding any article links as fallback
+                        title_elements = soup.find_all('a', href=True, string=True)
+                        logger.debug(f"Fallback: Found {len(title_elements)} article links")
 
                     for elem in title_elements[:limit]:
                         try:
                             title = elem.get_text(strip=True)
+
+                            # Skip if title is too short or empty
+                            if not title or len(title) < 10:
+                                continue
+
                             link = elem.get(target["link_attr"], "")
 
-                            if not link.startswith("http"):
-                                base_url = f"{response.url.scheme}://{response.url.host}"
-                                link = base_url + link
+                            # Build full URL
+                            if link and not link.startswith("http"):
+                                if link.startswith("/"):
+                                    link = target.get("base_url", "") + link
+                                else:
+                                    base_url = f"{response.url.scheme}://{response.url.host}"
+                                    link = base_url + "/" + link
+
+                            # Skip if no valid link
+                            if not link or not link.startswith("http"):
+                                continue
 
                             article = NewsArticle(
                                 title=title,
                                 url=link,
-                                source=self.source_name,
+                                source="MoneyControl",
                                 published_at=datetime.utcnow(),
                             )
                             articles.append(article)
 
                             if len(articles) >= limit:
-                                return articles
+                                break
+
                         except Exception as e:
-                            logger.warning(f"Error parsing scraped element: {e}")
+                            logger.debug(f"Error parsing scraped element: {e}")
                             continue
+
+                    logger.info(f"Successfully scraped {len(articles)} articles from {target['url']}")
 
                 except Exception as e:
                     logger.error(f"Error scraping {target['url']}: {e}")

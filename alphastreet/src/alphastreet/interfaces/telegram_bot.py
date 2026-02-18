@@ -145,25 +145,45 @@ Sentiment analysis powered by FinBERT (local) with optional LLM support.
             min_score = user.min_sentiment_score
             max_suggestions = user.max_suggestions
 
-        await update.message.reply_text("🔍 Starting analysis... This may take a minute.")
+        # Immediately show which sources are being used
+        configured_sources = [s for s in self.news_sources if s.is_configured()]
+        source_list = "\n".join([f"  • {s.source_name}" for s in configured_sources])
+
+        await update.message.reply_text(
+            f"🔍 *Starting Analysis*\n\n"
+            f"*Fetching from {len(configured_sources)} sources:*\n"
+            f"{source_list}\n\n"
+            f"_This may take 1-2 minutes..._",
+            parse_mode="Markdown"
+        )
 
         try:
             all_articles = []
-            for source in self.news_sources:
-                if source.is_configured():
-                    articles = await source.fetch_news(
-                        query="indian stocks market NSE BSE",
-                        days=settings.analysis_lookback_days,
-                        limit=30
-                    )
-                    all_articles.extend(articles)
-                    logger.info(f"Fetched {len(articles)} from {source.source_name}")
+            source_results = []
+
+            for source in configured_sources:
+                articles = await source.fetch_news(
+                    query="indian stocks market NSE BSE",
+                    days=settings.analysis_lookback_days,
+                    limit=30
+                )
+                all_articles.extend(articles)
+                source_results.append(f"  • {source.source_name}: {len(articles)} articles")
+                logger.info(f"Fetched {len(articles)} from {source.source_name}")
 
             if not all_articles:
                 await update.message.reply_text("❌ No news articles found. Please try again later.")
                 return
 
-            await update.message.reply_text(f"📰 Analyzing {len(all_articles)} news articles...")
+            # Show per-source breakdown
+            results_text = "\n".join(source_results)
+            await update.message.reply_text(
+                f"📊 *Articles Fetched:*\n"
+                f"{results_text}\n\n"
+                f"*Total: {len(all_articles)} articles*\n\n"
+                f"_Now analyzing sentiment..._",
+                parse_mode="Markdown"
+            )
 
             suggestions = await self.suggester.generate_suggestions(
                 all_articles,

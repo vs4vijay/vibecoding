@@ -14,7 +14,7 @@ class GNewsSource(NewsSource):
     """
 
     def __init__(self):
-        super().__init__("Google News (Free)")
+        super().__init__("Google News")
 
     def is_configured(self) -> bool:
         """Always available - no API key needed"""

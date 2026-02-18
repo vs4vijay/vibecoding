@@ -15,6 +15,11 @@ logger = get_logger(__name__)
 
 class StockSuggester:
     def __init__(self):
+        # Initialize attributes first to prevent AttributeError
+        self.valid_stocks = set()
+        self.stock_names = {}
+        self.name_to_symbol = {}
+
         self.sentiment_analyzer = SentimentAnalyzer()
         self._load_stock_symbols()
 
