@@ -134,9 +134,12 @@ Sentiment analysis powered by FinBERT (local) with optional LLM support.
             await update.message.reply_text("❌ Access Denied")
             return
 
+        # Get user preferences before session closes
         with get_db_session() as session:
             repo = Repository(session)
             user = repo.get_or_create_user(telegram_id, update.effective_user.username)
+            min_score = user.min_sentiment_score
+            max_suggestions = user.max_suggestions
 
         await update.message.reply_text("🔍 Starting analysis... This may take a minute.")
 
@@ -160,8 +163,8 @@ Sentiment analysis powered by FinBERT (local) with optional LLM support.
 
             suggestions = await self.suggester.generate_suggestions(
                 all_articles,
-                min_score=user.min_sentiment_score,
-                max_suggestions=user.max_suggestions
+                min_score=min_score,
+                max_suggestions=max_suggestions
             )
 
             if not suggestions:
@@ -192,18 +195,24 @@ Sentiment analysis powered by FinBERT (local) with optional LLM support.
             await update.message.reply_text("❌ Access Denied")
             return
 
+        # Get user settings before session closes
         with get_db_session() as session:
             repo = Repository(session)
             user = repo.get_or_create_user(telegram_id, update.effective_user.username)
+            frequency = user.frequency
+            analysis_time = user.analysis_time
+            min_sentiment_score = user.min_sentiment_score
+            max_suggestions = user.max_suggestions
+            is_active = user.is_active
 
         settings_text = f"""
 ⚙️ Your Current Settings:
 
-📅 Frequency: {user.frequency}
-⏰ Analysis Time: {user.analysis_time} IST
-📊 Min Sentiment Score: {user.min_sentiment_score:.2f}
-🎯 Max Suggestions: {user.max_suggestions}
-✅ Status: {"Active" if user.is_active else "Inactive"}
+📅 Frequency: {frequency}
+⏰ Analysis Time: {analysis_time} IST
+📊 Min Sentiment Score: {min_sentiment_score:.2f}
+🎯 Max Suggestions: {max_suggestions}
+✅ Status: {"Active" if is_active else "Inactive"}
 
 Use the set commands to update your preferences:
 /setfrequency <frequency>

@@ -89,6 +89,7 @@ class StockSuggester:
 
         stock_sentiments = defaultdict(list)
         stock_articles = defaultdict(list)
+        stock_article_details = defaultdict(list)  # Store full article details
 
         with get_db_session() as session:
             repo = Repository(session)
@@ -133,6 +134,14 @@ class StockSuggester:
                         if stock:
                             stock_sentiments[stock].append(existing_sentiment.sentiment_score)
                             stock_articles[stock].append(existing_article.id)
+                            # Store article details for display
+                            stock_article_details[stock].append({
+                                "title": existing_article.title,
+                                "url": existing_article.url,
+                                "source": existing_article.source,
+                                "sentiment_score": existing_sentiment.sentiment_score,
+                                "sentiment_label": existing_sentiment.sentiment_label
+                            })
 
                 except Exception as e:
                     logger.error(f"Error processing article {article.url}: {e}")
@@ -147,11 +156,19 @@ class StockSuggester:
                 avg_score = sum(sentiment_scores) / len(sentiment_scores)
 
                 if avg_score >= min_score:
+                    # Sort articles by sentiment score (highest first)
+                    article_details = sorted(
+                        stock_article_details[stock_symbol],
+                        key=lambda x: x["sentiment_score"],
+                        reverse=True
+                    )
+
                     suggestions.append({
                         "stock_symbol": stock_symbol,
                         "avg_sentiment": avg_score,
                         "article_count": len(sentiment_scores),
-                        "related_articles": stock_articles[stock_symbol]
+                        "related_articles": stock_articles[stock_symbol],
+                        "article_details": article_details[:3]  # Top 3 articles
                     })
 
             suggestions.sort(key=lambda x: (x["avg_sentiment"], x["article_count"]), reverse=True)
