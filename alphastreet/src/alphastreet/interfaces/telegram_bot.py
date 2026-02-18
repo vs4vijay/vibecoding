@@ -1,0 +1,335 @@
+import asyncio
+from datetime import datetime
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+)
+from ..config import settings
+from ..data import get_db_session, Repository, init_db
+from ..sources import RSSNewsSource, NewsAPISource, WebScraperSource, GNewsSource
+from ..core import StockSuggester
+from ..utils import get_logger
+
+logger = get_logger(__name__)
+
+
+class TelegramBot:
+    def __init__(self):
+        self.token = settings.telegram_bot_token
+        if not self.token:
+            raise ValueError("TELEGRAM_BOT_TOKEN not configured")
+
+        # Parse allowed user IDs
+        self.allowed_user_ids = set()
+        if settings.allowed_telegram_ids:
+            try:
+                self.allowed_user_ids = {
+                    int(uid.strip())
+                    for uid in settings.allowed_telegram_ids.split(",")
+                    if uid.strip()
+                }
+                logger.info(f"Access restricted to {len(self.allowed_user_ids)} user(s)")
+            except ValueError as e:
+                logger.error(f"Invalid ALLOWED_TELEGRAM_IDS format: {e}")
+                raise
+
+        self.application = Application.builder().token(self.token).build()
+        self.suggester = StockSuggester()
+        self.news_sources = [
+            RSSNewsSource(),
+            GNewsSource(),
+            NewsAPISource(),
+            WebScraperSource(),
+        ]
+
+        self._register_handlers()
+
+    def is_user_allowed(self, user_id: int) -> bool:
+        """Check if user is allowed to use the bot"""
+        if not self.allowed_user_ids:
+            return True
+        return user_id in self.allowed_user_ids
+
+    def _register_handlers(self):
+        self.application.add_handler(CommandHandler("start", self.start_command))
+        self.application.add_handler(CommandHandler("help", self.help_command))
+        self.application.add_handler(CommandHandler("analyze", self.analyze_command))
+        self.application.add_handler(CommandHandler("settings", self.settings_command))
+        self.application.add_handler(CommandHandler("setfrequency", self.set_frequency_command))
+        self.application.add_handler(CommandHandler("settime", self.set_time_command))
+        self.application.add_handler(CommandHandler("setscore", self.set_score_command))
+        self.application.add_handler(CommandHandler("status", self.status_command))
+
+    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user = update.effective_user
+        telegram_id = user.id
+
+        # Check access control
+        if not self.is_user_allowed(telegram_id):
+            await update.message.reply_text(
+                "❌ Access Denied\n\n"
+                "This bot is restricted to authorized users only.\n"
+                f"Your Telegram ID: {telegram_id}\n\n"
+                "Please contact the bot owner for access."
+            )
+            logger.warning(f"Unauthorized access attempt from user {telegram_id} (@{user.username})")
+            return
+
+        with get_db_session() as session:
+            repo = Repository(session)
+            db_user = repo.get_or_create_user(telegram_id, user.username)
+
+        welcome_message = f"""
+👋 Welcome to AlphaStreet, {user.first_name}!
+
+I analyze Indian stock market sentiment from multiple news sources and suggest stocks based on recent news.
+
+Available commands:
+/analyze - Run immediate analysis
+/settings - View your current settings
+/setfrequency <daily|twice_daily|hourly|weekly> - Set analysis frequency
+/settime <HH:MM> - Set analysis time (IST)
+/setscore <0.0-1.0> - Set minimum sentiment score
+/status - Check bot status
+/help - Show this message
+
+Your account has been created! Use /analyze to get started.
+"""
+        await update.message.reply_text(welcome_message)
+
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.is_user_allowed(update.effective_user.id):
+            await update.message.reply_text("❌ Access Denied")
+            return
+
+        help_text = """
+📊 AlphaStreet Bot Commands:
+
+/analyze - Run sentiment analysis now and get stock suggestions
+/settings - View your current preferences
+/setfrequency <frequency> - Set how often to receive updates
+  • daily - Once per day (default)
+  • twice_daily - Market open and close
+  • hourly - Every hour
+  • weekly - Once per week
+/settime <HH:MM> - Set analysis time in IST (e.g., /settime 09:30)
+/setscore <0.0-1.0> - Set minimum sentiment score for suggestions
+/status - Check bot and analysis status
+
+The bot analyzes news from:
+• RSS feeds (MoneyControl, ET, Mint, BS)
+• NewsAPI (if configured)
+• Web scraping
+
+Sentiment analysis powered by FinBERT (local) with optional LLM support.
+"""
+        await update.message.reply_text(help_text)
+
+    async def analyze_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        telegram_id = update.effective_user.id
+
+        if not self.is_user_allowed(telegram_id):
+            await update.message.reply_text("❌ Access Denied")
+            return
+
+        with get_db_session() as session:
+            repo = Repository(session)
+            user = repo.get_or_create_user(telegram_id, update.effective_user.username)
+
+        await update.message.reply_text("🔍 Starting analysis... This may take a minute.")
+
+        try:
+            all_articles = []
+            for source in self.news_sources:
+                if source.is_configured():
+                    articles = await source.fetch_news(
+                        query="indian stocks market NSE BSE",
+                        days=settings.analysis_lookback_days,
+                        limit=30
+                    )
+                    all_articles.extend(articles)
+                    logger.info(f"Fetched {len(articles)} from {source.source_name}")
+
+            if not all_articles:
+                await update.message.reply_text("❌ No news articles found. Please try again later.")
+                return
+
+            await update.message.reply_text(f"📰 Analyzing {len(all_articles)} news articles...")
+
+            suggestions = await self.suggester.generate_suggestions(
+                all_articles,
+                min_score=user.min_sentiment_score,
+                max_suggestions=user.max_suggestions
+            )
+
+            if not suggestions:
+                await update.message.reply_text(
+                    "No stocks met your criteria. Try lowering your minimum sentiment score with /setscore"
+                )
+                return
+
+            message = f"📈 Top {len(suggestions)} Stock Suggestions:\n\n"
+            for i, suggestion in enumerate(suggestions, 1):
+                score_emoji = "🟢" if suggestion["avg_sentiment"] > 0.7 else "🟡"
+                message += f"{i}. {score_emoji} *{suggestion['stock_symbol']}*\n"
+                message += f"   Sentiment: {suggestion['avg_sentiment']:.2%}\n"
+                message += f"   Articles: {suggestion['article_count']}\n\n"
+
+            message += f"\n⏰ Analysis completed at {datetime.now().strftime('%Y-%m-%d %H:%M IST')}"
+
+            await update.message.reply_text(message, parse_mode="Markdown")
+
+        except Exception as e:
+            logger.error(f"Error in analyze command: {e}", exc_info=True)
+            await update.message.reply_text(f"❌ Error during analysis: {str(e)}")
+
+    async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        telegram_id = update.effective_user.id
+
+        if not self.is_user_allowed(telegram_id):
+            await update.message.reply_text("❌ Access Denied")
+            return
+
+        with get_db_session() as session:
+            repo = Repository(session)
+            user = repo.get_or_create_user(telegram_id, update.effective_user.username)
+
+        settings_text = f"""
+⚙️ Your Current Settings:
+
+📅 Frequency: {user.frequency}
+⏰ Analysis Time: {user.analysis_time} IST
+📊 Min Sentiment Score: {user.min_sentiment_score:.2f}
+🎯 Max Suggestions: {user.max_suggestions}
+✅ Status: {"Active" if user.is_active else "Inactive"}
+
+Use the set commands to update your preferences:
+/setfrequency <frequency>
+/settime <HH:MM>
+/setscore <0.0-1.0>
+"""
+        await update.message.reply_text(settings_text)
+
+    async def set_frequency_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        telegram_id = update.effective_user.id
+
+        if not self.is_user_allowed(telegram_id):
+            await update.message.reply_text("❌ Access Denied")
+            return
+
+        if not context.args:
+            await update.message.reply_text(
+                "Usage: /setfrequency <daily|twice_daily|hourly|weekly>"
+            )
+            return
+
+        frequency = context.args[0].lower()
+        valid_frequencies = ["daily", "twice_daily", "hourly", "weekly"]
+
+        if frequency not in valid_frequencies:
+            await update.message.reply_text(
+                f"Invalid frequency. Choose from: {', '.join(valid_frequencies)}"
+            )
+            return
+
+        with get_db_session() as session:
+            repo = Repository(session)
+            user = repo.get_or_create_user(telegram_id, update.effective_user.username)
+            repo.update_user_preferences(user.id, frequency=frequency)
+
+        await update.message.reply_text(f"✅ Frequency updated to: {frequency}")
+
+    async def set_time_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        telegram_id = update.effective_user.id
+
+        if not self.is_user_allowed(telegram_id):
+            await update.message.reply_text("❌ Access Denied")
+            return
+
+        if not context.args:
+            await update.message.reply_text("Usage: /settime <HH:MM> (e.g., /settime 09:30)")
+            return
+
+        time_str = context.args[0]
+        try:
+            datetime.strptime(time_str, "%H:%M")
+        except ValueError:
+            await update.message.reply_text("Invalid time format. Use HH:MM (e.g., 09:30)")
+            return
+
+        with get_db_session() as session:
+            repo = Repository(session)
+            user = repo.get_or_create_user(telegram_id, update.effective_user.username)
+            repo.update_user_preferences(user.id, analysis_time=time_str)
+
+        await update.message.reply_text(f"✅ Analysis time updated to: {time_str} IST")
+
+    async def set_score_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        telegram_id = update.effective_user.id
+
+        if not self.is_user_allowed(telegram_id):
+            await update.message.reply_text("❌ Access Denied")
+            return
+
+        if not context.args:
+            await update.message.reply_text("Usage: /setscore <0.0-1.0> (e.g., /setscore 0.65)")
+            return
+
+        try:
+            score = float(context.args[0])
+            if not 0.0 <= score <= 1.0:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("Invalid score. Must be between 0.0 and 1.0")
+            return
+
+        with get_db_session() as session:
+            repo = Repository(session)
+            user = repo.get_or_create_user(telegram_id, update.effective_user.username)
+            repo.update_user_preferences(user.id, min_sentiment_score=score)
+
+        await update.message.reply_text(f"✅ Minimum sentiment score updated to: {score:.2f}")
+
+    async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.is_user_allowed(update.effective_user.id):
+            await update.message.reply_text("❌ Access Denied")
+            return
+
+        status_text = f"""
+🤖 AlphaStreet Bot Status:
+
+✅ Bot: Online
+📡 Sentiment Provider: {settings.sentiment_provider}
+🗃️ Database: Connected
+📰 News Sources: {len([s for s in self.news_sources if s.is_configured()])} active
+🔐 Access Control: {"Enabled" if self.allowed_user_ids else "Disabled (Open)"}
+
+Configuration:
+• Lookback: {settings.analysis_lookback_days} days
+• Default Time: {settings.default_analysis_time} IST
+• Timezone: {settings.timezone}
+"""
+        await update.message.reply_text(status_text)
+
+    def run(self):
+        init_db()
+        logger.info("Starting Telegram bot...")
+
+        if self.allowed_user_ids:
+            logger.info(f"User access control: Enabled for {len(self.allowed_user_ids)} user(s)")
+        else:
+            logger.warning("User access control: DISABLED - Bot is open to all users!")
+
+        # Start polling - this will run the bot's event loop
+        self.application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+def main():
+    bot = TelegramBot()
+    bot.run()
+
+
+if __name__ == "__main__":
+    main()
