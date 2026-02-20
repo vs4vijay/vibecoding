@@ -14,14 +14,29 @@ logger = get_logger(__name__)
 
 
 class StockSuggester:
-    def __init__(self):
-        # Initialize attributes first to prevent AttributeError
-        self.valid_stocks = set()
-        self.stock_names = {}
-        self.name_to_symbol = {}
+    _sentiment_analyzer = None
 
-        self.sentiment_analyzer = SentimentAnalyzer()
+    def __init__(self):
+        object.__setattr__(self, '_valid_stocks', set())
+        object.__setattr__(self, 'stock_names', {})
+        object.__setattr__(self, 'name_to_symbol', {})
+
         self._load_stock_symbols()
+
+    @property
+    def sentiment_analyzer(self):
+        if StockSuggester._sentiment_analyzer is None:
+            logger.info("Initializing sentiment analyzer (lazy load)...")
+            StockSuggester._sentiment_analyzer = SentimentAnalyzer()
+        return StockSuggester._sentiment_analyzer
+
+    @property
+    def valid_stocks(self):
+        return getattr(self, '_valid_stocks', set())
+
+    @valid_stocks.setter
+    def valid_stocks(self, value):
+        object.__setattr__(self, '_valid_stocks', value)
 
     def _load_stock_symbols(self):
         """Load valid stock symbols from JSON file."""
@@ -129,9 +144,6 @@ class StockSuggester:
         "SERVICES", "SERVICE", "TECHNOLOGIES", "TECHNOLOGY", "SYSTEMS", "SYSTEM",
         "SOLUTIONS", "SOLUTION", "PRODUCTS", "PRODUCT", "ENTERPRISES", "ENTERPRISE",
     }
-
-    def __init__(self):
-        self.sentiment_analyzer = SentimentAnalyzer()
 
     async def generate_suggestions(
         self,

@@ -1,9 +1,6 @@
 from typing import Dict, Optional
 from enum import Enum
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from openai import AsyncOpenAI
-from anthropic import AsyncAnthropic
+import asyncio
 from ..config import settings
 from ..utils import get_logger
 
@@ -35,26 +32,57 @@ class SentimentResult:
 class SentimentAnalyzer:
     def __init__(self):
         self.provider = settings.sentiment_provider
-        self.local_model = None
-        self.local_tokenizer = None
-        self.openai_client = None
-        self.anthropic_client = None
+        self._local_model = None
+        self._local_tokenizer = None
+        self._openai_client = None
+        self._anthropic_client = None
+        self._model_loaded = False
 
+    def _ensure_loaded(self):
+        if self._model_loaded:
+            return
+        self._model_loaded = True
+        
         if self.provider == "local":
             self._load_local_model()
         elif self.provider == "openai" and settings.openai_api_key:
-            self.openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+            from openai import AsyncOpenAI
+            self._openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
         elif self.provider == "anthropic" and settings.anthropic_api_key:
-            self.anthropic_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+            from anthropic import AsyncAnthropic
+            self._anthropic_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+    @property
+    def local_model(self):
+        self._ensure_loaded()
+        return self._local_model
+
+    @property
+    def local_tokenizer(self):
+        self._ensure_loaded()
+        return self._local_tokenizer
+
+    @property
+    def openai_client(self):
+        self._ensure_loaded()
+        return self._openai_client
+
+    @property
+    def anthropic_client(self):
+        self._ensure_loaded()
+        return self._anthropic_client
 
     def _load_local_model(self):
+        import torch
+        from transformers import AutoTokenizer, AutoModelForSequenceClassification
+        
         try:
             logger.info(f"Loading local sentiment model: {settings.local_model_name}")
-            self.local_tokenizer = AutoTokenizer.from_pretrained(settings.local_model_name)
-            self.local_model = AutoModelForSequenceClassification.from_pretrained(
+            self._local_tokenizer = AutoTokenizer.from_pretrained(settings.local_model_name)
+            self._local_model = AutoModelForSequenceClassification.from_pretrained(
                 settings.local_model_name
             )
-            self.local_model.eval()
+            self._local_model.eval()
             logger.info("Local model loaded successfully")
         except Exception as e:
             logger.error(f"Error loading local model: {e}")
@@ -69,11 +97,24 @@ class SentimentAnalyzer:
             return await self._analyze_anthropic(text)
         else:
             logger.warning(f"Unknown provider: {self.provider}, falling back to local")
-            if not self.local_model:
-                self._load_local_model()
             return await self._analyze_local(text)
 
     async def _analyze_local(self, text: str) -> SentimentResult:
+        try:
+            return await asyncio.to_thread(self._run_inference, text)
+        except Exception as e:
+            logger.error(f"Error in local sentiment analysis: {e}")
+            return SentimentResult(
+                label=SentimentLabel.NEUTRAL,
+                score=0.5,
+                confidence=0.0,
+                provider="local",
+                model_name=settings.local_model_name
+            )
+
+    def _run_inference(self, text: str) -> SentimentResult:
+        import torch
+        
         try:
             inputs = self.local_tokenizer(
                 text,
