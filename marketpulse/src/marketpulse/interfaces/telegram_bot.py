@@ -468,7 +468,9 @@ Use /help for available commands.
 
         try:
             if is_windows:
-                asyncio.create_task(self._send_startup_broadcast())
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(self._send_startup_broadcast())
                 self.application.run_polling(allowed_updates=Update.ALL_TYPES)
             else:
                 asyncio.run(send_broadcast_and_run())
