@@ -152,10 +152,9 @@ function FundsExplorer({ funds, prices, isLoading, onViewDetails }: FundsExplore
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [sortConfig, setSortConfig] = useState<{ key: keyof MutualFund; direction: 'asc' | 'desc' } | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  const [filters, setFilters] = useState({
+  const [columnFilters, setColumnFilters] = useState({
     code: '',
     name: '',
-    nav: '',
   });
 
   const categories = useMemo(() => {
@@ -186,26 +185,28 @@ function FundsExplorer({ funds, prices, isLoading, onViewDetails }: FundsExplore
   const filteredFunds = useMemo(() => {
     let result = [...funds];
     
-    if (filters.code) {
-      result = result.filter(f => f.schemeCode.toLowerCase().includes(filters.code.toLowerCase()));
-    }
-    if (filters.name) {
-      result = result.filter(f => f.schemeName.toLowerCase().includes(filters.name.toLowerCase()));
-    }
-    if (searchTerm) {
+    const searchLower = searchTerm.toLowerCase();
+    if (searchLower) {
       result = result.filter(f => 
-        f.schemeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        f.schemeCode.includes(searchTerm)
+        String(f.schemeName).toLowerCase().includes(searchLower) ||
+        String(f.schemeCode).toLowerCase().includes(searchLower)
       );
+    }
+
+    if (columnFilters.code) {
+      result = result.filter(f => String(f.schemeCode).toLowerCase().includes(columnFilters.code.toLowerCase()));
+    }
+    if (columnFilters.name) {
+      result = result.filter(f => String(f.schemeName).toLowerCase().includes(columnFilters.name.toLowerCase()));
     }
     if (categoryFilter !== 'All') {
       result = result.filter(f => getCategory(f.schemeName) === categoryFilter);
     }
 
     if (sortConfig) {
-      result.sort((a, b) => {
-        const aVal = a[sortConfig.key];
-        const bVal = b[sortConfig.key];
+      result = [...result].sort((a, b) => {
+        const aVal = String(a[sortConfig.key]);
+        const bVal = String(b[sortConfig.key]);
         if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
@@ -213,7 +214,7 @@ function FundsExplorer({ funds, prices, isLoading, onViewDetails }: FundsExplore
     }
 
     return result;
-  }, [funds, searchTerm, categoryFilter, sortConfig, filters]);
+  }, [funds, searchTerm, categoryFilter, sortConfig, columnFilters]);
 
   const handleSort = (key: keyof MutualFund) => {
     setSortConfig(current => ({
@@ -301,8 +302,8 @@ function FundsExplorer({ funds, prices, isLoading, onViewDetails }: FundsExplore
                   <input
                     type="text"
                     placeholder="Filter..."
-                    value={filters.code}
-                    onChange={(e) => setFilters(f => ({ ...f, code: e.target.value }))}
+                    value={columnFilters.code}
+                    onChange={(e) => setColumnFilters(f => ({ ...f, code: e.target.value }))}
                     className="mt-1 w-full text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </th>
@@ -318,8 +319,8 @@ function FundsExplorer({ funds, prices, isLoading, onViewDetails }: FundsExplore
                   <input
                     type="text"
                     placeholder="Filter..."
-                    value={filters.name}
-                    onChange={(e) => setFilters(f => ({ ...f, name: e.target.value }))}
+                    value={columnFilters.name}
+                    onChange={(e) => setColumnFilters(f => ({ ...f, name: e.target.value }))}
                     className="mt-1 w-full text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </th>
