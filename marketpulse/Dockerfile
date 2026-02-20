@@ -10,7 +10,7 @@ COPY pyproject.toml uv.lock ./
 COPY src ./src
 
 RUN pip install uv && \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev --all-extras
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1

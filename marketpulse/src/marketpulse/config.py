@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     )
 
     sentiment_provider: Literal["local", "openai", "anthropic"] = Field(
-        default="openai",
+        default="local",
         description="Sentiment analysis provider (local requires torch+transformers)"
     )
     
