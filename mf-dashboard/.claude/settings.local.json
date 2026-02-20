@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(bun create:*)",
+      "Bash(bun init:*)",
+      "Bash(bun add:*)",
+      "Bash(bunx tailwindcss init:*)",
+      "Bash(bun run dev:*)",
+      "Bash(bun --version:*)"
+    ]
+  }
+}
