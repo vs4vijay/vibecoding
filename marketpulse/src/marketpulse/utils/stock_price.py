@@ -64,6 +64,13 @@ class StockPriceFetcher:
 
     def _format_symbol(self, symbol: str) -> str:
         symbol = symbol.strip().upper()
-        if '.' not in symbol:
-            symbol = f"{symbol}.NS"
-        return symbol
+        if '.' in symbol:
+            return symbol
+        known_tickers = {
+            'TATAMOTORS': 'TATAMOTORS.NS',
+            'M&M': 'M&M.NS',
+            'L&TFH': 'L&TFH.NS',
+        }
+        if symbol in known_tickers:
+            return known_tickers[symbol]
+        return f"{symbol}.NS"
