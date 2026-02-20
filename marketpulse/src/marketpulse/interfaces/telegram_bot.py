@@ -462,19 +462,26 @@ Use /help for available commands.
             except ImportError:
                 pass
 
+        async def start_broadcast():
+            await self._send_startup_broadcast()
+
         if is_windows:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            loop.run_until_complete(self._send_startup_broadcast())
+            loop.run_until_complete(start_broadcast())
+            self.application.run_polling(allowed_updates=Update.ALL_TYPES)
         else:
             try:
                 loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(start_broadcast())
+                else:
+                    loop.run_until_complete(start_broadcast())
             except RuntimeError:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-            loop.run_until_complete(self._send_startup_broadcast())
-
-        self.application.run_polling(allowed_updates=Update.ALL_TYPES)
+                loop.run_until_complete(start_broadcast())
+            self.application.run_polling(allowed_updates=Update.ALL_TYPES)
 
     async def _send_shutdown_broadcast(self):
         if not self.allowed_user_ids:
