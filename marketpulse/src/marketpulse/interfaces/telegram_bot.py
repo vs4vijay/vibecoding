@@ -1,6 +1,4 @@
 import asyncio
-import signal
-import os
 from datetime import datetime
 from telegram import Update
 from telegram.ext import (
@@ -457,35 +455,23 @@ Use /help for available commands.
         import platform
         is_windows = platform.system() == "Windows"
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        async def run_with_broadcast():
+        if not is_windows:
+            try:
+                import uvloop
+                asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+            except ImportError:
+                pass
+
+        async def run_bot():
             await self._send_startup_broadcast()
             await self.application.run_polling(allowed_updates=Update.ALL_TYPES)
 
-        if not is_windows:
-            async def shutdown_handler(sig):
-                logger.info(f"Received signal {sig}, sending shutdown broadcast...")
-                message = f"""
-*MarketPulse v{__version__} is going offline*
-
-Bot is shutting down. See you soon!
-"""
-                await self._send_shutdown_broadcast()
-                await self.application.stop()
-                loop.stop()
-
-            for sig in (signal.SIGTERM, signal.SIGINT):
-                loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(shutdown_handler(s)))
-
         try:
-            loop.run_until_complete(run_with_broadcast())
-        except KeyboardInterrupt:
-            if is_windows:
-                loop.run_until_complete(self._send_shutdown_broadcast())
+            asyncio.run(run_bot())
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            logger.info("Bot stopped by user")
         finally:
-            loop.close()
+            logger.info("Bot shutdown complete")
 
     async def _send_shutdown_broadcast(self):
         if not self.allowed_user_ids:
