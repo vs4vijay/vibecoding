@@ -11,8 +11,3 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - SENTIMENT_PROVIDER=${SENTIMENT_PROVIDER:-local}
       - ALLOWED_TELEGRAM_IDS=${ALLOWED_TELEGRAM_IDS}
-    healthcheck:
-      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
