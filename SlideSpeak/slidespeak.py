@@ -347,7 +347,8 @@ class PPT2Video:
         lang: str = "en",
         slide_duration: float = 5.0,
         fps: int = 30,
-        dpi: int = 150
+        dpi: int = 150,
+        slide_range: Optional[str] = None
     ):
         self.pptx_path = pptx_path
         self.output_path = output_path
@@ -355,6 +356,7 @@ class PPT2Video:
         self.slide_duration = slide_duration
         self.fps = fps
         self.dpi = dpi
+        self.slide_range = self._parse_slide_range(slide_range)
         
         # Create temporary directory for intermediate files
         self.temp_dir = tempfile.mkdtemp()
@@ -363,6 +365,26 @@ class PPT2Video:
         
         os.makedirs(self.images_dir, exist_ok=True)
         os.makedirs(self.audio_dir, exist_ok=True)
+    
+    def _parse_slide_range(self, slide_range: Optional[str]) -> Optional[list[int]]:
+        if not slide_range:
+            return None
+        
+        slides = set()
+        parts = slide_range.split(",")
+        
+        for part in parts:
+            part = part.strip()
+            if "-" in part:
+                start, end = part.split("-", 1)
+                start = int(start.strip())
+                end = int(end.strip())
+                slides.update(range(start, end + 1))
+            else:
+                slides.add(int(part))
+        
+        # Convert to 0-indexed and return sorted list
+        return sorted([s - 1 for s in slides])
 
     def run(self) -> str:
         click.echo("Reading PowerPoint file...")
@@ -371,10 +393,23 @@ class PPT2Video:
         
         click.echo(f"Found {len(slides_data)} slides")
         
+        # Filter slides if slide_range is specified
+        if self.slide_range is not None:
+            total_slides = len(slides_data)
+            valid_slides = [s for s in self.slide_range if 0 <= s < total_slides]
+            if not valid_slides:
+                raise ValueError(f"No valid slides in range. Presentation has {total_slides} slides.")
+            slides_data = [slides_data[i] for i in valid_slides]
+            click.echo(f"Processing {len(slides_data)} slides: {sorted(valid_slides)}")
+        
         # Convert slides to images
         click.echo("Exporting slides to images...")
         slide_exporter = SlideToImage(self.pptx_path, self.images_dir, self.dpi)
         slide_images = slide_exporter.export_slides()
+        
+        # Filter slide_images if slide_range is specified
+        if self.slide_range is not None:
+            slide_images = [slide_images[i] for i in self.slide_range if i < len(slide_images)]
         
         # Generate audio for each slide
         click.echo("Generating voiceover audio...")
@@ -422,7 +457,9 @@ class PPT2Video:
 @click.option("-d", "--duration", default=5.0, type=float, help="Minimum duration per slide in seconds")
 @click.option("--fps", default=30, type=int, help="Frames per second for output video")
 @click.option("--dpi", default=150, type=int, help=" DPI for slide images")
-def cli(pptx_file: str, output_path: Optional[str], lang: str, duration: float, fps: int, dpi: int):
+@click.option("--slides", default=None, help="Slide range to process (e.g., '1', '1,2,3', '1-5')")
+@click.option("--play", is_flag=True, help="Play the generated video after creation")
+def cli(pptx_file: str, output_path: Optional[str], lang: str, duration: float, fps: int, dpi: int, slides: Optional[str], play: bool):
     """Convert a PowerPoint presentation to video with voiceover."""
     converter = PPT2Video(
         pptx_path=pptx_file,
@@ -430,9 +467,21 @@ def cli(pptx_file: str, output_path: Optional[str], lang: str, duration: float, 
         lang=lang,
         slide_duration=duration,
         fps=fps,
-        dpi=dpi
+        dpi=dpi,
+        slide_range=slides
     )
-    converter.run()
+    result = converter.run()
+    
+    if play and result:
+        import subprocess
+        import platform
+        system = platform.system()
+        if system == "Windows":
+            subprocess.run(["start", "", result], shell=True)
+        elif system == "Darwin":
+            subprocess.run(["open", result])
+        else:
+            subprocess.run(["xdg-open", result])
 
 
 if __name__ == "__main__":
