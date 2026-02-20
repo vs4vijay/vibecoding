@@ -163,13 +163,76 @@ Share this ID with the bot owner to get access!
             return
         
         if query.data == "cmd_myid":
-            await self.myid_command(update, context)
+            user = query.from_user
+            telegram_id = user.id
+            username = user.username or "Not set"
+            message = f"""
+👤 *Your Telegram Info*
+
+• ID: `{telegram_id}`
+• Username: @{username}
+• First Name: {user.first_name}
+• Last Name: {user.last_name or 'Not set'}
+
+Share this ID with the bot owner to get access!
+"""
+            if query.message:
+                await query.message.reply_text(message, parse_mode="Markdown")
+            else:
+                await query.edit_message_text(message, parse_mode="Markdown")
         elif query.data == "cmd_analyze":
-            await self.analyze_command(update, context)
+            if query.message:
+                await query.message.reply_text("Starting analysis... (this may take a minute)")
+            configured_sources = [s for s in self.news_sources if s.is_configured()]
+            source_list = "\n".join([f"  • {s.source_name}" for s in configured_sources])
+            await query.edit_message_text(
+                f"🔍 *Starting Analysis*\n\n"
+                f"*Fetching from {len(configured_sources)} sources:*\n"
+                f"{source_list}\n\n"
+                f"_This may take 1-2 minutes..._",
+                parse_mode="Markdown"
+            )
         elif query.data == "cmd_settings":
-            await self.settings_command(update, context)
+            telegram_id = user_id
+            with get_db_session() as session:
+                repo = Repository(session)
+                user = repo.get_or_create_user(telegram_id, query.from_user.username)
+                min_score = user.min_sentiment_score
+                max_suggestions = user.max_suggestions
+            
+            settings_text = f"""
+⚙️ *Your Settings*
+
+• Analysis Frequency: {user.analysis_frequency}
+• Analysis Time: {user.analysis_time or 'Not set'} IST
+• Min Sentiment Score: {min_score}
+• Max Suggestions: {max_suggestions}
+
+_Send /settime, /setfrequency, /setscore to change_
+"""
+            if query.message:
+                await query.message.reply_text(settings_text, parse_mode="Markdown")
+            else:
+                await query.edit_message_text(settings_text, parse_mode="Markdown")
         elif query.data == "cmd_recent":
-            await self.recent_command(update, context)
+            telegram_id = user_id
+            with get_db_session() as session:
+                repo = Repository(session)
+                suggestions = repo.get_recent_suggestions(telegram_id, limit=10)
+            
+            if not suggestions:
+                response = "📊 No recent analysis found. Run /analyze first!"
+            else:
+                response = "📊 *Recent Stock Suggestions*\n\n"
+                for suggestion in suggestions:
+                    score_emoji = "🟢" if suggestion.sentiment_score > 0.6 else "🔴" if suggestion.sentiment_score < 0.4 else "🟡"
+                    response += f"{score_emoji} *{suggestion.stock_symbol}*\n"
+                    response += f"   Score: {suggestion.sentiment_score:.2f} | Articles: {suggestion.article_count}\n\n"
+            
+            if query.message:
+                await query.message.reply_text(response, parse_mode="Markdown")
+            else:
+                await query.edit_message_text(response, parse_mode="Markdown")
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_user_allowed(update.effective_user.id):
