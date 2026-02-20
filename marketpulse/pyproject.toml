@@ -29,8 +29,6 @@ dependencies = [
 
 [project.scripts]
 marketpulse = "marketpulse.main:main"
-marketpulse-bot = "marketpulse.interfaces.telegram_bot:main"
-marketpulse-tui = "marketpulse.interfaces.tui:main"
 
 [build-system]
 requires = ["uv_build>=0.8.6,<0.9.0"]
