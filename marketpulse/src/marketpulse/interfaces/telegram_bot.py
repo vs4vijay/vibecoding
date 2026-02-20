@@ -454,31 +454,36 @@ Use /help for available commands.
         else:
             logger.warning("User access control: DISABLED - Bot is open to all users!")
 
+        import platform
+        is_windows = platform.system() == "Windows"
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-        async def shutdown_handler(sig):
-            logger.info(f"Received signal {sig}, sending shutdown broadcast...")
-            message = f"""
-*MarketPulse v{__version__} is going offline*
-
-Bot is shutting down. See you soon!
-"""
-            await self._send_shutdown_broadcast()
-            await self.application.stop()
-            loop.stop()
-
         async def run_with_broadcast():
             await self._send_startup_broadcast()
             await self.application.run_polling(allowed_updates=Update.ALL_TYPES)
 
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(shutdown_handler(s)))
+        if not is_windows:
+            async def shutdown_handler(sig):
+                logger.info(f"Received signal {sig}, sending shutdown broadcast...")
+                message = f"""
+*MarketPulse v{__version__} is going offline*
+
+Bot is shutting down. See you soon!
+"""
+                await self._send_shutdown_broadcast()
+                await self.application.stop()
+                loop.stop()
+
+            for sig in (signal.SIGTERM, signal.SIGINT):
+                loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(shutdown_handler(s)))
 
         try:
             loop.run_until_complete(run_with_broadcast())
         except KeyboardInterrupt:
-            pass
+            if is_windows:
+                loop.run_until_complete(self._send_shutdown_broadcast())
         finally:
             loop.close()
 
