@@ -1,4 +1,6 @@
 import asyncio
+import signal
+import os
 from datetime import datetime
 from telegram import Update
 from telegram.ext import (
@@ -6,6 +8,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
 )
+from .. import __version__
 from ..config import settings
 from ..data import get_db_session, Repository, init_db
 from ..sources import RSSNewsSource, NewsAPISource, WebScraperSource, GNewsSource
@@ -45,6 +48,22 @@ class TelegramBot:
         ]
 
         self._register_handlers()
+
+    async def _broadcast_message(self, message: str):
+        """Send message to all allowed users."""
+        if not self.allowed_user_ids:
+            logger.warning("No allowed users to broadcast to")
+            return
+        
+        for user_id in self.allowed_user_ids:
+            try:
+                await self.application.bot.send_message(
+                    chat_id=user_id,
+                    text=message,
+                    parse_mode="Markdown"
+                )
+            except Exception as e:
+                logger.error(f"Failed to send message to {user_id}: {e}")
 
     def is_user_allowed(self, user_id: int) -> bool:
         """Check if user is allowed to use the bot"""
@@ -399,7 +418,7 @@ Use the set commands to update your preferences:
             return
 
         status_text = f"""
-🤖 MarketPulse Bot Status:
+🤖 MarketPulse v{__version__} Status:
 
 ✅ Bot: Online
 📡 Sentiment Provider: {settings.sentiment_provider}
@@ -414,6 +433,18 @@ Configuration:
 """
         await update.message.reply_text(status_text)
 
+    async def _send_startup_broadcast(self):
+        if not self.allowed_user_ids:
+            return
+        message = f"""
+*MarketPulse v{__version__} is now online!*
+
+Bot started successfully.
+Use /help for available commands.
+"""
+        await self._broadcast_message(message)
+        logger.info("Sent startup broadcast")
+
     def run(self):
         init_db()
         logger.info("Starting Telegram bot...")
@@ -423,8 +454,43 @@ Configuration:
         else:
             logger.warning("User access control: DISABLED - Bot is open to all users!")
 
-        # Start polling - this will run the bot's event loop
-        self.application.run_polling(allowed_updates=Update.ALL_TYPES)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        async def shutdown_handler(sig):
+            logger.info(f"Received signal {sig}, sending shutdown broadcast...")
+            message = f"""
+*MarketPulse v{__version__} is going offline*
+
+Bot is shutting down. See you soon!
+"""
+            await self._send_shutdown_broadcast()
+            await self.application.stop()
+            loop.stop()
+
+        async def run_with_broadcast():
+            await self._send_startup_broadcast()
+            await self.application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(shutdown_handler(s)))
+
+        try:
+            loop.run_until_complete(run_with_broadcast())
+        except KeyboardInterrupt:
+            pass
+        finally:
+            loop.close()
+
+    async def _send_shutdown_broadcast(self):
+        if not self.allowed_user_ids:
+            return
+        message = f"""
+*MarketPulse v{__version__} is going offline*
+
+Bot is shutting down. See you soon!
+"""
+        await self._broadcast_message(message)
 
 
 def main():
