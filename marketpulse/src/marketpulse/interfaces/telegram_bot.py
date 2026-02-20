@@ -462,20 +462,19 @@ Use /help for available commands.
             except ImportError:
                 pass
 
-        async def send_broadcast_and_run():
-            await self._send_startup_broadcast()
-            await self.application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-        try:
-            if is_windows:
+        if is_windows:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self._send_startup_broadcast())
+        else:
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                loop.run_until_complete(self._send_startup_broadcast())
-                self.application.run_polling(allowed_updates=Update.ALL_TYPES)
-            else:
-                asyncio.run(send_broadcast_and_run())
-        except (KeyboardInterrupt, asyncio.CancelledError):
-            logger.info("Bot stopped by user")
+            loop.run_until_complete(self._send_startup_broadcast())
+
+        self.application.run_polling(allowed_updates=Update.ALL_TYPES)
 
     async def _send_shutdown_broadcast(self):
         if not self.allowed_user_ids:
