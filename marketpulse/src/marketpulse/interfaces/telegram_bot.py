@@ -225,9 +225,10 @@ _Send /settime, /setfrequency, /setscore to change_
             else:
                 response = "📊 *Recent Stock Suggestions*\n\n"
                 for suggestion in suggestions:
-                    score_emoji = "🟢" if suggestion.sentiment_score > 0.6 else "🔴" if suggestion.sentiment_score < 0.4 else "🟡"
+                    score = suggestion.avg_sentiment_score or 0.5
+                    score_emoji = "🟢" if score > 0.6 else "🔴" if score < 0.4 else "🟡"
                     response += f"{score_emoji} *{suggestion.stock_symbol}*\n"
-                    response += f"   Score: {suggestion.sentiment_score:.2f} | Articles: {suggestion.article_count}\n\n"
+                    response += f"   Score: {score:.2f} | Articles: {suggestion.article_count}\n\n"
             
             if query.message:
                 await query.message.reply_text(response, parse_mode="Markdown")
