@@ -142,11 +142,13 @@ class Repository:
 
     def get_recent_suggestions(
         self,
+        telegram_id: int,
         hours: int = 24,
         limit: int = 10
     ) -> List[StockSuggestion]:
         """Get the most recent stock suggestions within the specified hours."""
-        since_time = datetime.utcnow() - timedelta(hours=hours)
+        from datetime import timezone
+        since_time = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         return self.session.query(StockSuggestion).filter(
             StockSuggestion.created_at >= since_time
