@@ -1,9 +1,10 @@
 import asyncio
 from datetime import datetime
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
+    CallbackQueryHandler,
     ContextTypes,
 )
 from .. import __version__
@@ -80,6 +81,7 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("settime", self.set_time_command))
         self.application.add_handler(CommandHandler("setscore", self.set_score_command))
         self.application.add_handler(CommandHandler("status", self.status_command))
+        self.application.add_handler(CallbackQueryHandler(self.button_callback))
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
@@ -118,7 +120,18 @@ Available commands:
 
 Your account has been created! Use /analyze to get started.
 """
-        await update.message.reply_text(welcome_message)
+        keyboard = [
+            [
+                InlineKeyboardButton("📊 Analyze", callback_data="cmd_analyze"),
+                InlineKeyboardButton("👤 My ID", callback_data="cmd_myid"),
+            ],
+            [
+                InlineKeyboardButton("⚙️ Settings", callback_data="cmd_settings"),
+                InlineKeyboardButton("📈 Recent", callback_data="cmd_recent"),
+            ],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(welcome_message, reply_markup=reply_markup)
 
     async def myid_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show user's Telegram ID - useful for access control setup."""
@@ -137,6 +150,26 @@ Your account has been created! Use /analyze to get started.
 Share this ID with the bot owner to get access!
 """
         await update.message.reply_text(message, parse_mode="Markdown")
+
+    async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle inline keyboard button clicks."""
+        query = update.callback_query
+        await query.answer()
+        
+        user_id = query.from_user.id
+        
+        if not self.is_user_allowed(user_id):
+            await query.edit_message_text("❌ Access Denied")
+            return
+        
+        if query.data == "cmd_myid":
+            await self.myid_command(update, context)
+        elif query.data == "cmd_analyze":
+            await self.analyze_command(update, context)
+        elif query.data == "cmd_settings":
+            await self.settings_command(update, context)
+        elif query.data == "cmd_recent":
+            await self.recent_command(update, context)
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_user_allowed(update.effective_user.id):
