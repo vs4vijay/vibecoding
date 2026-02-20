@@ -72,6 +72,7 @@ class TelegramBot:
     def _register_handlers(self):
         self.application.add_handler(CommandHandler("start", self.start_command))
         self.application.add_handler(CommandHandler("help", self.help_command))
+        self.application.add_handler(CommandHandler("myid", self.myid_command))
         self.application.add_handler(CommandHandler("analyze", self.analyze_command))
         self.application.add_handler(CommandHandler("recent", self.recent_command))
         self.application.add_handler(CommandHandler("settings", self.settings_command))
@@ -105,6 +106,7 @@ class TelegramBot:
 I analyze Indian stock market sentiment from multiple news sources and suggest stocks based on recent news.
 
 Available commands:
+/myid - Get your Telegram ID (for access setup)
 /analyze - Run immediate analysis
 /recent - Get last analysis (instant)
 /settings - View your current settings
@@ -117,6 +119,24 @@ Available commands:
 Your account has been created! Use /analyze to get started.
 """
         await update.message.reply_text(welcome_message)
+
+    async def myid_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show user's Telegram ID - useful for access control setup."""
+        user = update.effective_user
+        telegram_id = user.id
+        username = user.username or "Not set"
+        
+        message = f"""
+👤 *Your Telegram Info*
+
+• ID: `{telegram_id}`
+• Username: @{username}
+• First Name: {user.first_name}
+• Last Name: {user.last_name or 'Not set'}
+
+Share this ID with the bot owner to get access!
+"""
+        await update.message.reply_text(message, parse_mode="Markdown")
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self.is_user_allowed(update.effective_user.id):
