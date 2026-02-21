@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -45,8 +46,28 @@ class TelegramBot:
             NewsAPISource(),
             WebScraperSource(),
         ]
+        self.executor = ThreadPoolExecutor(max_workers=2)
 
         self._register_handlers()
+
+    def _run_suggestions_sync(self, all_articles, min_score, max_suggestions):
+        """Synchronous wrapper for generate_suggestions to run in thread pool."""
+        import nest_asyncio
+        nest_asyncio.apply()
+        
+        async def run_async():
+            return await self.suggester.generate_suggestions(
+                all_articles,
+                min_score=min_score,
+                max_suggestions=max_suggestions
+            )
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(run_async())
+        finally:
+            loop.close()
 
     async def _broadcast_message(self, message: str):
         """Send message to all allowed users."""
@@ -272,14 +293,12 @@ Sentiment analysis powered by FinBERT (local) with optional LLM support.
             await update.message.reply_text("❌ Access Denied")
             return
 
-        # Get user preferences before session closes
         with get_db_session() as session:
             repo = Repository(session)
             user = repo.get_or_create_user(telegram_id, update.effective_user.username)
             min_score = user.min_sentiment_score
             max_suggestions = user.max_suggestions
 
-        # Immediately show which sources are being used
         configured_sources = [s for s in self.news_sources if s.is_configured()]
         source_list = "\n".join([f"  • {s.source_name}" for s in configured_sources])
 
@@ -287,7 +306,7 @@ Sentiment analysis powered by FinBERT (local) with optional LLM support.
             f"🔍 *Starting Analysis*\n\n"
             f"*Fetching from {len(configured_sources)} sources:*\n"
             f"{source_list}\n\n"
-            f"_This may take 1-2 minutes..._",
+            f"_This may take 2-3 minutes on first run (downloading model)..._",
             parse_mode="Markdown"
         )
 
@@ -309,20 +328,20 @@ Sentiment analysis powered by FinBERT (local) with optional LLM support.
                 await update.message.reply_text("❌ No news articles found. Please try again later.")
                 return
 
-            # Show per-source breakdown
             results_text = "\n".join(source_results)
             await update.message.reply_text(
                 f"📊 *Articles Fetched:*\n"
                 f"{results_text}\n\n"
                 f"*Total: {len(all_articles)} articles*\n\n"
-                f"_Now analyzing sentiment..._",
+                f"_Analyzing sentiment (this may take a while on first run)..._",
                 parse_mode="Markdown"
             )
 
-            suggestions = await self.suggester.generate_suggestions(
+            suggestions = await asyncio.to_thread(
+                self._run_suggestions_sync,
                 all_articles,
-                min_score=min_score,
-                max_suggestions=max_suggestions
+                min_score,
+                max_suggestions
             )
 
             if not suggestions:
