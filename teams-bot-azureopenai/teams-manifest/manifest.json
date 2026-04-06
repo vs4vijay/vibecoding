@@ -1,0 +1,62 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "YOUR-BOT-APP-ID-HERE",
+  "packageName": "com.yourcompany.aiteamsbot",
+  "developer": {
+    "name": "Your Company Name",
+    "websiteUrl": "https://yourcompany.com",
+    "privacyUrl": "https://yourcompany.com/privacy",
+    "termsOfUseUrl": "https://yourcompany.com/terms"
+  },
+  "name": {
+    "short": "AI Assistant",
+    "full": "AI Assistant powered by Azure OpenAI"
+  },
+  "description": {
+    "short": "Intelligent AI chatbot for Teams",
+    "full": "An intelligent chatbot that helps answer questions using Azure OpenAI. Future capabilities include querying Kusto, Azure DevOps, and telemetry systems."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#FFFFFF",
+  "bots": [
+    {
+      "botId": "YOUR-BOT-APP-ID-HERE",
+      "scopes": [
+        "personal",
+        "team",
+        "groupchat"
+      ],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": [
+            "personal",
+            "team",
+            "groupchat"
+          ],
+          "commands": [
+            {
+              "title": "Help",
+              "description": "Get help on how to use the bot"
+            },
+            {
+              "title": "Clear History",
+              "description": "Clear conversation history"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": []
+}

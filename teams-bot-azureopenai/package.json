@@ -1,0 +1,28 @@
+{
+  "name": "teams-bot-azureopenai",
+  "version": "1.0.0",
+  "description": "Secure Teams Bot with Azure OpenAI integration using Managed Identity",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/restify": "^8.5.12"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.13.0",
+    "@azure/openai": "^2.0.0",
+    "botbuilder": "^4.23.3",
+    "dotenv": "^17.2.3",
+    "openai": "^6.22.0",
+    "restify": "^11.1.0"
+  }
+}
