@@ -1,0 +1,45 @@
+/* Globe component styles */
+
+.globe-container {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.cesium-viewer {
+  width: 100%;
+  height: 100%;
+}
+
+/* Override Cesium default styles for better integration */
+.cesium-viewer .cesium-widget-credits {
+  display: none !important;
+}
+
+.cesium-viewer .cesium-viewer-bottom {
+  display: none !important;
+}
+
+/* Fullscreen button styling */
+.cesium-viewer .cesium-fullscreenButton {
+  background-color: rgba(42, 42, 42, 0.8);
+}
+
+/* Animation widget styling */
+.cesium-viewer .cesium-animationWidget {
+  top: 50px;
+  left: 10px;
+}
+
+/* Timeline styling */
+.cesium-viewer .cesium-timelineWidget {
+  bottom: 30px;
+}
+
+/* Make the globe container responsive */
+@media (max-width: 768px) {
+  .globe-container {
+    height: 60vh;
+  }
+}

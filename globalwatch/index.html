@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GlobalWatch - CesiumJS with OpenStreetMap</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap');
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body, #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    
+    #cesiumContainer {
+      background: #0a0a0f;
+    }
+    
+    .cesium-viewer-bottom {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  
+  <script>
+    // OpenStreetMap tile provider configuration
+    // Using direct OSM tile URL (no API key required)
+    const OSM_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    
+    // OSM Attribution - required by OpenStreetMap license
+    const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+    
+    // Create OpenStreetMap imagery provider
+    const osmImageryProvider = new Cesium.UrlTemplateImageryProvider({
+      url: OSM_TILE_URL,
+      credit: new Cesium.Credit(OSM_ATTRIBUTION, true),
+      minimumLevel: 0,
+      maximumLevel: 19,
+      ellipsoid: Cesium.Ellipsoid.WGS84
+    });
+    
+    // Initialize Cesium Viewer with OSM tiles
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      // Use our OSM imagery provider
+      imageryProvider: osmImageryProvider,
+      
+      // Enable base layer picker (we'll customize it)
+      baseLayerPicker: true,
+      
+      // Timeline and animation widgets
+      timeline: false,
+      animation: false,
+      
+      // Scene mode - 3D globe
+      sceneMode: Cesium.SceneMode.SCENE3D,
+      
+      // Navigation controls
+      geocoder: false,
+      homeButton: true,
+      sceneModePicker: true,
+      navigationHelpButton: false,
+      
+      // Selection indicator
+      selectionIndicator: true,
+      
+      // Info box
+      infoBox: true,
+      
+      // Dark theme for the widgets
+      skyBox: new Cesium.SkyBox({
+        sources: {
+          positiveX: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg',
+          negativeX: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg',
+          positiveY: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg',
+          negativeY: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg',
+          positiveZ: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg',
+          negativeZ: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg'
+        }
+      }),
+      
+      // Fullscreen button
+      fullscreenButton: false
+    });
+    
+    // Configure for global coverage - enable depth testing for terrain
+    viewer.scene.globe.depthTestAgainstTerrain = true;
+    
+    // Set initial camera view to show global perspective
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(0, 20, 20000000)
+    });
+    
+    // Enable lighting based on sun position
+    viewer.scene.globe.enableLighting = true;
+    
+    // Remove default Bing Maps imagery if present
+    viewer.imageryLayers.removeAll();
+    
+    // Add OSM layer as the base layer
+    viewer.imageryLayers.addImageryProvider(osmImageryProvider);
+    
+    console.log('GlobalWatch initialized with OpenStreetMap tiles');
+    console.log('Tile URL:', OSM_TILE_URL);
+    console.log('Max zoom level: 19');
+  </script>
+</body>
+</html>
