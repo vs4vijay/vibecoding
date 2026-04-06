@@ -74,7 +74,15 @@ fn main() -> Result<()> {
         let public_key = key_pair.public_key();
         let public_key_str = public_key.to_openssh()?;
 
-        if public_key_str.starts_with(&args.prefix) {
+        let key_data = public_key_str
+            .split_whitespace()
+            .nth(1)
+            .ok_or_else(|| anyhow!("Invalid public key format"))?;
+
+        if key_data
+            .to_lowercase()
+            .starts_with(&args.prefix.to_lowercase())
+        {
             println!("\n\n✅ Found matching key after {} attempts!", attempts);
             println!(
                 "⏱️  Time elapsed: {:.2} seconds",

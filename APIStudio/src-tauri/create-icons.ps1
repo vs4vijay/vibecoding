@@ -1,0 +1,21 @@
+Add-Type -AssemblyName System.Drawing
+$bmp = New-Object System.Drawing.Bitmap(32,32)
+$g = [System.Drawing.Graphics]::FromImage($bmp)
+$g.Clear([System.Drawing.Color]::FromArgb(66, 133, 244))
+$g.Dispose()
+$bmp.Save("S:\GitHub\vibecoding\APIStudio\src-tauri\icons\32x32.png", [System.Drawing.Imaging.ImageFormat]::Png)
+$bmp.Dispose()
+
+$bmp128 = New-Object System.Drawing.Bitmap(128,128)
+$g128 = [System.Drawing.Graphics]::FromImage($bmp128)
+$g128.Clear([System.Drawing.Color]::FromArgb(66, 133, 244))
+$g128.Dispose()
+$bmp128.Save("S:\GitHub\vibecoding\APIStudio\src-tauri\icons\128x128.png", [System.Drawing.Imaging.ImageFormat]::Png)
+$bmp128.Dispose()
+
+$bmp256 = New-Object System.Drawing.Bitmap(256,256)
+$g256 = [System.Drawing.Graphics]::FromImage($bmp256)
+$g256.Clear([System.Drawing.Color]::FromArgb(66, 133, 244))
+$g256.Dispose()
+$bmp256.Save("S:\GitHub\vibecoding\APIStudio\src-tauri\icons\128x128@2x.png", [System.Drawing.Imaging.ImageFormat]::Png)
+$bmp256.Dispose()

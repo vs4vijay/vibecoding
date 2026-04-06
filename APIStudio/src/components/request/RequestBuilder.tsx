@@ -1,29 +1,44 @@
-import { useState } from 'react';
-import { Send } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Send, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HttpMethod, HttpHeader, QueryParam } from '@/types/request';
-import { sendHttpRequest } from '@/lib/http-client';
+import { sendHttpRequest, buildUrlWithParams } from '@/lib/http-client';
 import { HttpResponse } from '@/types/response';
+import { useRequestStore } from '@/stores/request-store';
+import { useEnvironmentStore } from '@/stores/environment-store';
+import { useHistoryStore } from '@/stores/history-store';
+import { useCollectionStore } from '@/stores/collection-store';
 
 interface RequestBuilderProps {
   onResponse?: (response: HttpResponse) => void;
 }
 
 export function RequestBuilder({ onResponse }: RequestBuilderProps) {
-  const [method, setMethod] = useState<HttpMethod>('GET');
-  const [url, setUrl] = useState('');
-  const [headers, setHeaders] = useState<HttpHeader[]>([
-    { key: '', value: '', enabled: true },
-  ]);
-  const [queryParams, setQueryParams] = useState<QueryParam[]>([
-    { key: '', value: '', enabled: true },
-  ]);
-  const [body, setBody] = useState('');
+  const currentRequest = useRequestStore((state) => state.currentRequest);
+  const setMethod = useRequestStore((state) => state.setMethod);
+  const setUrl = useRequestStore((state) => state.setUrl);
+  const setHeaders = useRequestStore((state) => state.setHeaders);
+  const setQueryParams = useRequestStore((state) => state.setQueryParams);
+  const setBody = useRequestStore((state) => state.setBody);
+  const setResponse = useRequestStore((state) => state.setResponse);
+  const loading = useRequestStore((state) => state.loading);
+  const setLoading = useRequestStore((state) => state.setLoading);
+
+  const getVariables = useEnvironmentStore((state) => state.getVariables);
+  const addToHistory = useHistoryStore((state) => state.addToHistory);
+  const activeRequestId = useCollectionStore((state) => state.activeRequestId);
+  const updateRequest = useCollectionStore((state) => state.updateRequest);
+
   const [activeTab, setActiveTab] = useState('params');
-  const [loading, setLoading] = useState(false);
+
+  const method = currentRequest.method || 'GET';
+  const url = currentRequest.url || '';
+  const headers = currentRequest.headers || [{ key: '', value: '', enabled: true }];
+  const queryParams = currentRequest.queryParams || [{ key: '', value: '', enabled: true }];
+  const body = currentRequest.body?.content || '';
 
   const addHeader = () => {
     setHeaders([...headers, { key: '', value: '', enabled: true }]);
@@ -53,18 +68,51 @@ export function RequestBuilder({ onResponse }: RequestBuilderProps) {
     setQueryParams(queryParams.filter((_, i) => i !== index));
   };
 
+  const handleSave = () => {
+    if (activeRequestId) {
+      updateRequest(activeRequestId, {
+        method,
+        url,
+        headers,
+        queryParams,
+        body: body ? { type: 'json', content: body } : undefined,
+      });
+    }
+  };
+
   const handleSend = async () => {
     if (!url) return;
 
     setLoading(true);
     try {
+      const variables = getVariables();
+      const finalUrl = buildUrlWithParams(url, queryParams, variables);
+
       const response = await sendHttpRequest({
         method,
-        url,
+        url: finalUrl,
         headers,
         body: body || undefined,
+        variables,
       });
+
+      setResponse(response);
       onResponse?.(response);
+
+      // Add to history
+      addToHistory({
+        request: {
+          method,
+          url: finalUrl,
+          headers: headers.reduce((acc, h) => {
+            if (h.enabled && h.key) acc[h.key] = h.value;
+            return acc;
+          }, {} as Record<string, string>),
+          body,
+        },
+        response,
+        timestamp: Date.now(),
+      });
     } catch (error) {
       console.error('Request failed:', error);
     } finally {

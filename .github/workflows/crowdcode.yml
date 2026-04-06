@@ -1,18 +1,26 @@
 name: CrowdCode Daily Run
 
 on:
+  workflow_dispatch:
   schedule:
     # Run daily at 12:00 UTC
     - cron: '0 12 * * *'
-  workflow_dispatch:  # Allow manual trigger
 
 jobs:
   crowdcode:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      issues: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
@@ -21,19 +29,25 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+        working-directory: CrowdController
+
+      - name: Install OpenCode CLI
+        run: |
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> $GITHUB_PATH
 
       - name: Run CrowdCode
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
           GITHUB_OWNER: ${{ github.repository_owner }}
           GITHUB_REPO: ${{ github.event.repository.name }}
         run: bun run index.ts
+        working-directory: CrowdController
 
       - name: Upload workspace logs (if any)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: crowdcode-logs
-          path: workspace/
+          path: CrowdController/workspace/
           if-no-files-found: ignore

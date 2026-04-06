@@ -1,0 +1,33 @@
+{
+  "name": "cosmosdb-tui",
+  "version": "1.0.0",
+  "description": "A LazyGit-inspired TUI for Azure Cosmos DB management",
+  "main": "dist/index.js",
+  "bin": {
+    "cosmosdb-tui": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target node",
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts",
+    "test-connection": "bun run src/test-connection.ts",
+    "clean": "rm -rf dist",
+    "welcome": "bun run welcome.ts",
+    "setup": "bun run setup.sh"
+  },
+  "keywords": ["cosmosdb", "tui", "azure", "database", "terminal"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@azure/cosmos": "^4.0.0",
+    "blessed": "^0.1.81",
+    "blessed-contrib": "^4.11.0",
+    "dotenv": "^16.4.5",
+    "chalk": "^4.1.2"
+  },
+  "devDependencies": {
+    "@types/blessed": "^0.1.25",
+    "@types/node": "^20.11.5",
+    "bun-types": "latest"
+  }
+}

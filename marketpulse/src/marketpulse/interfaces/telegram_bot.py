@@ -1,6 +1,5 @@
 import asyncio
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -46,28 +45,8 @@ class TelegramBot:
             NewsAPISource(),
             WebScraperSource(),
         ]
-        self.executor = ThreadPoolExecutor(max_workers=2)
 
         self._register_handlers()
-
-    def _run_suggestions_sync(self, all_articles, min_score, max_suggestions):
-        """Synchronous wrapper for generate_suggestions to run in thread pool."""
-        import nest_asyncio
-        nest_asyncio.apply()
-        
-        async def run_async():
-            return await self.suggester.generate_suggestions(
-                all_articles,
-                min_score=min_score,
-                max_suggestions=max_suggestions
-            )
-        
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(run_async())
-        finally:
-            loop.close()
 
     async def _broadcast_message(self, message: str):
         """Send message to all allowed users."""
@@ -337,11 +316,10 @@ Sentiment analysis powered by FinBERT (local) with optional LLM support.
                 parse_mode="Markdown"
             )
 
-            suggestions = await asyncio.to_thread(
-                self._run_suggestions_sync,
+            suggestions = await self.suggester.generate_suggestions(
                 all_articles,
-                min_score,
-                max_suggestions
+                min_score=min_score,
+                max_suggestions=max_suggestions
             )
 
             if not suggestions:
@@ -587,6 +565,23 @@ Use /help for available commands.
             logger.info(f"User access control: Enabled for {len(self.allowed_user_ids)} user(s)")
         else:
             logger.warning("User access control: DISABLED - Bot is open to all users!")
+
+        # Set up bot commands menu
+        from telegram import BotCommand
+        commands = [
+            BotCommand("start", "Start the bot"),
+            BotCommand("help", "Show help"),
+            BotCommand("myid", "Get your Telegram ID"),
+            BotCommand("analyze", "Run sentiment analysis"),
+            BotCommand("recent", "Get recent suggestions"),
+            BotCommand("settings", "View your settings"),
+            BotCommand("setfrequency", "Set analysis frequency"),
+            BotCommand("settime", "Set analysis time"),
+            BotCommand("setscore", "Set min sentiment score"),
+            BotCommand("status", "Check bot status"),
+        ]
+        self.application.bot.set_my_commands(commands)
+        logger.info("Bot commands registered")
 
         import platform
         is_windows = platform.system() == "Windows"

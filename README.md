@@ -2,6 +2,25 @@
 
 A collection of AI-assisted projects built with vibe coding - the art of coding through natural language conversations with AI assistants.
 
+---
+
+## AI Coding Agents
+
+These projects were built using:
+
+### [OpenCode](https://github.com/anomalyco/opencode)
+
+The open source AI coding agent. A powerful terminal-based AI assistant for developers, providing intelligent coding assistance directly in your terminal. Supports multiple AI providers including OpenAI, Anthropic Claude, Google Gemini, and more.
+
+### [Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode)
+
+The best agent harness - a plugin that transforms OpenCode into a powerful multi-agent orchestration system with specialized agents (Sisyphus, Oracle, Librarian, etc.), MCP support, and parallel execution capabilities.
+
+```bash
+OPENCODE_SERVER_USERNAME=viz OPENCODE_SERVER_PASSWORD=VerySecurePasswordHere opencode web --hostname 0.0.0.0 --port 3030 --mdns --mdns-domain vizcode.local
+```
+---
+
 ## Projects
 
 ### [WealthIQ](./wealthiq)
@@ -97,20 +116,6 @@ Experimental automated system where community proposes features through GitHub i
 - **Tech**: TypeScript, Bun, Octokit, simple-git
 - **Features**: GitHub issue integration, vote-based prioritization, automated PR creation
 - **Package Manager**: Bun
-
----
-
-## Tools Used
-
-These projects were built using:
-
-### [OpenCode](https://github.com/anomalyco/opencode)
-
-The open source AI coding agent. A powerful terminal-based AI assistant for developers, providing intelligent coding assistance directly in your terminal. Supports multiple AI providers including OpenAI, Anthropic Claude, Google Gemini, and more.
-
-### [Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode)
-
-The best agent harness - a plugin that transforms OpenCode into a powerful multi-agent orchestration system with specialized agents (Sisyphus, Oracle, Librarian, etc.), MCP support, and parallel execution capabilities.
 
 ---
 

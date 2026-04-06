@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun:*)",
+      "Bash(cargo clean:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(tree:*)",
+      "Bash(uv init:*)",
+      "Bash(uv run python:*)",
+      "Bash(uv sync:*)"
+    ]
+  }
+}
