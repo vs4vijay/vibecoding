@@ -365,6 +365,83 @@ def vm_list_shapes(ctx):
         click.echo(f"{shape.shape:<30} {ocpus:<10} {memory:<15}")
 
 
+@cli.group("keys")
+def keys():
+    """OCI API key management."""
+    pass
+
+
+@keys.command("generate")
+@click.option(
+    "--key-name",
+    default=None,
+    prompt=False,
+    help="Key name (default: oci_api_key)",
+)
+def keys_generate(key_name: str | None):
+    """Generate RSA key pair for OCI API signing."""
+    import subprocess
+
+    default_name = "oci_api_key"
+
+    while True:
+        if key_name is None:
+            prompt_name = click.prompt(
+                "Key name",
+                default=default_name,
+                type=str,
+            )
+        else:
+            prompt_name = key_name
+            key_name = None
+
+        oci_dir = Path.home() / ".oci"
+        private_key_path = oci_dir / f"{prompt_name}.pem"
+        public_key_path = oci_dir / f"{prompt_name}.public.pem"
+
+        if private_key_path.exists() or public_key_path.exists():
+            click.echo(f"[red]Error:[/red] Key files already exist:", err=True)
+            click.echo(f"  Private: {private_key_path}", err=True)
+            click.echo(f"  Public:  {public_key_path}", err=True)
+            click.echo()
+            prompt_name = click.prompt("Enter a different key name", default=default_name, type=str)
+            continue
+
+        break
+
+    oci_dir.mkdir(parents=True, exist_ok=True)
+
+    result = subprocess.run(
+        ["openssl", "genrsa", "-out", str(private_key_path), "2048"],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        click.echo(f"[red]Error:[/red] {result.stderr}", err=True)
+        sys.exit(1)
+
+    result = subprocess.run(
+        ["openssl", "rsa", "-pubout", "-in", str(private_key_path), "-out", str(public_key_path)],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        click.echo(f"[red]Error:[/red] {result.stderr}", err=True)
+        private_key_path.unlink(missing_ok=True)
+        sys.exit(1)
+
+    private_key_path.chmod(0o600)
+
+    console.print(Panel(
+        f"[green]✓[/green] Keys generated successfully!\n\n"
+        f"[bold]Private key:[/bold] {private_key_path}\n"
+        f"[bold]Public key:[/bold]  {public_key_path}\n\n"
+        f"[dim]Upload the public key to OCI console → Identity → Users → API Keys[/dim]",
+        title="[bold]Keys Created[/bold]",
+        border_style="green"
+    ))
+
+
 def main():
     cli(obj={})
 
