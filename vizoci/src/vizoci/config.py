@@ -26,6 +26,7 @@ class OCIConfig:
     max_instances: int = 1
     ssh_public_key: str = ""
     availability_domain: str = ""
+    assign_public_ip: bool = True
     boot_volume_size_in_gbs: int | None = None
 
 
@@ -67,6 +68,7 @@ def load_config(env_file: str = ".env") -> Config:
         max_instances=int(os.getenv("OCI_MAX_INSTANCES", "1")),
         ssh_public_key=os.getenv("OCI_SSH_PUBLIC_KEY", ""),
         availability_domain=os.getenv("OCI_AVAILABILITY_DOMAIN", ""),
+        assign_public_ip=os.getenv("OCI_ASSIGN_PUBLIC_IP", "true").lower() == "true",
         boot_volume_size_in_gbs=_parse_int_env("OCI_BOOT_VOLUME_SIZE_IN_GBS"),
     )
 

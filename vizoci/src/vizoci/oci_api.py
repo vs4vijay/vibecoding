@@ -135,7 +135,7 @@ class OCIApi:
 
     def get_vnic(self, vnic_id: str):
         """Get VNIC details."""
-        from oci.network_management import VirtualNetworkClient
+        from oci.core import VirtualNetworkClient
 
         vnc_client = VirtualNetworkClient(self._config)
         response = vnc_client.get_vnic(vnic_id=vnic_id)
@@ -149,7 +149,7 @@ class OCIApi:
 
         create_vnic_details = oci.core.models.CreateVnicDetails(
             subnet_id=self.config.subnet_id,
-            assign_public_ip=False,
+            assign_public_ip=self.config.assign_public_ip,
             assign_private_dns_record=True,
         )
 
