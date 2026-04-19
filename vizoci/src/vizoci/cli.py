@@ -31,7 +31,7 @@ def cli(ctx, env_file: str):
 def get_api(ctx):
     """Get OCI API client, auto-discovering config if needed."""
     config = ctx.obj["config"]
-    errors = validate_discoverable(config)
+    errors = validate_config(config, require_all=True)
     if errors:
         click.echo("Configuration errors:", err=True)
         for error in errors:
@@ -47,6 +47,14 @@ def discover(ctx):
     run = ctx.obj.get("run", 1)
     env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
+
+    errors = validate_config(config, require_all=True)
+    if errors:
+        click.echo("Configuration errors:", err=True)
+        for error in errors:
+            click.echo(f"  - {error}", err=True)
+        sys.exit(1)
+
     api = OCIApi(config.oci)
 
     discovered = api.get_config()
@@ -207,7 +215,8 @@ def vm_list(ctx, shape: str | None, state: str | None):
     """List all instances in the compartment."""
     env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
-    errors = validate_discoverable(config)
+
+    errors = validate_config(config, require_all=True)
     if errors:
         click.echo("Configuration errors:", err=True)
         for error in errors:
@@ -253,6 +262,13 @@ def vm_create(ctx, loop_mode: bool, loop_min: int, loop_max: int):
     env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
 
+    errors = validate_config(config, require_all=True)
+    if errors:
+        click.echo("Configuration errors:", err=True)
+        for error in errors:
+            click.echo(f"  - {error}", err=True)
+        sys.exit(1)
+
     api = OCIApi(config.oci)
 
     if not config.oci.tenancy_id:
@@ -287,7 +303,8 @@ def vm_get(ctx, instance_id: str):
     """Get details of a specific instance."""
     env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
-    errors = validate_discoverable(config)
+
+    errors = validate_config(config, require_all=True)
     if errors:
         click.echo("Configuration errors:", err=True)
         for error in errors:
@@ -325,7 +342,8 @@ def vm_list_ads(ctx):
     """List availability domains."""
     env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
-    errors = validate_discoverable(config)
+
+    errors = validate_config(config, require_all=True)
     if errors:
         click.echo("Configuration errors:", err=True)
         for error in errors:
@@ -347,7 +365,8 @@ def vm_list_shapes(ctx):
     """List available shapes in the region."""
     env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
-    errors = validate_discoverable(config)
+
+    errors = validate_config(config, require_all=True)
     if errors:
         click.echo("Configuration errors:", err=True)
         for error in errors:
@@ -432,10 +451,32 @@ def keys_generate(key_name: str | None):
 
     private_key_path.chmod(0o600)
 
+    # Generate both fingerprints
+    import hashlib
+    
+    # Standard fingerprint (for reference)
+    result_std = subprocess.run(
+        ["openssl", "rsa", "-in", str(private_key_path), "-pubout"],
+        capture_output=True, text=True
+    )
+    std_fp = hashlib.md5(result_std.stdout.encode()).hexdigest()
+    std_fp_formatted = ":".join(std_fp[i:i+2] for i in range(0, len(std_fp), 2))
+    
+    # OCI fingerprint (DER format - what OCI uses)
+    result_der = subprocess.run(
+        ["openssl", "rsa", "-in", str(private_key_path), "-pubout", "-outform", "DER"],
+        capture_output=True
+    )
+    oci_fp = hashlib.md5(result_der.stdout).hexdigest()
+    oci_fp_formatted = ":".join(oci_fp[i:i+2] for i in range(0, len(oci_fp), 2))
+
     console.print(Panel(
         f"[green]✓[/green] Keys generated successfully!\n\n"
         f"[bold]Private key:[/bold] {private_key_path}\n"
         f"[bold]Public key:[/bold]  {public_key_path}\n\n"
+        f"[bold]Fingerprints:[/bold]\n"
+        f"  Standard (SSH/API): {std_fp_formatted}\n"
+        f"  [bold]OCI (use this):[/bold] {oci_fp_formatted}\n\n"
         f"[dim]Upload the public key to OCI console → Identity → Users → API Keys[/dim]",
         title="[bold]Keys Created[/bold]",
         border_style="green"
