@@ -1,0 +1,27 @@
+{
+  "alwaysThinkingEnabled": true,
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(ls *)",
+      "Bash(tree:*)",
+      "Bash(pytest)",
+      "Bash(git status)",
+      "Bash(uv run python:*)",
+      "Bash(uv sync:*)",
+      "Bash(bun:*)",
+      "Bash(cargo clean:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)"
+    ],
+    "ask": [
+      "Bash(rm -rf *)",
+      "Bash(git push *)",
+      "Bash(git reset --hard)",
+      "Read(**/.env*)"
+    ],
+    "deny": ["Read(~/.ssh/**)"]
+  }
+}
