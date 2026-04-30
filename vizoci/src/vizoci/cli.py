@@ -31,7 +31,7 @@ def cli(ctx, env_file: str):
 def get_api(ctx):
     """Get OCI API client, auto-discovering config if needed."""
     config = ctx.obj["config"]
-    errors = validate_discoverable(config)
+    errors = validate_config(config, require_all=True)
     if errors:
         click.echo("Configuration errors:", err=True)
         for error in errors:
@@ -47,6 +47,14 @@ def discover(ctx):
     run = ctx.obj.get("run", 1)
     env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
+
+    errors = validate_config(config, require_all=True)
+    if errors:
+        click.echo("Configuration errors:", err=True)
+        for error in errors:
+            click.echo(f"  - {error}", err=True)
+        sys.exit(1)
+
     api = OCIApi(config.oci)
 
     discovered = api.get_config()
@@ -66,6 +74,46 @@ def discover(ctx):
         try:
             compartment = api.get_compartment()
             console.print(f"[green]✓[/green] Tenancy Name: [bold]{compartment.name}[/bold]")
+        except Exception as e:
+            console.print(f"[red]✗[/red] Error: {e}")
+
+    console.print()
+
+    with Status("[cyan]Fetching running instances...", console=console):
+        try:
+            instances = api.get_instances()
+            running = [i for i in instances if i.lifecycle_state == "RUNNING"]
+            
+            if running:
+                instances_table = Table(title="Running Instances", box=SIMPLE_HEAVY)
+                instances_table.add_column("Name", style="cyan", no_wrap=True)
+                instances_table.add_column("Shape", style="white")
+                instances_table.add_column("IP", style="green")
+                instances_table.add_column("ID", style="dim")
+                
+                for inst in running:
+                    ip = ""
+                    try:
+                        vnics = api.get_instance_vnics(inst.id)
+                        if vnics:
+                            vnic_details = api.get_vnic(vnics[0].vnic_id)
+                            if hasattr(vnic_details, 'public_ip') and vnic_details.public_ip:
+                                ip = vnic_details.public_ip
+                            elif hasattr(vnic_details, 'private_ip') and vnic_details.private_ip:
+                                ip = vnic_details.private_ip
+                    except Exception:
+                        pass
+                    
+                    instances_table.add_row(
+                        inst.display_name or "N/A",
+                        inst.shape,
+                        ip,
+                        inst.id[:20] + "..." if len(inst.id) > 20 else inst.id
+                    )
+                
+                console.print(Panel(instances_table, border_style="green"))
+            else:
+                console.print("[yellow]No running instances found[/yellow]")
         except Exception as e:
             console.print(f"[red]✗[/red] Error: {e}")
 
@@ -96,29 +144,31 @@ def discover(ctx):
                 oracle_images = [i for i in images if "Oracle" in i.display_name and "Ubuntu" not in i.display_name]
                 other_images = [i for i in images if "Ubuntu" not in i.display_name and "Oracle" not in i.display_name and "Windows" not in i.display_name]
 
-                console.print("[bold]Images:[/bold]")
+                images_content = ""
                 
                 if ubuntu_images:
-                    console.print("\n  [bold cyan]Ubuntu:[/bold cyan]")
+                    images_content += "[bold cyan]Ubuntu:[/bold cyan]\n"
                     for image in ubuntu_images:
-                        console.print(f"    [white]{image.display_name}[/white]")
-                        console.print(f"      [dim]{image.id}[/dim]")
+                        images_content += f"  [white]{image.display_name}[/white]\n"
+                        images_content += f"    [dim]{image.id}[/dim]\n"
                 
                 if oracle_images:
-                    console.print("\n  [bold]Oracle Linux:[/bold]")
+                    images_content += "\n[bold]Oracle Linux:[/bold]\n"
                     for image in oracle_images[:5]:
-                        console.print(f"    [white]{image.display_name}[/white]")
-                        console.print(f"      [dim]{image.id}[/dim]")
+                        images_content += f"  [white]{image.display_name}[/white]\n"
+                        images_content += f"    [dim]{image.id}[/dim]\n"
                     if len(oracle_images) > 5:
-                        console.print(f"    [dim]... and {len(oracle_images) - 5} more[/dim]")
+                        images_content += f"  [dim]... and {len(oracle_images) - 5} more[/dim]\n"
                 
                 if other_images:
-                    console.print("\n  [bold]Other:[/bold]")
+                    images_content += "\n[bold]Other:[/bold]\n"
                     for image in other_images[:10]:
-                        console.print(f"    [white]{image.display_name}[/white]")
-                        console.print(f"      [dim]{image.id}[/dim]")
+                        images_content += f"  [white]{image.display_name}[/white]\n"
+                        images_content += f"    [dim]{image.id}[/dim]\n"
                     if len(other_images) > 10:
-                        console.print(f"    [dim]... and {len(other_images) - 10} more[/dim]")
+                        images_content += f"  [dim]... and {len(other_images) - 10} more[/dim]\n"
+                
+                console.print(Panel(images_content.strip(), title="Images", border_style="cyan"))
             else:
                 console.print("[yellow]No images found[/yellow]")
         except Exception as e:
@@ -158,12 +208,15 @@ def vm():
 
 
 @vm.command("list")
+@click.pass_context
 @click.option("--shape", default=None, help="Filter by shape")
 @click.option("--state", default=None, help="Filter by state")
-def vm_list(shape: str | None, state: str | None):
+def vm_list(ctx, shape: str | None, state: str | None):
     """List all instances in the compartment."""
+    env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
-    errors = validate_discoverable(config)
+
+    errors = validate_config(config, require_all=True)
     if errors:
         click.echo("Configuration errors:", err=True)
         for error in errors:
@@ -182,19 +235,39 @@ def vm_list(shape: str | None, state: str | None):
         click.echo("No instances found.")
         return
 
-    click.echo(f"{'Name':<30} {'Shape':<25} {'State':<15} {'ID':<50}")
+    click.echo(f"{'Name':<30} {'Shape':<25} {'State':<15} {'IP':<18} {'ID':<30}")
     click.echo("-" * 120)
     for inst in instances:
-        click.echo(f"{inst.display_name:<30} {inst.shape:<25} {inst.lifecycle_state:<15} {inst.id:<50}")
+        ip = ""
+        try:
+            vnics = api.get_instance_vnics(inst.id)
+            if vnics:
+                vnic_details = api.get_vnic(vnics[0].vnic_id)
+                if hasattr(vnic_details, 'public_ip') and vnic_details.public_ip:
+                    ip = vnic_details.public_ip
+                elif hasattr(vnic_details, 'private_ip') and vnic_details.private_ip:
+                    ip = vnic_details.private_ip
+        except Exception:
+            pass
+        click.echo(f"{inst.display_name:<30} {inst.shape:<25} {inst.lifecycle_state:<15} {ip:<18} {inst.id[:30]:<30}")
 
 
 @vm.command("create")
+@click.pass_context
 @click.option("--loop", "loop_mode", is_flag=True, help="Run in loop mode until instance is created")
 @click.option("--loop-min", default=60, type=int, help="Min loop interval in seconds")
 @click.option("--loop-max", default=120, type=int, help="Max loop interval in seconds")
-def vm_create(loop_mode: bool, loop_min: int, loop_max: int):
+def vm_create(ctx, loop_mode: bool, loop_min: int, loop_max: int):
     """Create a new instance."""
+    env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
+
+    errors = validate_config(config, require_all=True)
+    if errors:
+        click.echo("Configuration errors:", err=True)
+        for error in errors:
+            click.echo(f"  - {error}", err=True)
+        sys.exit(1)
 
     api = OCIApi(config.oci)
 
@@ -224,11 +297,14 @@ def vm_create(loop_mode: bool, loop_min: int, loop_max: int):
 
 
 @vm.command("get")
+@click.pass_context
 @click.argument("instance_id")
-def vm_get(instance_id: str):
+def vm_get(ctx, instance_id: str):
     """Get details of a specific instance."""
+    env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
-    errors = validate_discoverable(config)
+
+    errors = validate_config(config, require_all=True)
     if errors:
         click.echo("Configuration errors:", err=True)
         for error in errors:
@@ -261,10 +337,13 @@ def vm_get(instance_id: str):
 
 
 @vm.command("list-ads")
-def vm_list_ads():
+@click.pass_context
+def vm_list_ads(ctx):
     """List availability domains."""
+    env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
-    errors = validate_discoverable(config)
+
+    errors = validate_config(config, require_all=True)
     if errors:
         click.echo("Configuration errors:", err=True)
         for error in errors:
@@ -281,10 +360,13 @@ def vm_list_ads():
 
 
 @vm.command("list-shapes")
-def vm_list_shapes():
+@click.pass_context
+def vm_list_shapes(ctx):
     """List available shapes in the region."""
+    env_file = ctx.obj.get("env_file", ".env")
     config = load_config(env_file)
-    errors = validate_discoverable(config)
+
+    errors = validate_config(config, require_all=True)
     if errors:
         click.echo("Configuration errors:", err=True)
         for error in errors:
@@ -300,6 +382,105 @@ def vm_list_shapes():
         ocpus = shape.shape_config.ocpus if hasattr(shape, 'shape_config') and shape.shape_config else "?"
         memory = shape.shape_config.memory_in_gbs if hasattr(shape, 'shape_config') and shape.shape_config else "?"
         click.echo(f"{shape.shape:<30} {ocpus:<10} {memory:<15}")
+
+
+@cli.group("keys")
+def keys():
+    """OCI API key management."""
+    pass
+
+
+@keys.command("generate")
+@click.option(
+    "--key-name",
+    default=None,
+    prompt=False,
+    help="Key name (default: oci_api_key)",
+)
+def keys_generate(key_name: str | None):
+    """Generate RSA key pair for OCI API signing."""
+    import subprocess
+
+    default_name = "oci_api_key"
+
+    while True:
+        if key_name is None:
+            prompt_name = click.prompt(
+                "Key name",
+                default=default_name,
+                type=str,
+            )
+        else:
+            prompt_name = key_name
+            key_name = None
+
+        oci_dir = Path.home() / ".oci"
+        private_key_path = oci_dir / f"{prompt_name}.pem"
+        public_key_path = oci_dir / f"{prompt_name}.public.pem"
+
+        if private_key_path.exists() or public_key_path.exists():
+            click.echo(f"[red]Error:[/red] Key files already exist:", err=True)
+            click.echo(f"  Private: {private_key_path}", err=True)
+            click.echo(f"  Public:  {public_key_path}", err=True)
+            click.echo()
+            prompt_name = click.prompt("Enter a different key name", default=default_name, type=str)
+            continue
+
+        break
+
+    oci_dir.mkdir(parents=True, exist_ok=True)
+
+    result = subprocess.run(
+        ["openssl", "genrsa", "-out", str(private_key_path), "2048"],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        click.echo(f"[red]Error:[/red] {result.stderr}", err=True)
+        sys.exit(1)
+
+    result = subprocess.run(
+        ["openssl", "rsa", "-pubout", "-in", str(private_key_path), "-out", str(public_key_path)],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        click.echo(f"[red]Error:[/red] {result.stderr}", err=True)
+        private_key_path.unlink(missing_ok=True)
+        sys.exit(1)
+
+    private_key_path.chmod(0o600)
+
+    # Generate both fingerprints
+    import hashlib
+    
+    # Standard fingerprint (for reference)
+    result_std = subprocess.run(
+        ["openssl", "rsa", "-in", str(private_key_path), "-pubout"],
+        capture_output=True, text=True
+    )
+    std_fp = hashlib.md5(result_std.stdout.encode()).hexdigest()
+    std_fp_formatted = ":".join(std_fp[i:i+2] for i in range(0, len(std_fp), 2))
+    
+    # OCI fingerprint (DER format - what OCI uses)
+    result_der = subprocess.run(
+        ["openssl", "rsa", "-in", str(private_key_path), "-pubout", "-outform", "DER"],
+        capture_output=True
+    )
+    oci_fp = hashlib.md5(result_der.stdout).hexdigest()
+    oci_fp_formatted = ":".join(oci_fp[i:i+2] for i in range(0, len(oci_fp), 2))
+
+    console.print(Panel(
+        f"[green]✓[/green] Keys generated successfully!\n\n"
+        f"[bold]Private key:[/bold] {private_key_path}\n"
+        f"[bold]Public key:[/bold]  {public_key_path}\n\n"
+        f"[bold]Fingerprints:[/bold]\n"
+        f"  Standard (SSH/API): {std_fp_formatted}\n"
+        f"  [bold]OCI (use this):[/bold] {oci_fp_formatted}\n\n"
+        f"[dim]Upload the public key to OCI console → Identity → Users → API Keys[/dim]",
+        title="[bold]Keys Created[/bold]",
+        border_style="green"
+    ))
 
 
 def main():
