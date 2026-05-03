@@ -1,0 +1,26 @@
+// Prisma schema for Postgres-for-everything stack
+// Supports both PostgreSQL (production) and PGlite (local development)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Example model - replace with your domain models
+model Item {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("items")
+}
+
+// Note: Graphile Worker tables (_private_jobs, _private_known_crontabs, etc.)
+// are managed automatically by Graphile Worker's migration system.
+// No need to define them in Prisma schema.

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /a \"S:\\\\GitHub\\\\vibecoding\\\\vibecoding-starter\")",
+      "Bash(bunx create-next-app:*)",
+      "Bash(bun add:*)",
+      "Bash(bun run:*)",
+      "Bash(taskkill:*)",
+      "Bash(curl:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(start http://localhost:3000)",
+      "Bash(PORT=9000 bun run:*)"
+    ]
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "vibecoding-starter",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "PORT=7070 bun run scripts/dev.ts",
+    "dev:next": "next dev",
+    "dev:worker": "bun run src/lib/worker.ts",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:generate": "prisma generate",
+    "db:init": "bun run scripts/init-db.ts",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "bun run prisma/seed.ts",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.4.5",
+    "@prisma/client": "6",
+    "graphile-worker": "^0.16.6",
+    "next": "16.2.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "^4.4.1"
+  },
+  "devDependencies": {
+    "@prisma/adapter-pg": "6",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "prisma": "6",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "ignoreScripts": [
+    "sharp",
+    "unrs-resolver"
+  ],
+  "trustedDependencies": [
+    "sharp",
+    "unrs-resolver"
+  ]
+}
