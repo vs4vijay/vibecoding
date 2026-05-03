@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 const enqueueJobSchema = z.object({
   taskName: z.string(),
-  payload: z.record(z.any()),
+  payload: z.record(z.string(), z.any()),
   runAt: z.string().datetime().optional(),
   maxAttempts: z.number().int().min(1).max(100).optional(),
   priority: z.number().int().min(-1000).max(1000).optional(),
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation failed', details: error.errors },
+        { error: 'Validation failed', details: error.issues },
         { status: 400 }
       );
     }

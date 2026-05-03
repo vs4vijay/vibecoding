@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { executeQuery } from '@/lib/db';
 import { z } from 'zod';
+
+// Force Node.js runtime for PGlite compatibility
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const updateItemSchema = z.object({
   name: z.string().min(1).max(255).optional(),
@@ -21,18 +25,19 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const item = await prisma.item.findUnique({
-      where: { id },
-    });
+    const items = await executeQuery(
+      'SELECT * FROM items WHERE id = $1',
+      [id]
+    );
 
-    if (!item) {
+    if (items.length === 0) {
       return NextResponse.json(
         { error: 'Item not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ item });
+    return NextResponse.json({ item: items[0] });
   } catch (error) {
     console.error('Failed to fetch item:', error);
     return NextResponse.json(
@@ -55,16 +60,46 @@ export async function PATCH(
     const body = await request.json();
     const data = updateItemSchema.parse(body);
 
-    const item = await prisma.item.update({
-      where: { id },
-      data,
-    });
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
 
-    return NextResponse.json({ item });
+    if (data.name !== undefined) {
+      updates.push(`name = $${paramIndex++}`);
+      values.push(data.name);
+    }
+    if (data.description !== undefined) {
+      updates.push(`description = $${paramIndex++}`);
+      values.push(data.description);
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      );
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+
+    const result = await executeQuery(
+      `UPDATE items SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      values
+    );
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Item not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ item: result[0] });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation failed', details: error.errors },
+        { error: 'Validation failed', details: error.issues },
         { status: 400 }
       );
     }
@@ -88,9 +123,17 @@ export async function DELETE(
   try {
     const { id } = await context.params;
 
-    await prisma.item.delete({
-      where: { id },
-    });
+    const result = await executeQuery(
+      'DELETE FROM items WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Item not found' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
