@@ -4,7 +4,7 @@ A collection of AI-assisted projects built with vibe coding - the art of coding 
 
 ---
 
-## AI Coding Agents
+## AI Coding Agents, Skills, and Tools uses
 
 These projects were built using:
 
@@ -19,6 +19,30 @@ The best agent harness - a plugin that transforms OpenCode into a powerful multi
 ```bash
 OPENCODE_SERVER_USERNAME=viz OPENCODE_SERVER_PASSWORD=VerySecurePasswordHere opencode web --hostname 0.0.0.0 --port 3030 --mdns --mdns-domain vizcode.local
 ```
+
+- rtk-ai
+- claude skill add juliusbrussee/caveman:caveman
+- playwright-cli Skills
+  - bunx skills add https://github.com/microsoft/playwright-cli --skill playwright-cli
+- superpowers Skills
+
+
+
+bunx skills add https://github.com/vercel-labs/skills --skill find-skills
+
+bunx skills add https://github.com/browser-use/browser-use --skill browser-use
+
+bunx skills add vercel-labs/agent-browser
+
+bunx skills add remotion/agent-skills
+
+bunx skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
+
+https://mcp.excalidraw.com
+
+
+
+
 ---
 
 ## Projects
