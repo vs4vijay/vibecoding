@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=1920, height=1080" />
-    <title>Product Promo</title>
+    <title>WealthIQ Product Demo</title>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=block"
@@ -21,7 +21,7 @@
         width: 1920px;
         height: 1080px;
         overflow: hidden;
-        background: #0a0a0f;
+        background: #0f172a;
         font-family: "Inter", sans-serif;
       }
       .scene {
@@ -33,7 +33,7 @@
       }
       .caption-text-wrapper {
         position: absolute;
-        bottom: 150px;
+        bottom: 120px;
         left: 0;
         right: 0;
         display: flex;
@@ -44,13 +44,27 @@
       }
       .caption-line {
         color: white;
-        font-size: 48px;
+        font-size: 40px;
         font-weight: 600;
         letter-spacing: -0.02em;
         text-align: center;
         text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
         transform: translateY(100%);
         opacity: 0;
+      }
+      .feature-badge {
+        position: absolute;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+        color: white;
+        padding: 12px 28px;
+        border-radius: 30px;
+        font-size: 18px;
+        font-weight: 700;
+        opacity: 0;
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
       }
     </style>
   </head>
@@ -59,44 +73,83 @@
       id="root"
       data-composition-id="main"
       data-start="0"
-      data-duration="20"
+      data-duration="30"
       data-width="1920"
       data-height="1080"
     >
-      <!-- Scene 1: Logo Intro -->
+      <!-- Scene 1: WealthIQ Intro -->
       <div
         id="scene-1"
         class="scene"
-        data-composition-id="scene1-logo-intro"
-        data-composition-src="compositions/scene1-logo-intro.html"
+        data-composition-id="scene1-wealthiq-intro"
+        data-composition-src="compositions/scene1-wealthiq-intro.html"
         data-start="0"
-        data-duration="1.5"
+        data-duration="2"
         data-track-index="1"
         data-width="1920"
         data-height="1080"
       ></div>
 
-      <!-- Scene 2-4: Continuous Canvas -->
+      <!-- Scene 2: Explorer -->
       <div
-        id="scene-2-4"
+        id="scene-2"
         class="scene"
-        data-composition-id="scene2-4-canvas"
-        data-composition-src="compositions/scene2-4-canvas.html"
-        data-start="1.5"
-        data-duration="12.5"
+        data-composition-id="scene2-explorer"
+        data-composition-src="compositions/scene2-explorer.html"
+        data-start="2"
+        data-duration="5"
         data-track-index="1"
         data-width="1920"
         data-height="1080"
       ></div>
 
-      <!-- Scene 5: Logo Outro -->
+      <!-- Scene 3: Compare -->
+      <div
+        id="scene-3"
+        class="scene"
+        data-composition-id="scene3-compare"
+        data-composition-src="compositions/scene3-compare.html"
+        data-start="7"
+        data-duration="5"
+        data-track-index="1"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <!-- Scene 4: SIP Calculator -->
+      <div
+        id="scene-4"
+        class="scene"
+        data-composition-id="scene4-sip"
+        data-composition-src="compositions/scene4-sip.html"
+        data-start="12"
+        data-duration="5"
+        data-track-index="1"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <!-- Scene 5: Portfolio -->
       <div
         id="scene-5"
         class="scene"
-        data-composition-id="scene5-logo-outro"
-        data-composition-src="compositions/scene5-logo-outro.html"
-        data-start="14"
-        data-duration="6"
+        data-composition-id="scene5-portfolio"
+        data-composition-src="compositions/scene5-portfolio.html"
+        data-start="17"
+        data-duration="5"
+        data-track-index="1"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <!-- Scene 6: Outro -->
+      <div
+        id="scene-6"
+        class="scene"
+        data-composition-id="scene6-outro"
+        data-composition-src="compositions/scene6-outro.html"
+        data-start="22"
+        data-duration="8"
         data-track-index="1"
         data-width="1920"
         data-height="1080"
@@ -106,14 +159,14 @@
       <div
         id="captions-comp"
         data-composition-id="captions"
-        data-start="1.5"
-        data-duration="12.5"
+        data-start="2"
+        data-duration="20"
         data-track-index="2"
         data-width="1920"
         data-height="1080"
       >
         <div class="caption-text-wrapper">
-          <div id="caption-text" class="caption-line">Starting with a blank canvas.</div>
+          <div id="caption-text" class="caption-line">Explore 2,800+ mutual funds with real-time NAV.</div>
         </div>
 
         <script>
@@ -121,18 +174,19 @@
             const tl = gsap.timeline({ paused: true });
             const text = document.querySelector("#caption-text");
 
-            tl.to(text, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, 0);
-            tl.to(text, { opacity: 0, y: -20, duration: 0.3, ease: "power3.in" }, 3.2);
-            tl.set(text, { innerText: "Three cursors. One file. Zero meetings.", y: 40 }, 3.5);
-            tl.to(text, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 3.5);
-            tl.to(text, { opacity: 0, y: -20, duration: 0.3, ease: "power3.in" }, 7.7);
-            tl.set(
-              text,
-              { innerText: "Components in. Feedback resolved. No one waited.", y: 40 },
-              8.0,
-            );
-            tl.to(text, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 8.0);
-            tl.to(text, { opacity: 0, y: -20, duration: 0.4, ease: "power3.in" }, 12.1);
+            tl.to(text, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0);
+            tl.to(text, { opacity: 0, y: -20, duration: 0.3, ease: "power3.in" }, 4.5);
+            tl.set(text, { innerText: "Compare funds side-by-side with visual charts.", y: 40 }, 4.8);
+            tl.to(text, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 4.8);
+            tl.to(text, { opacity: 0, y: -20, duration: 0.3, ease: "power3.in" }, 9.3);
+            tl.set(text, { innerText: "Plan your investments with the SIP calculator.", y: 40 }, 9.6);
+            tl.to(text, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 9.6);
+            tl.to(text, { opacity: 0, y: -20, duration: 0.3, ease: "power3.in" }, 14.1);
+            tl.set(text, { innerText: "Track your watchlist and recent views.", y: 40 }, 14.4);
+            tl.to(text, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 14.4);
+            tl.to(text, { opacity: 0, y: -20, duration: 0.3, ease: "power3.in" }, 18.9);
+            tl.set(text, { innerText: "Start your investment journey with WealthIQ.", y: 40 }, 19.2);
+            tl.to(text, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 19.2);
 
             window.__timelines = window.__timelines || {};
             window.__timelines["captions"] = tl;
@@ -145,12 +199,17 @@
       window.__timelines = window.__timelines || {};
       const mainTl = gsap.timeline({ paused: true });
 
-      mainTl.set("#scene-2-4", { scale: 1, filter: "blur(0px)" }, 1.5);
-      mainTl.to(
-        "#scene-2-4",
-        { duration: 0.25, scale: 0.94, filter: "blur(6px)", opacity: 0, ease: "power2.in" },
-        13.75,
-      );
+      mainTl.set("#scene-2", { scale: 1, opacity: 1 }, 2);
+      mainTl.to("#scene-2", { duration: 0.3, scale: 0.96, filter: "blur(4px)", opacity: 0, ease: "power2.in" }, 6.7);
+      
+      mainTl.set("#scene-3", { scale: 1, opacity: 1 }, 7);
+      mainTl.to("#scene-3", { duration: 0.3, scale: 0.96, filter: "blur(4px)", opacity: 0, ease: "power2.in" }, 11.7);
+
+      mainTl.set("#scene-4", { scale: 1, opacity: 1 }, 12);
+      mainTl.to("#scene-4", { duration: 0.3, scale: 0.96, filter: "blur(4px)", opacity: 0, ease: "power2.in" }, 16.7);
+
+      mainTl.set("#scene-5", { scale: 1, opacity: 1 }, 17);
+      mainTl.to("#scene-5", { duration: 0.3, scale: 0.96, filter: "blur(4px)", opacity: 0, ease: "power2.in" }, 21.7);
 
       window.__timelines["main"] = mainTl;
     </script>

@@ -1,0 +1,141 @@
+<template id="scene3-compare-template">
+  <div
+    data-composition-id="scene3-compare"
+    data-width="1920"
+    data-height="1080"
+  >
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      .scene3-compare-content {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #f8fafc;
+        font-family: "Inter", sans-serif;
+      }
+      .header { background: white; padding: 24px 48px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; }
+      .logo { display: flex; align-items: center; gap: 16px; }
+      .logo-icon { width: 48px; height: 48px; background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+      .logo-icon span { color: white; font-size: 24px; font-weight: 800; }
+      .logo-text h1 { font-size: 24px; font-weight: 800; color: #0f172a; }
+      .logo-text p { font-size: 12px; color: #64748b; }
+      .nav-tabs { display: flex; gap: 8px; background: #f1f5f9; padding: 6px; border-radius: 10px; }
+      .nav-tab { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; color: #475569; }
+      .nav-tab:nth-child(2) { background: white; color: #3b82f6; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+      .main-content { padding: 40px 48px; max-width: 1400px; margin: 0 auto; }
+      .section-label { font-size: 14px; font-weight: 600; color: #3b82f6; text-transform: uppercase; margin-bottom: 8px; }
+      .section-title { font-size: 36px; font-weight: 700; color: #0f172a; margin-bottom: 32px; }
+      .compare-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+      .fund-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+      .fund-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+      .fund-card-title { font-size: 18px; font-weight: 700; color: #0f172a; line-height: 1.3; }
+      .remove-btn { width: 28px; height: 28px; border-radius: 50%; border: none; background: #fee2e2; color: #ef4444; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+      .fund-meta { display: flex; gap: 12px; margin-bottom: 20px; }
+      .meta-tag { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+      .tag-blue { background: #dbeafe; color: #2563eb; }
+      .tag-purple { background: #ede9fe; color: #7c3aed; }
+      .nav-display { display: flex; align-items: baseline; gap: 8px; margin-bottom: 16px; }
+      .nav-label { font-size: 14px; color: #64748b; }
+      .nav-amount { font-size: 32px; font-weight: 800; color: #0f172a; }
+      .returns-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+      .return-item { text-align: center; padding: 12px; border-radius: 10px; background: #f8fafc; }
+      .return-period { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+      .return-value { font-size: 18px; font-weight: 700; }
+      .positive { color: #10b981; }
+      .negative { color: #ef4444; }
+      .chart-section { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+      .chart-title { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 20px; }
+      .chart-container { height: 200px; position: relative; }
+    </style>
+    <div class="scene3-compare-content">
+      <div class="header">
+        <div class="logo"><div class="logo-icon"><span>W</span></div><div class="logo-text"><h1>WealthIQ</h1><p>Mutual Fund Analytics</p></div></div>
+        <div class="nav-tabs">
+          <div class="nav-tab">Explorer</div>
+          <div class="nav-tab">Compare</div>
+          <div class="nav-tab">SIP Calculator</div>
+          <div class="nav-tab">Suggest</div>
+          <div class="nav-tab">Portfolio</div>
+        </div>
+        <div style="font-size: 14px; color: #64748b;">3 funds selected</div>
+      </div>
+      <div class="main-content">
+        <div class="section-label">Feature</div>
+        <h2 class="section-title">Compare Funds</h2>
+        <div class="compare-grid">
+          <div class="fund-card">
+            <div class="fund-card-header"><div class="fund-card-title">SBI Blue Chip Fund</div><button class="remove-btn">×</button></div>
+            <div class="fund-meta"><span class="meta-tag tag-blue">Equity</span><span class="meta-tag tag-purple">Large Cap</span></div>
+            <div class="nav-display"><span class="nav-label">NAV</span><span class="nav-amount">₹78.42</span></div>
+            <div class="returns-grid">
+              <div class="return-item"><div class="return-period">1M</div><div class="return-value positive">+2.3%</div></div>
+              <div class="return-item"><div class="return-period">3M</div><div class="return-value positive">+5.8%</div></div>
+              <div class="return-item"><div class="return-period">1Y</div><div class="return-value positive">+18.4%</div></div>
+            </div>
+          </div>
+          <div class="fund-card">
+            <div class="fund-card-header"><div class="fund-card-title">HDFC Top 100 Fund</div><button class="remove-btn">×</button></div>
+            <div class="fund-meta"><span class="meta-tag tag-blue">Equity</span><span class="meta-tag tag-purple">Large Cap</span></div>
+            <div class="nav-display"><span class="nav-label">NAV</span><span class="nav-amount">₹892.35</span></div>
+            <div class="returns-grid">
+              <div class="return-item"><div class="return-period">1M</div><div class="return-value positive">+1.9%</div></div>
+              <div class="return-item"><div class="return-period">3M</div><div class="return-value positive">+4.2%</div></div>
+              <div class="return-item"><div class="return-period">1Y</div><div class="return-value positive">+15.7%</div></div>
+            </div>
+          </div>
+          <div class="fund-card">
+            <div class="fund-card-header"><div class="fund-card-title">ICICI Prudential Bluechip</div><button class="remove-btn">×</button></div>
+            <div class="fund-meta"><span class="meta-tag tag-blue">Equity</span><span class="meta-tag tag-purple">Large Cap</span></div>
+            <div class="nav-display"><span class="nav-label">NAV</span><span class="nav-amount">₹68.19</span></div>
+            <div class="returns-grid">
+              <div class="return-item"><div class="return-period">1M</div><div class="return-value positive">+2.1%</div></div>
+              <div class="return-item"><div class="return-period">3M</div><div class="return-value negative">-1.3%</div></div>
+              <div class="return-item"><div class="return-period">1Y</div><div class="return-value positive">+12.9%</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="chart-section">
+          <div class="chart-title">NAV History Comparison (1 Year)</div>
+          <div class="chart-container">
+            <svg viewBox="0 0 1200 200" style="width:100%;height:100%;">
+              <path d="M0,160 Q100,140 200,130 T400,100 T600,80 T800,60 T1000,40 T1200,30" fill="none" stroke="#3b82f6" stroke-width="3"/>
+              <path d="M0,150 Q100,145 200,135 T400,115 T600,95 T800,85 T1000,70 T1200,55" fill="none" stroke="#10b981" stroke-width="3"/>
+              <path d="M0,155 Q100,150 200,145 T400,125 T600,110 T800,95 T1000,80 T1200,65" fill="none" stroke="#f59e0b" stroke-width="3"/>
+            </svg>
+          </div>
+          <div style="display: flex; gap: 32px; justify-content: center; margin-top: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 16px; height: 3px; background: #3b82f6; border-radius: 2px;"></div><span style="font-size: 14px; color: #64748b;">SBI Blue Chip</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 16px; height: 3px; background: #10b981; border-radius: 2px;"></div><span style="font-size: 14px; color: #64748b;">HDFC Top 100</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 16px; height: 3px; background: #f59e0b; border-radius: 2px;"></div><span style="font-size: 14px; color: #64748b;">ICICI Bluechip</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        const root = document.querySelector('[data-composition-id="scene3-compare"]');
+        const tl = gsap.timeline({ paused: true });
+        const header = root.querySelector(".header");
+        const sectionLabel = root.querySelector(".section-label");
+        const sectionTitle = root.querySelector(".section-title");
+        const compareGrid = root.querySelector(".compare-grid");
+        const chartSection = root.querySelector(".chart-section");
+
+        tl.set(header, { y: -80, opacity: 0 });
+        tl.set(sectionLabel, { y: 30, opacity: 0 });
+        tl.set(sectionTitle, { y: 30, opacity: 0 });
+        tl.set(compareGrid, { y: 40, opacity: 0 });
+        tl.set(chartSection, { y: 30, opacity: 0 });
+
+        tl.to(header, { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 0);
+        tl.to(sectionLabel, { y: 0, opacity: 1, duration: 0.4, ease: "power2.out" }, 0.2);
+        tl.to(sectionTitle, { y: 0, opacity: 1, duration: 0.4, ease: "power2.out" }, 0.3);
+        tl.to(compareGrid, { y: 0, opacity: 1, duration: 0.6, ease: "power3.out" }, 0.4);
+        tl.to(chartSection, { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.7);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene3-compare"] = tl;
+      })();
+    </script>
+  </div>
+</template>

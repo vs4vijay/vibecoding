@@ -1,0 +1,105 @@
+<template id="scene1-wealthiq-intro-template">
+  <div
+    data-composition-id="scene1-wealthiq-intro"
+    data-width="1920"
+    data-height="1080"
+  >
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      .scene1-wealthiq-intro-content {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #0f172a;
+        font-family: "Inter", sans-serif;
+      }
+      .logo-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+      .logo-icon {
+        width: 120px;
+        height: 120px;
+        background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+        border-radius: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .logo-icon span {
+        color: white;
+        font-size: 56px;
+        font-weight: 800;
+      }
+      .logo-text {
+        display: flex;
+        flex-direction: column;
+      }
+      .logo-text h1 {
+        font-size: 64px;
+        font-weight: 800;
+        color: white;
+        letter-spacing: -0.03em;
+      }
+      .logo-text p {
+        font-size: 24px;
+        color: #94a3b8;
+        font-weight: 500;
+      }
+      .tagline {
+        position: absolute;
+        bottom: 200px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 28px;
+        color: #64748b;
+        font-weight: 500;
+      }
+      .tagline span {
+        color: #3b82f6;
+      }
+    </style>
+    <div class="scene1-wealthiq-intro-content">
+      <div class="logo-container">
+        <div class="logo-icon">
+          <span>W</span>
+        </div>
+        <div class="logo-text">
+          <h1>WealthIQ</h1>
+          <p>Mutual Fund Analytics</p>
+        </div>
+      </div>
+      <div class="tagline">
+        Smart investing for <span>India</span>
+      </div>
+    </div>
+    <script>
+      (function () {
+        const root = document.querySelector('[data-composition-id="scene1-wealthiq-intro"]');
+        const tl = gsap.timeline({ paused: true });
+        const container = root.querySelector(".logo-container");
+        const icon = root.querySelector(".logo-icon");
+        const text = root.querySelector(".logo-text");
+        const tagline = root.querySelector(".tagline");
+
+        tl.set(container, { opacity: 0, scale: 0.8 });
+        tl.set(icon, { rotation: -10, opacity: 0 });
+        tl.set(text, { x: -30, opacity: 0 });
+        tl.set(tagline, { opacity: 0 });
+
+        tl.to(container, { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.2)" }, 0.1);
+        tl.to(icon, { rotation: 0, opacity: 1, duration: 0.5, ease: "back.out(1.7)" }, 0.3);
+        tl.to(text, { x: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.5);
+        tl.to(tagline, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0.9);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene1-wealthiq-intro"] = tl;
+      })();
+    </script>
+  </div>
+</template>
