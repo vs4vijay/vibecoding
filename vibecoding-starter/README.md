@@ -6,7 +6,7 @@ A production-ready Next.js full-stack starter using the **"Postgres for everythi
 
 This starter embraces simplicity by using PostgreSQL for all persistence needs:
 - **Data storage**: Your application data
-- **Job queue**: Background jobs via Graphile Worker
+- **Job queue**: Background jobs via PostgreSQL LISTEN/NOTIFY + SKIP LOCKED
 - **Caching**: Query results and materialized views (optional)
 - **Local development**: PGlite runs in-process, no Docker needed
 
@@ -23,13 +23,13 @@ This starter embraces simplicity by using PostgreSQL for all persistence needs:
 - **Prisma ORM** - Type-safe database access
 - **PostgreSQL** - Production database
 - **PGlite** - In-process Postgres for local development
-- **Graphile Worker** - Postgres-based job queue
+- **Postgres Queue** - Custom job queue using LISTEN/NOTIFY + SKIP LOCKED
 - **Zod** - Runtime validation
 
 ### Development
 - **Bun** - Fast package manager and runtime
 - **ESLint** - Code linting
-- **Custom dev runner** - Concurrent Next.js + Worker processes
+- **Custom dev runner** - Concurrent Next.js processes
 
 ## Features
 
@@ -39,10 +39,11 @@ This starter embraces simplicity by using PostgreSQL for all persistence needs:
 - No environment-specific code needed
 
 ### Background Jobs
-- Postgres-based job queue via Graphile Worker
+- Postgres-based job queue using native LISTEN/NOTIFY + SKIP LOCKED
 - No additional services (Redis, RabbitMQ, etc.)
 - Built-in retry logic and error handling
 - Job persistence and history
+- Atomic job claiming prevents race conditions
 
 ### Job Dashboard
 - Custom Next.js dashboard for job monitoring
@@ -59,8 +60,8 @@ This starter embraces simplicity by using PostgreSQL for all persistence needs:
 ## Getting Started
 
 > **📝 Important**: This starter supports two development modes:
-> - **Quick Mode** (PGlite) - Frontend + API only, no background jobs [Default]
-> - **Full Stack Mode** (PostgreSQL) - Complete system with background jobs
+> - **Quick Mode** (PGlite) - Frontend + API only, no background worker [Default]
+> - **Full Stack Mode** (PostgreSQL) - Complete system with background worker
 >
 > See [DEV_MODES.md](DEV_MODES.md) for detailed comparison.
 
@@ -76,7 +77,7 @@ bun run db:init
 bun run dev:next
 ```
 
-Visit http://localhost:3000 - Everything works except background job processing.
+Visit http://localhost:7070 - Everything works except background job processing.
 
 **Need background jobs?** See [DEV_MODES.md](DEV_MODES.md) for Full Stack Mode with PostgreSQL.
 
@@ -110,7 +111,7 @@ bun run db:init
 
 5. Start development:
 ```bash
-# Option A: Quick Mode (No background jobs)
+# Option A: Quick Mode (No background worker)
 bun run dev:next
 
 # Option B: Full Stack Mode (Requires PostgreSQL - see DEV_MODES.md)
@@ -119,9 +120,9 @@ bun run dev
 
 ### Verify Setup
 
-1. Open [http://localhost:3000](http://localhost:3000) - View homepage
-2. Open [http://localhost:3000/jobs](http://localhost:3000/jobs) - View job dashboard
-3. Test API: [http://localhost:3000/api/items](http://localhost:3000/api/items)
+1. Open [http://localhost:7070](http://localhost:7070) - View homepage
+2. Open [http://localhost:7070/jobs](http://localhost:7070/jobs) - View job dashboard
+3. Test API: [http://localhost:7070/api/items](http://localhost:7070/api/items)
 
 ## Project Structure
 
@@ -139,9 +140,14 @@ vibecoding-starter/
 │   │   └── jobs/              # Job dashboard components
 │   ├── lib/                   # Shared utilities
 │   │   ├── db.ts             # Prisma client (PGlite/Postgres)
-│   │   └── worker.ts         # Graphile Worker setup
+│   │   ├── worker.ts         # Queue wrapper
+│   │   └── queue/            # Queue implementation
+│   │       ├── types.ts      # Queue interfaces
+│   │       ├── postgres-queue.ts  # LISTEN/NOTIFY implementation
+│   │       └── worker.ts     # Worker implementation
 │   └── workers/               # Background job definitions
 │       └── tasks/
+│           ├── index.ts      # Task registry
 │           ├── process-item.ts
 │           └── send-notification.ts
 ├── prisma/
@@ -151,9 +157,9 @@ vibecoding-starter/
 ├── scripts/
 │   └── dev.ts                # Development runner
 ├── .env.example
-├── .env.local
-├── package.json
-└── README.md
+│   ├── .env.local
+│   ├── package.json
+│   └── README.md
 ```
 
 ## Usage
@@ -162,7 +168,7 @@ vibecoding-starter/
 
 Create a new item:
 ```bash
-curl -X POST http://localhost:3000/api/items \
+curl -X POST http://localhost:7070/api/items \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My Item",
@@ -173,23 +179,23 @@ curl -X POST http://localhost:3000/api/items \
 
 Get all items:
 ```bash
-curl http://localhost:3000/api/items
+curl http://localhost:7070/api/items
 ```
 
 Get specific item:
 ```bash
-curl http://localhost:3000/api/items/{id}
+curl http://localhost:7070/api/items/{id}
 ```
 
 ### Background Jobs
 
 Jobs are automatically enqueued when creating items with `processInBackground: true`.
 
-View jobs in the dashboard: [http://localhost:3000/jobs](http://localhost:3000/jobs)
+View jobs in the dashboard: [http://localhost:7070/jobs](http://localhost:7070/jobs)
 
 Manually enqueue a job:
 ```bash
-curl -X POST http://localhost:3000/api/jobs \
+curl -X POST http://localhost:7070/api/jobs \
   -H "Content-Type: application/json" \
   -d '{
     "taskName": "process-item",
@@ -205,27 +211,31 @@ curl -X POST http://localhost:3000/api/jobs \
 
 ```typescript
 // src/workers/tasks/my-task.ts
-import { Task } from 'graphile-worker';
+import { JobPayload, Job } from '@/lib/queue/types';
 
-interface MyTaskPayload {
-  data: string;
-}
+export default async function myTask(payload: JobPayload, _job: Job): Promise<void> {
+  const { data } = payload as { data: string };
 
-const myTask: Task = async (payload, helpers) => {
-  const { data } = payload as MyTaskPayload;
-
-  helpers.logger.info('Processing:', data);
+  console.log('Processing:', data);
 
   // Your task logic here
   await doSomething(data);
 
-  helpers.logger.info('Completed successfully');
-};
-
-export default myTask;
+  console.log('Completed successfully');
+}
 ```
 
-2. Enqueue the job from your API route:
+2. Register the task in `src/workers/tasks/index.ts`:
+
+```typescript
+import { Worker } from '@/lib/queue/worker';
+
+export function registerAllTasks(worker: Worker): void {
+  worker.registerTask('my-task', myTask);
+}
+```
+
+3. Enqueue the job from your API route:
 
 ```typescript
 import { enqueueJob } from '@/lib/worker';
@@ -288,7 +298,7 @@ bun run dev
 # Start only Next.js
 bun run dev:next
 
-# Start only Graphile Worker
+# Start only Worker (requires PostgreSQL)
 bun run dev:worker
 
 # Build for production
@@ -367,12 +377,29 @@ pm2 start "bun run dev:worker" --name worker
 3. **Compatible** - Prisma works identically with both
 4. **Portable** - Single file database (`dev.db`)
 
-### Why Graphile Worker?
+### Why Postgres LISTEN/NOTIFY + SKIP LOCKED?
 
-1. **Postgres-native** - Uses Postgres LISTEN/NOTIFY
-2. **Reliable** - Battle-tested in production
-3. **Features** - Retries, priorities, scheduled jobs
-4. **Observable** - Jobs stored as data, easy to query
+1. **Postgres-native** - Uses native Postgres features
+2. **Atomic claiming** - SKIP LOCKED prevents race conditions
+3. **Notification-based** - LISTEN/NOTIFY for real-time job dispatch
+4. **Simple** - No external dependencies or complexity
+5. **Extensible** - Easy to swap for Redis, RabbitMQ, etc.
+
+### Queue Abstraction
+
+The queue system is designed to be easily swappable:
+
+```
+src/lib/queue/
+├── types.ts           # IQueue interface (defines contract)
+├── postgres-queue.ts  # Default implementation (LISTEN/NOTIFY)
+└── worker.ts         # Worker implementation
+```
+
+To switch to a different queue (Redis, RabbitMQ, etc.):
+1. Implement the `IQueue` interface in a new file
+2. Update the worker to use your implementation
+3. No changes needed to API routes or tasks
 
 ## Troubleshooting
 
@@ -381,8 +408,7 @@ pm2 start "bun run dev:worker" --name worker
 If you encounter PGlite errors, delete the database file:
 ```bash
 rm dev.db
-bun run db:push
-bun run db:seed
+bun run db:init
 ```
 
 ### Worker Not Processing Jobs
@@ -390,7 +416,7 @@ bun run db:seed
 1. Check worker is running (should see log output)
 2. Verify DATABASE_URL is correct
 3. Check job dashboard for errors
-4. Review task file exports (must be `export default`)
+4. Review task file exports and registration
 
 ### Prisma Client Errors
 
@@ -413,5 +439,5 @@ Built with:
 - [Next.js](https://nextjs.org)
 - [Prisma](https://prisma.io)
 - [PGlite](https://github.com/electric-sql/pglite)
-- [Graphile Worker](https://github.com/graphile/worker)
+- [PostgreSQL](https://postgresql.org)
 - [Bun](https://bun.sh)

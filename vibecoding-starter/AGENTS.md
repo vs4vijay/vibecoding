@@ -6,7 +6,7 @@ This file provides guidance for AI coding agents working on this codebase.
 
 This is a **Postgres-for-Everything** full-stack starter that uses PostgreSQL for all persistence needs:
 - Application data storage
-- Background job queue (via Graphile Worker)
+- Background job queue (via PostgreSQL LISTEN/NOTIFY + SKIP LOCKED)
 - Local development uses **PGlite** (in-process Postgres)
 - Production uses standard **PostgreSQL**
 
@@ -20,7 +20,7 @@ This is a **Postgres-for-Everything** full-stack starter that uses PostgreSQL fo
 - **Language**: TypeScript
 - **Database**: PostgreSQL (prod) / PGlite (local)
 - **ORM**: Prisma (for schema only, NOT for queries)
-- **Job Queue**: Graphile Worker
+- **Job Queue**: PostgreSQL LISTEN/NOTIFY + SKIP LOCKED (swappable)
 - **Styling**: Tailwind CSS
 
 ## Key Files and Their Roles
@@ -32,8 +32,11 @@ This is a **Postgres-for-Everything** full-stack starter that uses PostgreSQL fo
   - **NEVER use Prisma client methods** (findMany, create, etc.)
   - **ALWAYS use executeQuery()** with raw SQL
 
-### Job Queue
-- `src/lib/worker.ts` - Graphile Worker configuration
+### Job Queue (Generic Interface)
+- `src/lib/queue/types.ts` - IQueue interface and Job types
+- `src/lib/queue/postgres-queue.ts` - Default implementation using LISTEN/NOTIFY + SKIP LOCKED
+- `src/lib/queue/worker.ts` - Worker implementation
+- `src/lib/worker.ts` - Simple wrapper for backward compatibility
   - `enqueueJob()` - Add jobs to queue
   - `getJobs()` - Query job status
   - Worker runs as separate process
@@ -41,7 +44,7 @@ This is a **Postgres-for-Everything** full-stack starter that uses PostgreSQL fo
 ### Database Initialization
 - `scripts/init-db.ts` - Creates schema in PGlite
   - Creates items table
-  - Creates Graphile Worker tables
+  - Creates jobs table (custom queue)
   - Seeds sample data
 
 ### API Routes
@@ -51,9 +54,8 @@ This is a **Postgres-for-Everything** full-stack starter that uses PostgreSQL fo
 
 ### Background Tasks
 - `src/workers/tasks/*.ts` - Job task definitions
-  - Must export default Task function
-  - Use `executeQuery()` for database access
-  - Graphile Worker auto-loads from this directory
+- `src/workers/tasks/index.ts` - Task registry (must register all tasks)
+- Tasks receive (payload, job) and return Promise<void>
 
 ## Important Patterns
 
@@ -76,10 +78,26 @@ const items = await prisma.item.findMany(); // This won't work with PGlite
 4. Use `executeQuery()` to interact with new table
 
 ### Creating Background Jobs
-1. Create task file in `src/workers/tasks/my-task.ts`
-2. Export default Task function
+1. Create task file in `src/workers/tasks/my-task.ts`:
+```typescript
+import { JobPayload, Job } from '@/lib/queue/types';
+
+export default async function myTask(payload: JobPayload, _job: Job): Promise<void> {
+  // Your task logic
+}
+```
+2. Register task in `src/workers/tasks/index.ts`:
+```typescript
+worker.registerTask('my-task', myTask);
+```
 3. Use `executeQuery()` for database access
 4. Enqueue with `enqueueJob('my-task', payload)`
+
+### Swapping Queue Implementation
+The queue is designed to be swappable. To use a different queue:
+1. Implement `IQueue` interface in `src/lib/queue/`
+2. Update worker to use new implementation
+3. API routes remain unchanged
 
 ### API Route Pattern
 ```typescript
@@ -111,13 +129,13 @@ bun run db:generate
 # Initialize PGlite database
 bun run db:init
 
-# Start dev server (Next.js + Worker)
+# Start dev server (Next.js only - no worker in PGlite mode)
 bun run dev
 
 # Start only Next.js
 bun run dev:next
 
-# Start only Worker
+# Start only Worker (requires PostgreSQL)
 bun run dev:worker
 ```
 
@@ -131,8 +149,14 @@ bun run dev:worker
 
 ### Adding a New Background Job
 1. Create `src/workers/tasks/my-job.ts`
-2. Export default Task function
-3. Enqueue from API routes with `enqueueJob()`
+2. Export default function with (payload, job) signature
+3. Register in `src/workers/tasks/index.ts`
+4. Enqueue from API routes with `enqueueJob()`
+
+### Swapping Queue System
+1. Implement `IQueue` interface in new file
+2. Create new worker using your queue
+3. Update `src/lib/worker.ts` to import from new implementation
 
 ### Modifying Database Schema
 1. Update `prisma/schema.prisma`
@@ -146,6 +170,7 @@ bun run dev:worker
 3. **Use Bun commands** - Not npm/yarn/pnpm
 4. **Raw SQL only** - PGlite doesn't support Prisma migrations
 5. **Keep PGlite/Postgres compatible** - Test SQL works with both
+6. **Register all tasks** - Add new tasks to task registry
 
 ## Next.js Specifics
 
@@ -174,9 +199,27 @@ CREATE TABLE items (
 );
 ```
 
-### Graphile Worker Tables
-Automatically managed in `graphile_worker` schema. Key table:
-- `graphile_worker.jobs` - Job queue
+### Jobs Table (Custom Queue)
+```sql
+CREATE TABLE jobs (
+  id TEXT PRIMARY KEY,
+  task_identifier TEXT NOT NULL,
+  payload JSON DEFAULT '{}'::JSON NOT NULL,
+  status TEXT DEFAULT 'pending' NOT NULL,
+  priority INTEGER DEFAULT 0 NOT NULL,
+  run_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  attempts INTEGER DEFAULT 0 NOT NULL,
+  max_attempts INTEGER DEFAULT 25 NOT NULL,
+  last_error TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  locked_at TIMESTAMP,
+  locked_by TEXT,
+  completed_at TIMESTAMP,
+  key TEXT UNIQUE,
+  queue TEXT
+);
+```
 
 ## Troubleshooting for Agents
 
@@ -186,8 +229,8 @@ Automatically managed in `graphile_worker` schema. Key table:
 **Error: Migration failed**
 - Solution: PGlite doesn't support Prisma migrations. Use `scripts/init-db.ts`
 
-**Error: Worker not finding tasks**
-- Solution: Ensure task file exports default Task function
+**Error: Worker not processing jobs**
+- Solution: Ensure task is registered in `src/workers/tasks/index.ts`
 
 **Error: Database not found**
 - Solution: Run `bun run db:init` to create dev.db
@@ -205,5 +248,6 @@ This starter embraces **simplicity through PostgreSQL**:
 - No Redis, RabbitMQ, or additional services
 - PGlite makes local development seamless
 - Same code works in development and production
+- Queue system is swappable - easy to replace with production-grade system
 
 When making changes, preserve this philosophy and the PGlite/PostgreSQL dual compatibility.

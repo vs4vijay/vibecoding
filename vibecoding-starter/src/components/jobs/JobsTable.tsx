@@ -1,18 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-
-interface Job {
-  id: string;
-  task_identifier: string;
-  payload: any;
-  status: 'pending' | 'active' | 'scheduled' | 'failed';
-  attempts: number;
-  max_attempts: number;
-  run_at: string;
-  created_at: string;
-  last_error?: string;
-}
+import { Job } from '@/lib/queue/types';
 
 interface JobsTableProps {
   jobs: Job[];
@@ -27,6 +16,7 @@ export function JobsTable({ jobs }: JobsTableProps) {
       active: 'bg-green-100 text-green-700',
       scheduled: 'bg-yellow-100 text-yellow-700',
       failed: 'bg-red-100 text-red-700',
+      completed: 'bg-blue-100 text-blue-700',
     };
 
     return (
@@ -40,7 +30,7 @@ export function JobsTable({ jobs }: JobsTableProps) {
     );
   };
 
-  const formatDate = (date: string) => {
+  const formatDate = (date: Date | string) => {
     return new Date(date).toLocaleString();
   };
 
@@ -90,11 +80,11 @@ export function JobsTable({ jobs }: JobsTableProps) {
                 <tr key={job.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
-                      {job.task_identifier}
+                      {job.taskIdentifier}
                     </div>
-                    {job.last_error && (
+                    {job.lastError && (
                       <div className="text-xs text-red-500 mt-1 truncate max-w-xs">
-                        {job.last_error}
+                        {job.lastError}
                       </div>
                     )}
                   </td>
@@ -102,13 +92,13 @@ export function JobsTable({ jobs }: JobsTableProps) {
                     {getStatusBadge(job.status)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {job.attempts} / {job.max_attempts}
+                    {job.attempts} / {job.maxAttempts}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(job.created_at)}
+                    {formatDate(job.createdAt)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(job.run_at)}
+                    {formatDate(job.runAt)}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     <details className="cursor-pointer">

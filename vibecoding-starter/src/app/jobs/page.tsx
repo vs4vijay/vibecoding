@@ -27,7 +27,7 @@ export default async function JobsPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Background Jobs</h1>
             <p className="text-gray-600 mt-2">
-              Monitor and manage your background job queue powered by Graphile Worker
+              Monitor and manage your background job queue powered by PostgreSQL
             </p>
           </div>
           <EnqueueJobButton />

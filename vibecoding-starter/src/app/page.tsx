@@ -18,7 +18,7 @@ export default async function Home() {
             Postgres-for-Everything Starter
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            A full-stack Next.js starter with Prisma, PGlite, and Graphile Worker.
+            A full-stack Next.js starter with Prisma, PGlite, and PostgreSQL-based Job Queue.
             Everything runs on Postgres - no additional infrastructure needed.
           </p>
         </div>
@@ -42,7 +42,7 @@ export default async function Home() {
                 <li>Next.js API Routes</li>
                 <li>Prisma ORM</li>
                 <li>PostgreSQL / PGlite</li>
-                <li>Graphile Worker (Job Queue)</li>
+                <li>PostgreSQL Queue (Job Queue)</li>
               </ul>
             </div>
           </div>
