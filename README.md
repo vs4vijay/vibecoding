@@ -34,11 +34,14 @@ bunx skills add https://github.com/browser-use/browser-use --skill browser-use
 
 bunx skills add vercel-labs/agent-browser
 
-bunx skills add remotion/agent-skills
+bun x skills add remotion/agent-skills
+bun x skills add heygen-com/hyperframes
 
 bunx skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
 
 https://mcp.excalidraw.com
+
+
 
 
 
