@@ -20,29 +20,37 @@ The best agent harness - a plugin that transforms OpenCode into a powerful multi
 OPENCODE_SERVER_USERNAME=viz OPENCODE_SERVER_PASSWORD=VerySecurePasswordHere opencode web --hostname 0.0.0.0 --port 3030 --mdns --mdns-domain vizcode.local
 ```
 
+### Tools used
+
 - rtk-ai
+
+### Skills used
+
 - claude skill add juliusbrussee/caveman:caveman
 - playwright-cli Skills
-  - bunx skills add https://github.com/microsoft/playwright-cli --skill playwright-cli
+  ```bash
+  bun x skills add https://github.com/microsoft/playwright-cli --skill playwright-cli
+  bun x skills add https://github.com/browser-use/browser-use --skill browser-use
+  bun x skills add vercel-labs/agent-browser
+  ```
 - superpowers Skills
 
 
+bun x skills add https://github.com/vercel-labs/skills --skill find-skills
 
-bunx skills add https://github.com/vercel-labs/skills --skill find-skills
-
-bunx skills add https://github.com/browser-use/browser-use --skill browser-use
-
-bunx skills add vercel-labs/agent-browser
 
 bun x skills add remotion/agent-skills
 bun x skills add heygen-com/hyperframes
 
-bunx skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
+bun x skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
+
+
+android init
+android skills add --skill base
+
+## MCP used
 
 https://mcp.excalidraw.com
-
-
-
 
 
 
