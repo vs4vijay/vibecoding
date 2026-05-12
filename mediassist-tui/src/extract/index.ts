@@ -5,6 +5,7 @@ import {
   getOcrEngine,
   getTextExtractor,
 } from "../engines/registry.ts";
+import { rasterizePdf } from "../engines/rasterize.ts";
 
 export type FieldsFromTextResult = ClaimFields & { engines: { fields: string[] } };
 
@@ -74,15 +75,28 @@ async function loadText(filePath: string, ext: string, forceOcr: boolean): Promi
   if (ext === ".pdf") {
     const textEngine = getTextExtractor();
     const result = await textEngine.extract(filePath);
+
+    // Happy path: PDF has an embedded text layer → done.
     if (!forceOcr && result.hasTextLayer) {
       return { text: result.text, source: { text: textEngine.name } };
     }
-    if (result.text.length === 0) {
-      throw new Error(
-        "Scanned PDF detected (no embedded text). Convert pages to images first, or use a text extractor that supports OCR (e.g., TEXT_EXTRACTOR=markitdown when available).",
-      );
+
+    // Scanned PDF (or user forced OCR): rasterize each page and OCR it.
+    const pages = await rasterizePdf(filePath);
+    if (pages.length === 0) {
+      throw new Error("PDF has no pages to render");
     }
-    return { text: result.text, source: { text: textEngine.name } };
+    const ocr = getOcrEngine();
+    const pageTexts: string[] = [];
+    for (const p of pages) {
+      const t = await ocr.recognize(p.data);
+      pageTexts.push(t);
+    }
+    const text =
+      pages.length > 1
+        ? pageTexts.map((t, i) => `--- page ${i + 1} ---\n${t}`).join("\n\n").trim()
+        : pageTexts.join("\n\n").trim();
+    return { text, source: { text: textEngine.name, ocr: ocr.name } };
   }
   if ([".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"].includes(ext)) {
     const ocr = getOcrEngine();

@@ -28,7 +28,12 @@ export interface OcrEngine {
   readonly name: string;
   readonly extensions: readonly string[];
   available(): Promise<boolean> | boolean;
-  recognize(filePath: string): Promise<string>;
+  /**
+   * Recognize text in an image. Input is either an absolute file path
+   * (existing image on disk) or a Buffer/Uint8Array of image bytes — used
+   * when we rasterize a PDF page in-memory.
+   */
+  recognize(input: string | Uint8Array | Buffer): Promise<string>;
 }
 
 /**
