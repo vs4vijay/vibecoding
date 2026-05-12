@@ -1,6 +1,6 @@
 import { Box, Text, useApp, useInput } from "ink";
-import { useCallback, useEffect, useState } from "react";
-import type { MediAssistClient } from "../api/client.ts";
+import { createContext, useCallback, useEffect, useState } from "react";
+import { SessionExpiredError, type MediAssistClient } from "../api/client.ts";
 import { listClaims } from "../api/claims.ts";
 import { getOpdBalance, getPolicy, type OpdBalance } from "../api/policy.ts";
 import { getUserContext, type UserContext } from "../api/user-context.ts";
@@ -13,6 +13,15 @@ import { Dashboard } from "./dashboard.tsx";
 import { ClaimsView } from "./claims-view.tsx";
 import { NewClaim } from "./new-claim.tsx";
 
+/**
+ * Context that every view uses to bubble a `SessionExpiredError` up to the
+ * shell, which in turn tells the outer `runTui()` loop in `index.ts` to
+ * unmount and re-launch the login prompt.
+ */
+export const SessionContext = createContext<{ reportExpired: () => void }>({
+  reportExpired: () => {},
+});
+
 type GlobalData = {
   user: UserContext;
   policy: Policy;
@@ -20,7 +29,13 @@ type GlobalData = {
   claims: Claim[];
 };
 
-export function App({ client }: { client: MediAssistClient }): JSX.Element {
+type AppProps = {
+  client: MediAssistClient;
+  /** Called when a session-expired response is detected anywhere in the app. */
+  onSessionExpired: () => void;
+};
+
+export function App({ client, onSessionExpired }: AppProps): JSX.Element {
   const { exit } = useApp();
   const [view, setView] = useState<ViewKey>("dashboard");
   const [data, setData] = useState<GlobalData | null>(null);
@@ -29,6 +44,15 @@ export function App({ client }: { client: MediAssistClient }): JSX.Element {
   const [help, setHelp] = useState(false);
   const [palette, setPalette] = useState(false);
   const [viewHints, setViewHints] = useState<KeyHint[]>([]);
+  const [expiredReported, setExpiredReported] = useState(false);
+
+  const reportExpired = useCallback((): void => {
+    setExpiredReported((already) => {
+      if (already) return true;
+      onSessionExpired();
+      return true;
+    });
+  }, [onSessionExpired]);
 
   // ----- global data load (header relies on it) -----
   useEffect(() => {
@@ -45,13 +69,18 @@ export function App({ client }: { client: MediAssistClient }): JSX.Element {
         ]);
         if (!cancelled) setData({ user, policy, balance, claims });
       } catch (err) {
-        if (!cancelled) setLoadError((err as Error).message);
+        if (cancelled) return;
+        if (err instanceof SessionExpiredError) {
+          reportExpired();
+          return;
+        }
+        setLoadError((err as Error).message);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [client, refreshKey]);
+  }, [client, refreshKey, reportExpired]);
 
   // ----- global key bindings -----
   useInput((input, key) => {
@@ -102,6 +131,7 @@ export function App({ client }: { client: MediAssistClient }): JSX.Element {
   const isInteractive = !help && !palette;
 
   return (
+    <SessionContext.Provider value={{ reportExpired }}>
     <Box flexDirection="column">
       {data ? (
         <Header user={data.user} policy={data.policy} balance={data.balance} activeView={view} />
@@ -145,6 +175,7 @@ export function App({ client }: { client: MediAssistClient }): JSX.Element {
         </Box>
       ) : null}
     </Box>
+    </SessionContext.Provider>
   );
 }
 

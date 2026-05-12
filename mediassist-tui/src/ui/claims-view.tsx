@@ -1,9 +1,10 @@
 import { Box, Text, useInput } from "ink";
-import { useEffect, useState } from "react";
-import type { MediAssistClient } from "../api/client.ts";
+import { useContext, useEffect, useState } from "react";
+import { SessionExpiredError, type MediAssistClient } from "../api/client.ts";
 import { listClaims } from "../api/claims.ts";
 import type { Claim } from "../types.ts";
 import { FocusableList, type Column } from "./components/focusable-list.tsx";
+import { SessionContext } from "./app.tsx";
 
 type Props = {
   client: MediAssistClient;
@@ -25,6 +26,7 @@ type State =
  * so cycling onto it just dims the list cursor).
  */
 export function ClaimsView({ client, refreshKey, isActive }: Props): JSX.Element {
+  const { reportExpired } = useContext(SessionContext);
   const [state, setState] = useState<State>({ kind: "loading" });
   const [selected, setSelected] = useState(0);
   const [pane, setPane] = useState<"list" | "detail">("list");
@@ -40,13 +42,18 @@ export function ClaimsView({ client, refreshKey, isActive }: Props): JSX.Element
           setSelected(0);
         }
       } catch (err) {
-        if (!cancelled) setState({ kind: "error", message: (err as Error).message });
+        if (cancelled) return;
+        if (err instanceof SessionExpiredError) {
+          reportExpired();
+          return;
+        }
+        setState({ kind: "error", message: (err as Error).message });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [client, refreshKey]);
+  }, [client, refreshKey, reportExpired]);
 
   useInput(
     (input, key) => {

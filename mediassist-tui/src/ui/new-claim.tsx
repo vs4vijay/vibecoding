@@ -2,8 +2,8 @@ import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { MediAssistClient } from "../api/client.ts";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { SessionExpiredError, type MediAssistClient } from "../api/client.ts";
 import { getBankDetails, type BankDetail } from "../api/bank.ts";
 import {
   getBillTypes,
@@ -18,6 +18,7 @@ import type { UserContext } from "../api/user-context.ts";
 import { extractClaim } from "../extract/index.ts";
 import { BILL_TYPES, type BillType, type ClaimFields } from "../types.ts";
 import { CycleSelector } from "./components/cycle-selector.tsx";
+import { SessionContext } from "./app.tsx";
 
 type Props = {
   client: MediAssistClient;
@@ -70,6 +71,7 @@ type Resolved = {
 };
 
 export function NewClaim({ client, user, isActive, onContextHintsChange }: Props): JSX.Element {
+  const { reportExpired } = useContext(SessionContext);
   const [bills, setBills] = useState<Bill[]>([]);
   const [pathInput, setPathInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -94,13 +96,18 @@ export function NewClaim({ client, user, isActive, onContextHintsChange }: Props
         setBenefs(b);
         setBanks(k);
       } catch (err) {
-        if (!cancelled) setError((err as Error).message);
+        if (cancelled) return;
+        if (err instanceof SessionExpiredError) {
+          reportExpired();
+          return;
+        }
+        setError((err as Error).message);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [client]);
+  }, [client, reportExpired]);
 
   // ----- compute current selection -----
   const selectedFile = bills[selectedFileIdx];
@@ -140,14 +147,19 @@ export function NewClaim({ client, user, isActive, onContextHintsChange }: Props
         const billType = matchBillType(types, primary.billType) ?? undefined;
         const pincode = localities[0] ?? undefined;
         setResolved({ billType, pincode, loading: false });
-      } catch {
-        if (!cancelled) setResolved({ loading: false });
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof SessionExpiredError) {
+          reportExpired();
+          return;
+        }
+        setResolved({ loading: false });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [client, billsOnly, benefs, benefIdx]);
+  }, [client, billsOnly, benefs, benefIdx, reportExpired]);
 
   // ----- context-sensitive footer hints -----
   useEffect(() => {
