@@ -2,12 +2,15 @@
 import { password as promptPassword, text as promptText, isCancel, intro, outro } from "@clack/prompts";
 import { listClaims } from "./api/claims.ts";
 import { loadSession, login, logout } from "./api/auth.ts";
-import { getOpdBalance, getPolicy } from "./api/policy.ts";
+import { getOpdBalance, getPolicy, getSubmitBeneficiaries } from "./api/policy.ts";
+import { getBankDetails } from "./api/bank.ts";
+import { getBillTypes, lookupPincode, matchBillType } from "./api/lookups.ts";
+import { buildPayloadsForDryRun, type SubmitContext } from "./api/submit.ts";
 import { loadEnv } from "./config.ts";
 import { extractClaim } from "./extract/index.ts";
 import type { MediAssistClient } from "./api/client.ts";
 
-const COMMANDS = ["login", "whoami", "logout", "policy", "claims", "extract", "help"] as const;
+const COMMANDS = ["login", "whoami", "logout", "policy", "claims", "extract", "submit", "help"] as const;
 type Command = (typeof COMMANDS)[number];
 
 async function main(): Promise<void> {
@@ -41,6 +44,9 @@ async function main(): Promise<void> {
     case "extract":
       await cmdExtract();
       return;
+    case "submit":
+      await withSession(cmdSubmit);
+      return;
   }
 }
 
@@ -57,6 +63,8 @@ Commands:
   policy                 Fetch policy and sum-insured details
   claims                 List past claims
   extract <file...>      Extract claim fields from one or more PDFs/images (globs OK)
+  submit <file>          DRY-RUN: extract + resolve lookups + print the payloads
+                         that would be POSTed. Does NOT submit anything.
   help                   Show this message
 `);
 }
@@ -269,6 +277,165 @@ async function expandFileArgs(args: string[]): Promise<string[]> {
 function basename(p: string): string {
   const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
   return i >= 0 ? p.slice(i + 1) : p;
+}
+
+async function cmdSubmit(client: MediAssistClient): Promise<void> {
+  const file = process.argv[3];
+  if (!file) {
+    console.error("Usage: bun run cli submit <file>");
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`\n📄 Extracting ${file}...`);
+  const fields = await extractClaim(file);
+  console.log(
+    `   ${fields.billType} | ${fields.billNumber} | ${fields.billDate} | ₹ ${formatINR(fields.billAmount)} | ${fields.clinicName}`,
+  );
+  console.log(`   Patient hint: ${fields.beneficiaryHint ?? "—"}`);
+
+  console.log("\n🔍 Resolving lookups...");
+  const [benefs, banks] = await Promise.all([
+    getSubmitBeneficiaries(client),
+    getBankDetails(client),
+  ]);
+
+  const benef = matchBeneficiary(benefs, fields.beneficiaryHint);
+  if (!benef) {
+    console.error(
+      `\n❌ Could not match patient hint "${fields.beneficiaryHint ?? ""}" to any beneficiary.\n` +
+        `   Beneficiaries: ${benefs.map((b) => `${b.name} (${b.relation})`).join(", ")}`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`   Beneficiary: ${benef.name} (${benef.relation}, ${benef.age}y)`);
+
+  const bank = banks.find((b) => b.isActive && b.isPrimary) ?? banks[0];
+  if (!bank) {
+    console.error("\n❌ No bank account found on the policy.");
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`   Bank:        ${bank.bankName} ${bank.ifscCode} (cheque leaf ${bank.chequeLeafId})`);
+
+  const types = await getBillTypes(client, benef.policyId);
+  const billType = matchBillType(types, fields.billType);
+  if (!billType) {
+    console.error(
+      `\n❌ Could not map bill type "${fields.billType}" to a server ID.\n` +
+        `   Server offered: ${types.map((t) => `${t.name}=${t.id}`).join(", ")}`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`   Bill type:   ${billType.name} = ${billType.id}`);
+
+  let cityId = 0;
+  let cityName = "";
+  let stateId = 0;
+  let stateName = "";
+  let locality = "";
+  if (fields.pincode) {
+    const localities = await lookupPincode(client, fields.pincode);
+    const first = localities[0];
+    if (first) {
+      cityId = first.cityId;
+      cityName = first.cityName;
+      stateId = first.stateId;
+      stateName = first.stateName;
+      locality = first.locationName;
+      console.log(`   Pincode:     ${fields.pincode} → ${locality}, ${cityName}, ${stateName}`);
+    } else {
+      console.log(`   Pincode:     ${fields.pincode} (no localities returned)`);
+    }
+  } else {
+    console.log("   Pincode:     —");
+  }
+
+  const ctx: SubmitContext = {
+    beneficiary: {
+      id: benef.id,
+      maid: benef.maid,
+      name: benef.name,
+      relation: benef.relation,
+      relationId: benef.relationId,
+      age: benef.age,
+      alphaCode: benef.alphaCode,
+      employeeCode: benef.employeeCode,
+      policyId: benef.policyId,
+      policyNumber: benef.policyNumber,
+      insurer: benef.insurer,
+    },
+    bank,
+    empId: benef.employeeCode,
+    entityId: benef.entityId,
+    email: benef.email,
+    mobile: process.env.MEDIASSIST_MOBILE ?? "",
+    cityId,
+    cityName,
+    stateId,
+    stateName,
+    pincode: fields.pincode ?? "",
+    locality,
+    billTypeId: billType.id,
+    hospitalName: fields.clinicName,
+    totalDocCount: 1,
+  };
+
+  const payloads = buildPayloadsForDryRun(fields, ctx, file);
+
+  console.log("\n══════════════════════════════════════════════════════════════════");
+  console.log("                  DRY RUN — NO REQUESTS SENT");
+  console.log("══════════════════════════════════════════════════════════════════");
+  console.log("\n--- 1) POST /ServiceCalls/SaveDraft.aspx ---");
+  printForm(payloads.saveDraft);
+  console.log(`\n--- 2) POST ${payloads.fileUpload.endpoint} (multipart) ---`);
+  console.log(`     field "${payloads.fileUpload.field}" = <file at ${payloads.fileUpload.filePath}>`);
+  console.log("\n--- 3) POST /ServiceCalls/AddClaimBill.aspx (clmRegNo from #1) ---");
+  printForm(payloads.addClaimBill);
+  console.log("\n--- 4) POST /ServiceCalls/SubmitClaim.aspx (ClmRegNo from #1) ---");
+  printForm(payloads.submitClaim);
+  console.log("\n══════════════════════════════════════════════════════════════════");
+  console.log(" The above payloads were prepared but NOT sent.");
+  console.log(" Submission is disabled by design — verify values manually and");
+  console.log(" submit through the official portal when ready.");
+  console.log("══════════════════════════════════════════════════════════════════");
+}
+
+function matchBeneficiary<T extends { name: string; relation: string }>(
+  benefs: T[],
+  hint: string | undefined,
+): T | null {
+  if (!hint) {
+    return benefs.find((b) => b.relation === "Self") ?? null;
+  }
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+  const h = norm(hint);
+  let best: { benef: T; score: number } | null = null;
+  for (const b of benefs) {
+    const name = norm(b.name);
+    if (name === h) return b;
+    let score = 0;
+    if (name.startsWith(h)) score = 3;
+    else if (name.includes(h)) score = 2;
+    else if (h.includes(name.split(" ")[0]!)) score = 2;
+    else {
+      const firstName = name.split(" ")[0]!;
+      const hintFirst = h.split(" ")[0]!;
+      if (firstName === hintFirst) score = 1;
+    }
+    if (score > 0 && (best === null || score > best.score)) best = { benef: b, score };
+  }
+  return best?.benef ?? null;
+}
+
+function printForm(body: Record<string, string>): void {
+  const keyWidth = Math.max(...Object.keys(body).map((k) => k.length));
+  for (const [k, v] of Object.entries(body)) {
+    const displayV = v.length > 80 ? v.slice(0, 80) + "…" : v;
+    console.log(`   ${k.padEnd(keyWidth)} = ${displayV || "<empty>"}`);
+  }
 }
 
 function formatINR(n: number): string {

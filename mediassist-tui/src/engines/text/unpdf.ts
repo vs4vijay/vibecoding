@@ -72,7 +72,7 @@ function itemsToText(items: unknown[]): string {
       continue;
     }
     const transform = raw.transform;
-    const y = transform && transform.length >= 6 ? transform[5] : null;
+    const y = transform && transform.length >= 6 ? (transform[5] ?? null) : null;
 
     if (prevY !== null && y !== null && Math.abs(y - prevY) > LINE_Y_BREAK) {
       flushLine();

@@ -39,6 +39,58 @@ export async function getPolicy(client: MediAssistClient): Promise<Policy> {
 }
 
 /**
+ * Returns the full beneficiary records (with all CMS* fields needed for
+ * submission payloads — PolicyId, MAID, PriBenefId, etc.).
+ */
+export type SubmitBeneficiary = {
+  id: number;
+  maid: number;
+  name: string;
+  relation: string;
+  relationId: number;
+  age: number;
+  alphaCode?: string;
+  employeeCode: string;
+  email: string;
+  entityId: number;
+  policyId: number;
+  policyNumber: string;
+  insurer: string;
+};
+
+export async function getSubmitBeneficiaries(
+  client: MediAssistClient,
+): Promise<SubmitBeneficiary[]> {
+  const res = await client.request("/ServiceCalls/GetPolicies.aspx", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      Accept: "application/json, text/javascript, */*; q=0.01",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    body: "",
+  });
+  const data = (await res.json()) as PoliciesResponse;
+  const policy = data.Policies?.[0];
+  if (!policy) return [];
+  return (policy.Beneficiaries ?? []).map((b) => ({
+    id: b.CMSPriBenefId ?? 0,
+    maid: b.CMSMemberMAID ?? 0,
+    name: b.CMSMemberName ?? "",
+    relation: b.CMSMemberRelation ?? "",
+    relationId: b.CMSMemberRelationId ?? 0,
+    age: b.CMSMemberAge ?? 0,
+    alphaCode: b.CMSMemberAlphaCode,
+    employeeCode: b.CMSEmployeeCode ?? "",
+    email: b.CMSMemberEmail ?? "",
+    entityId: b.EntityId ?? 0,
+    policyId: b.PolicyId ?? 0,
+    policyNumber: b.PolicyNumber ?? "",
+    insurer: b.InsuranceCompany ?? "",
+  }));
+}
+
+/**
  * Returns OPD (domiciliary) limits and remaining balance for the self member.
  */
 export type OpdBalance = {
@@ -103,14 +155,19 @@ type RawBeneficiary = {
   CMSMemberMAID?: number;
   CMSMemberName?: string;
   CMSMemberRelation?: string;
+  CMSMemberRelationId?: number;
   CMSMemberDOB?: string;
   CMSMemberAge?: number;
+  CMSMemberAlphaCode?: string;
+  CMSMemberEmail?: string;
   CMSMemberDomiLimit?: number;
   CMSMemberDomiBalance?: number;
   CMSFamilySumInsured?: number;
   CMSFamilyBalanceSumInsured?: number;
   CMSFamilyDomiLimit?: number;
   CMSFamilyDomiBalance?: number;
+  EntityId?: number;
+  PolicyId?: number;
   PolicyNumber?: string;
   PolHolderName?: string;
   InsuranceCompany?: string;
