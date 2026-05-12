@@ -21,3 +21,5 @@ node_modules/
 .claude/settings.local.json
 
 tmpclaude-*
+
+.playwright-cli/
