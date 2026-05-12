@@ -1,6 +1,6 @@
 # Building a lazygit / k9s-style TUI
 
-A practical playbook for designing terminal apps that *feel* like k9s and lazygit. Distilled from studying both tools and building a real Ink + Bun TUI (`mediassist-tui` in this repo).
+A practical playbook for designing terminal UIs that *feel* like k9s and lazygit. Distilled from studying both tools and building real Ink + Bun apps.
 
 Use this as a starting reference whenever you build a new TUI. It's opinionated and concrete — every pattern is something you can implement directly.
 
@@ -17,7 +17,7 @@ k9s and lazygit are both excellent TUIs but follow **different layouts**. Decide
 | **Best when** | You have many discrete resource types and one is in focus at a time. | You have a few panels that all matter and the user pivots between them. |
 | **Focus indicator** | View name + breadcrumbs in header. | Bright border on focused panel; dim on others. |
 
-**Hybrid is fine.** mediassist-tui uses lazygit-style panels inside each view and k9s-style numbered top tabs to switch between views. Mix when it helps.
+**Hybrid is fine.** A common combo: lazygit-style multi-panel layout *inside each view* + k9s-style numbered top tabs *between views*. Mix when it helps.
 
 ---
 
@@ -39,8 +39,8 @@ Why fixed regions: users learn where to look once. Don't shift the header up whe
 
 **Header content priority** (left-to-right, drop the rightmost stuff as the terminal narrows):
 1. App name + identity (who am I logged in as)
-2. Current context (cluster / branch / policy number)
-3. Live status numbers (sum insured remaining, # pods running)
+2. Current context (cluster / branch / project / namespace)
+3. Live status numbers (e.g., quota remaining, # active jobs, request rate)
 4. Numbered view tabs
 
 **Footer content:** *only* the focused panel's keys + a short global tail (`tab`, `?`, `q`). Don't list every key you support — that's what `?` is for.
@@ -96,7 +96,7 @@ Pick from this set; don't invent new keys.
 | `[` / `]` | Previous / next tab inside a panel |
 
 Two more lazygit conventions worth stealing:
-- **`Space`** to toggle multi-select state (e.g., stage/unstage).
+- **`Space`** to toggle multi-select state (e.g., stage/unstage, check/uncheck).
 - **`a`** to apply to all (stage all, dismiss all).
 
 ---
@@ -145,16 +145,16 @@ The single best power-user feature. Implement it once, gives you free navigation
 - `Enter` runs the top match (or exact name); `Esc` closes
 
 **Commands to register:**
-- Every view: `dashboard`, `claims`, `new`, `settings`
+- Every view by name
 - Every common action: `refresh`, `quit`, `help`, `logout`
-- Power-user shortcuts: `:filter`, `:export`
+- Power-user shortcuts: `:filter`, `:export`, `:sort`
 
-**Aliases matter.** Let users type `:c` for claims, `:d` for dashboard. Implement prefix-match against `name` AND `aliases[]`.
+**Aliases matter.** Let users type `:l` for a "list" view, `:n` for "new". Implement prefix-match against `name` AND `aliases[]`.
 
 ```ts
 type Command = {
-  name: string;          // canonical: "claims"
-  aliases?: string[];    // ["c", "2"]
+  name: string;          // canonical, e.g. "list"
+  aliases?: string[];    // ["l", "2"]
   description: string;   // shown inline while typing
   action: () => void;
 };
@@ -214,7 +214,7 @@ Lightweight, doesn't shift layout. Best for one-keystroke decisions.
 ```
 Better for destructive actions (force-push, drop database). Forces the user to slow down.
 
-For irreversible things (e.g., submitting a real claim — *don't do this without explicit user approval, per `feedback_mediassist_no_submit.md`*), require typing `y` not just pressing `y`. Friction prevents finger-mistakes.
+For irreversible actions, require typing `y` (or the resource name) rather than accepting a single keypress. Friction prevents finger-mistakes.
 
 ---
 
@@ -248,9 +248,9 @@ This is where k9s and lazygit differ sharply.
 
 **lazygit:** commit messages and rebase plans use *inline* forms inside the app, because there's no natural file-on-disk format.
 
-**Rule:** if the data being edited has a natural text representation, shell out. If it's a structured field set (e.g., extracted invoice data), build an inline form.
+**Rule:** if the data being edited has a natural text representation, shell out. If it's a structured field set with strict types/enums, build an inline form.
 
-### Inline form pattern (the one I built)
+### Inline form pattern
 
 A form is a column of rows. Each row is:
 ```
@@ -268,7 +268,7 @@ Don't build a "form panel that captures all keys" — make each row independentl
 
 ## 13. Implementation in Ink — the must-knows
 
-[Ink](https://github.com/vadimdemedes/ink) is React for the terminal. The patterns above translate cleanly, but four traps to know:
+[Ink](https://github.com/vadimdemedes/ink) is React for the terminal. The patterns above translate cleanly, but several traps to know:
 
 ### Trap 1: `useInput` requires raw-mode TTY
 If your process's stdin isn't a TTY (piped, redirected, CI), `useInput` throws on mount. There's no `isActive` flag that fully bypasses it — `setRawMode(true)` runs at hook init.
@@ -290,6 +290,21 @@ There's no `stopPropagation`. If you have a parent and a child both listening, t
 useInput((input, key) => { /* ... */ }, { isActive: !modalOpen });
 ```
 
+**Sub-trap — don't double-bind `Tab`.** Tempting to make Tab both *switch top-level tabs* (in the App shell) and *cycle panels* (inside a view). But because every active `useInput` fires on every key, both run on each Tab press — the App's view-switch wins and you see the wrong screen. The view's panel cycle did execute too, but you can't see it.
+
+**Pick one role for Tab and stick to it.** lazygit / k9s both reserve Tab for *panel cycling within a view*. Use number keys (`1`/`2`/`3`) or a `:`-command for view switching. Single-purpose Tab keeps the model predictable.
+
+```tsx
+// In the App shell — DO NOT bind Tab.
+// 1/2/3 switch views, : opens the command palette, that's it.
+if (input === "1") setView("home");
+else if (input === "2") setView("list");
+else if (input === "3") setView("create");
+
+// In each view, Tab is yours:
+useInput((_, key) => { if (key.tab) cyclePanel(); }, { isActive });
+```
+
 ### Trap 3: `ink-text-input` captures keys when `focus={true}`
 The `focus` prop controls whether the internal `useInput` runs. Set it `false` when you want surrounding navigation keys to work and the input to be passive.
 
@@ -300,7 +315,39 @@ The `focus` prop controls whether the internal `useInput` runs. Set it `false` w
 This is how you build a panel that has both a text input *and* navigable rows — flip `focus` based on which sub-mode is active.
 
 ### Trap 4: React keys
-`<Box key={someId}>` — `someId` must actually be unique per row. Watch out for shared IDs (e.g., a primary-key field that's repeated across family members). Test by rendering with strict React in dev to catch warnings.
+`<Box key={someId}>` — `someId` must actually be unique per row. Watch out for shared identifiers (parent IDs that get repeated across child rows, etc.). Test by rendering with strict React in dev to catch warnings.
+
+### Trap 5: Multiple `<Text>` siblings in a row collapse trailing whitespace
+Each `<Text>` in a row Box is rendered as an inline run. Trailing whitespace at the boundary between two siblings gets eaten — even if you `padEnd(10)`-ed it explicitly. Result: tabular layouts collide ("FooBar" instead of "Foo  Bar").
+
+**Fix:** for tabular row layouts, use a *single* `<Text>` per row and concatenate fields with `.padEnd()` / `.padStart()` inside it. Nested `<Text>` within that one Text is fine for color/dim styling.
+
+```tsx
+// ❌ trailing spaces get eaten between siblings
+<Box>
+  <Text>{name.padEnd(20)}</Text>
+  <Text dimColor>{type.padEnd(10)}</Text>
+  <Text dimColor>{date}</Text>
+</Box>
+
+// ✅ one Text, spaces preserved
+<Text>
+  {name.padEnd(20)}
+  <Text dimColor>{type.padEnd(10)}{date}</Text>
+</Text>
+```
+
+### Trap 6: Equal-width rows need explicit flex basis
+`flexDirection="row"` with `flexGrow={1}` on each child gives each child a share of the *remaining* space, not equal slices of the *parent's* space. Children with content occupy their content-width baseline first, then flex-grow distributes leftover. Result: ragged right edge where two side-by-side panels don't reach the same width as the row above.
+
+**Fix:** set `flexBasis={0}` (or `width="50%"`) on each child along with `flexGrow={1}` — this forces equal slicing from the start. Pattern:
+
+```tsx
+<Box flexDirection="row" gap={1}>
+  <Box flexBasis={0} flexGrow={1}>{leftPanel}</Box>
+  <Box flexBasis={0} flexGrow={1}>{rightPanel}</Box>
+</Box>
+```
 
 ---
 
@@ -344,20 +391,141 @@ Keep state lazygit-flat, not k9s-nested. lazygit has a flat state model with exp
 
 ```ts
 type AppState = {
-  view: "dashboard" | "claims" | "newClaim";   // tabs
-  focus: "files" | "edit" | "beneficiary";     // panel within current view
-  refreshKey: number;                           // bumped to trigger reloads
-  help: boolean;                                // help overlay
-  palette: boolean;                             // command palette
+  view: "home" | "list" | "create";         // top-level tabs
+  focus: "left" | "right" | "form";          // panel within the current view
+  refreshKey: number;                         // bumped to trigger reloads
+  help: boolean;                              // help overlay open?
+  palette: boolean;                           // command palette open?
   // ...view-specific state below
 };
 ```
 
-When something doesn't fit ("how do I model the dry-run overlay?"), prefer adding a dedicated state shape over reusing existing fields. State is cheap; bugs from overloaded state are expensive.
+When something doesn't fit ("how do I model this overlay?"), prefer adding a dedicated state shape over reusing existing fields. State is cheap; bugs from overloaded state are expensive.
+
+### Cross-remount data persistence
+
+Switching views unmounts the inactive view's React tree. If that view's `useEffect` fetched data on mount, navigating away and back re-hits the network — and the user perceives an unexpected reload.
+
+**Fix:** **lift data to the App shell.** Fetch once at startup, pass the data down as props. Each view becomes a pure renderer.
+
+```ts
+// App fetches data once
+const [data, setData] = useState<{ items: Item[]; meta: Meta } | null>(null);
+
+// Views receive props, no own fetch
+<ListView items={data.items} ... />
+```
+
+Per-view local state (selection, scroll, pane focus) still resets on remount — that's fine, it's UI state. Data state should outlive remounts. Bump a `refreshKey` from the App on `r` to refetch on demand.
+
+### Context hints leaking between views
+
+If a view publishes its keybinding hints via a callback (`onContextHintsChange`), those hints stay in App state after the view unmounts. The next view inherits them until *it* publishes its own — leading to "[enter] add row" hints showing on a different view.
+
+**Fix:** when the active view changes, clear hints in App. Each view re-publishes when it mounts.
+
+```ts
+useEffect(() => { setViewHints([]); }, [view]);
+```
 
 ---
 
-## 16. Things to skip (anti-patterns)
+## 16. In-app login
+
+Most TUIs eventually need credentials. Two ways to handle it.
+
+### Don't: shell out to a prompt library *before* mounting Ink
+
+It works, but: there's a visible "flash" between the prompt library's TTY raw-mode and Ink's, the layout shifts, and you can't recover from mid-session expiry without unmounting and re-prompting outside the React tree.
+
+### Do: render an Ink login screen as a state of the App
+
+Auth becomes a state in your shell:
+
+```ts
+type AuthState =
+  | { kind: "checking" }                          // initial probe
+  | { kind: "login"; reason: "first" | "expired" }
+  | { kind: "ready"; client: ApiClient };
+```
+
+The login screen is just two `<TextInput>`s — username free, password with `mask="•"` for masking. Tab cycles fields, Enter submits. On success, transition to `ready`. On a session-expired error anywhere, transition back to `login` with `reason: "expired"` — no unmount, no console flash, in-place re-auth.
+
+```tsx
+<TextInput value={password} mask="•" focus={focused === "p" && !submitting}
+  onChange={setPassword} onSubmit={() => void submit()} />
+```
+
+`mask="•"` is the standard password mask — every keystroke renders as the mask character regardless of what was typed. Combine with a `submitting` flag that disables both inputs so the user can't keep typing while the network call is in flight.
+
+For propagating session-expired up from arbitrary views, use a tiny React Context that exposes `reportExpired()`. Any view that catches the error calls it; the shell switches to the login screen.
+
+---
+
+## 17. Building & distribution (Bun)
+
+For Bun-based Ink apps, `bun build --compile` produces a single self-contained executable (~100–120 MB — the Bun runtime is bundled). Drop it on any machine, run it, no `npm install`.
+
+```bash
+bun build --compile --minify src/index.ts --outfile bin/myapp.exe
+# cross-compile
+bun build --compile --target=bun-linux-x64 --outfile bin/myapp-linux-x64 src/index.ts
+```
+
+### The one gotcha — Ink's devtools import
+
+Ink has `if (process.env.DEV === 'true') await import('./devtools.js')` and `devtools.js` statically imports `react-devtools-core` — which isn't a real dependency. Bun's bundler follows the dynamic import even though the conditional is never true, then fails to resolve `react-devtools-core`.
+
+`--external react-devtools-core` makes the build succeed but the binary then fails at startup ("Cannot find package…") because there's no `node_modules` at runtime in a compiled binary.
+
+**Fix:** a 5-line Bun plugin that stubs the module with a no-op:
+
+```ts
+const stubDevtools: BunPlugin = {
+  name: "stub-react-devtools",
+  setup(b) {
+    b.onResolve({ filter: /^react-devtools-core$/ }, (a) => ({
+      path: a.path, namespace: "stub-devtools",
+    }));
+    b.onLoad({ filter: /.*/, namespace: "stub-devtools" }, () => ({
+      contents: "export default { connectToDevTools() {} };",
+      loader: "js",
+    }));
+  },
+};
+
+await Bun.build({
+  entrypoints: ["src/index.ts"],
+  compile: { outfile: "bin/myapp.exe" },
+  plugins: [stubDevtools],
+  // ...
+});
+```
+
+Use `Bun.build()` (the programmatic API) instead of the `bun build --compile` CLI when you need plugins. It supports all the same options.
+
+### Single binary, two modes (dispatcher pattern)
+
+If your app has both a TUI mode and CLI subcommands, a single binary with argv-based dispatch is cleaner than separate executables:
+
+```ts
+// src/index.ts
+const args = process.argv.slice(2);
+if (args.length > 0) {
+  const { runCli } = await import("./cli.ts");   // CLI mode
+  await runCli(args);
+} else {
+  if (!process.stdin.isTTY) { /* bail */ }
+  const { App } = await import("./ui/app.tsx");   // TUI mode
+  render(<App />);
+}
+```
+
+The same `myapp.exe` becomes `myapp.exe` (TUI), `myapp.exe whoami` (CLI), `myapp.exe export file.csv` (subcommand). Don't ship N binaries when one will do.
+
+---
+
+## 18. Things to skip (anti-patterns)
 
 - **Animations / transitions.** Terminal apps don't need fade-ins. They look broken.
 - **Mouse support.** Some Ink components support it; don't bother. Keyboard-first is faster and works over SSH.
@@ -370,36 +538,44 @@ When something doesn't fit ("how do I model the dry-run overlay?"), prefer addin
 
 ---
 
-## 17. Concrete checklist for a new TUI
+## 19. Concrete checklist for a new TUI
 
 Copy this into your next project's PRD:
 
 - [ ] Bun + Ink + `ink-text-input` (deps)
-- [ ] `process.stdin.isTTY` guard at entry
-- [ ] Header component: app name + identity + numbered tabs
-- [ ] KeybindingBar: context-sensitive footer
+- [ ] `process.stdin.isTTY` guard at entry (only when launching the TUI)
+- [ ] Single binary, argv dispatcher: no args → TUI, with args → CLI
+- [ ] In-app login screen (Ink-based, `mask="•"` for password) — no shell-out
+- [ ] Auth state machine: checking → login → ready, with `reportExpired()` context
+- [ ] App shell: header (identity + numbered tabs) + body + footer
+- [ ] KeybindingBar: context-sensitive footer; wipe on view change
 - [ ] HelpOverlay: `?` shows grouped keys
 - [ ] CommandPalette: `:` for view jumps and actions
 - [ ] FocusableList: reusable selectable list
 - [ ] CycleSelector: reusable single-line carousel
 - [ ] Color palette: cyan/gray for borders, green/yellow/red for status
-- [ ] Global keys: `1/2/3/tab/?/:/r/q`
+- [ ] Global keys: `1/2/3/?/:/r/q` (NOT `tab` — Tab is panel-scoped)
+- [ ] Per-view: Tab cycles internal panels; numbered keys switch views
 - [ ] Panel-focused border color: cyan focused, gray otherwise
 - [ ] Selection: `inverse` on selected row
+- [ ] Data fetched at App level once; views consume via props (no auto-refetch)
+- [ ] Tabular rows use a single `<Text>` per row (not sibling Texts)
+- [ ] Equal-split rows: `flexBasis={0} flexGrow={1}` on each child
 - [ ] Loading state: small in-place spinner, don't blank the view
 - [ ] Error state: inline banner + retry key
 - [ ] Inline forms with row-level `↑/↓` + `Enter` to edit + `Esc` to cancel
 - [ ] Confirmation: inline `[y/n]` for normal, modal for destructive
+- [ ] `bun build --compile` with the `stub-react-devtools` plugin
 
 ---
 
-## 18. The five highest-leverage patterns
+## 20. The five highest-leverage patterns
 
 If you only adopt five things, make it these. They're what separate a TUI that *feels* like lazygit/k9s from one that just runs in a terminal.
 
 1. **Cyan border on focused panel, gray everywhere else.** One styling rule, immediate clarity.
-2. **Numbered tab jumps + Tab fallback.** `1`/`2`/`3` for views, Tab for sub-panels. Power users never use a mouse.
-3. **Context-sensitive footer.** Show only the keys that work *now*, plus a 4-key global tail. The single biggest UX win.
+2. **Numbered jumps for views, Tab for panels — never both.** `1`/`2`/`3` switches views; Tab cycles panels *within* the current view. Pick one role for Tab and commit to it; double-binding leads to the "I press Tab and lose my place" bug.
+3. **Context-sensitive footer.** Show only the keys that work *now*, plus a short global tail. The single biggest UX win. Wipe on view change so nothing leaks.
 4. **`:` command palette.** Replaces a menu bar, replaces a dozen niche keys, gives users a search-anywhere escape hatch.
 5. **Inline editing with row-level focus.** Don't shell out for structured data, don't build a separate "edit screen" — make each form row independently focusable with `↑/↓` + `Enter`.
 
