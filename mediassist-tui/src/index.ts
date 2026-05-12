@@ -1,18 +1,32 @@
-// Phase 1: stubbed entry point. The interactive TUI lands in Phase 4 (see PRD.md §10).
-// For now this just informs the user to use the CLI.
+#!/usr/bin/env bun
+import React from "react";
+import { render } from "ink";
+import { loadSession } from "./api/auth.ts";
 import { loadEnv } from "./config.ts";
+import { App } from "./ui/app.tsx";
 
 loadEnv();
 
-console.log(`mediassist-tui — Phase 1 (API layer only)
+async function main(): Promise<void> {
+  if (!process.stdin.isTTY) {
+    console.error(
+      "mediassist-tui requires an interactive terminal (TTY).\n" +
+        "Run it directly — do not pipe stdin from a file.\n" +
+        "For non-interactive use, see: bun run cli <command>",
+    );
+    process.exit(2);
+  }
 
-The interactive TUI is not built yet. Use the CLI instead:
+  const client = await loadSession();
+  if (!client) {
+    console.error("Not logged in. Run: bun run cli login");
+    process.exit(1);
+  }
 
-  bun run cli login      # login and persist session
-  bun run cli policy     # show policy + sum insured
-  bun run cli claims     # list claims
-  bun run cli whoami     # show current session info
-  bun run cli logout     # clear session
+  const { waitUntilExit } = render(React.createElement(App, { client }), {
+    exitOnCtrlC: true,
+  });
+  await waitUntilExit();
+}
 
-See PRD.md for the full roadmap.
-`);
+await main();
