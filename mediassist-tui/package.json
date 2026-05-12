@@ -6,18 +6,15 @@
   "description": "Terminal UI for Medi Assist portal — submit OPD claims with auto-extraction from PDF/image",
   "scripts": {
     "start": "bun run src/index.ts",
-    "cli": "bun run src/cli.ts",
-    "ocr": "bun run src/ocr.ts",
+    "cli": "bun run src/index.ts",
     "dev": "bun --watch src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test:samples": "bun run src/cli.ts extract \"doc.pdf\"",
     "build": "bun run build.ts",
-    "build:all": "bun run build.ts tui cli ocr",
-    "build:windows": "bun run build.ts tui cli ocr --target=bun-windows-x64",
-    "build:linux": "bun run build.ts tui cli ocr --target=bun-linux-x64",
-    "build:macos-intel": "bun run build.ts tui cli ocr --target=bun-darwin-x64",
-    "build:macos-arm": "bun run build.ts tui cli ocr --target=bun-darwin-arm64",
-    "build:all-platforms": "bun run build:windows && bun run build:linux && bun run build:macos-intel && bun run build:macos-arm"
+    "build:windows": "bun run build.ts --target=bun-windows-x64",
+    "build:linux": "bun run build.ts --target=bun-linux-x64",
+    "build:macos-intel": "bun run build.ts --target=bun-darwin-x64",
+    "build:macos-arm": "bun run build.ts --target=bun-darwin-arm64",
+    "build:all": "bun run build:windows && bun run build:linux && bun run build:macos-intel && bun run build:macos-arm"
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",

@@ -1,42 +1,37 @@
 #!/usr/bin/env bun
-import {
-  password as promptPassword,
-  text as promptText,
-  select as promptSelect,
-  isCancel,
-  intro,
-  outro,
-} from "@clack/prompts";
+import { select as promptSelect, isCancel } from "@clack/prompts";
 import { parseArgs } from "node:util";
 import { listClaims } from "./api/claims.ts";
-import { loadSession, login, logout } from "./api/auth.ts";
+import { loadSession, logout } from "./api/auth.ts";
 import { getOpdBalance, getPolicy, getSubmitBeneficiaries, type SubmitBeneficiary } from "./api/policy.ts";
 import { getBankDetails } from "./api/bank.ts";
 import { getBillTypes, lookupPincode, matchBillType } from "./api/lookups.ts";
 import { buildPayloadsForDryRun, type SubmitContext } from "./api/submit.ts";
 import { getUserContext } from "./api/user-context.ts";
-import { loadEnv } from "./config.ts";
 import { extractClaim } from "./extract/index.ts";
+import { runOcr } from "./ocr.ts";
+import { loadEnv } from "./config.ts";
 import type { MediAssistClient } from "./api/client.ts";
 
-const COMMANDS = ["login", "whoami", "logout", "policy", "claims", "extract", "submit", "help"] as const;
+const COMMANDS = ["whoami", "logout", "policy", "claims", "extract", "submit", "ocr", "help"] as const;
 type Command = (typeof COMMANDS)[number];
 
-async function main(): Promise<void> {
-  loadEnv();
-  const [cmd = "help"] = process.argv.slice(2);
+/**
+ * CLI entry point. Called from index.ts when the binary is invoked with
+ * arguments; also runnable directly via `bun run src/cli.ts <command>`.
+ */
+export async function runCli(args: string[]): Promise<void> {
+  const [cmd = "help", ...rest] = args;
 
   if (!COMMANDS.includes(cmd as Command)) {
     printHelp();
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   switch (cmd as Command) {
     case "help":
       printHelp();
-      return;
-    case "login":
-      await cmdLogin();
       return;
     case "logout":
       cmdLogout();
@@ -51,22 +46,25 @@ async function main(): Promise<void> {
       await withSession(cmdClaims);
       return;
     case "extract":
-      await cmdExtract();
+      await cmdExtract(rest);
       return;
     case "submit":
-      await withSession(cmdSubmit);
+      await withSession((client) => cmdSubmit(client, rest));
+      return;
+    case "ocr":
+      await runOcr(rest);
       return;
   }
 }
 
 function printHelp(): void {
-  console.log(`mediassist-tui CLI
+  console.log(`mediassist-tui
 
 Usage:
-  bun run cli <command> [args]
+  mediassist-tui                       Open the interactive TUI (default)
+  mediassist-tui <command> [args]      Run a CLI command instead
 
 Commands:
-  login                  Login (interactive) and persist session cookie to .env
   logout                 Clear stored session cookie
   whoami                 Show current logged-in user from .env
   policy                 Fetch policy and sum-insured details
@@ -74,45 +72,20 @@ Commands:
   extract <file...>      Extract claim fields from one or more PDFs/images (globs OK)
   submit <file...>       DRY-RUN: extract + classify + resolve lookups + print
                          the payloads that would be POSTed. Does NOT submit.
-                         Files are auto-classified as "bill" (invoice with
-                         number+amount+date/clinic) or "doc" (supporting only).
+                         Files are auto-classified as "bill" or "doc".
                          Options:
                            --for <name|relation>  Override beneficiary selection
                            --bill <path>          Force a file to be a bill
                            --doc <path>           Force a file to be a doc
                            --yes                  Skip interactive prompts
+  ocr <file...>          Convert any file (PDF/image) to text (text-layer PDFs
+                         use unpdf, images use tesseract.js). Pass --help for
+                         OCR-specific options.
   help                   Show this message
+
+Login is handled by the TUI (run \`mediassist-tui\` with no arguments). CLI
+commands use the session stored in .env — they don't prompt for credentials.
 `);
-}
-
-async function cmdLogin(): Promise<void> {
-  intro("Medi Assist Login");
-  const env = loadEnv();
-  const usernameInput = await promptText({
-    message: "Username",
-    initialValue: env.MEDIASSIST_USER ?? "",
-    validate: (v) => (v.trim().length === 0 ? "Username is required" : undefined),
-  });
-  if (isCancel(usernameInput)) {
-    outro("Cancelled");
-    return;
-  }
-  const passwordInput = await promptPassword({
-    message: "Password",
-    validate: (v) => (v.length === 0 ? "Password is required" : undefined),
-  });
-  if (isCancel(passwordInput)) {
-    outro("Cancelled");
-    return;
-  }
-
-  try {
-    await login(usernameInput.trim(), passwordInput);
-    outro(`Logged in as ${usernameInput.trim()} — session saved to .env`);
-  } catch (err) {
-    outro(`Login failed: ${(err as Error).message}`);
-    process.exitCode = 1;
-  }
 }
 
 function cmdLogout(): void {
@@ -123,7 +96,7 @@ function cmdLogout(): void {
 function cmdWhoami(): void {
   const env = loadEnv();
   if (!env.MEDIASSIST_USER) {
-    console.log("Not logged in. Run: bun run cli login");
+    console.log("Not logged in. Run `mediassist-tui` to log in via the TUI.");
     return;
   }
   const expiresAt = env.MEDIASSIST_COOKIE_EXPIRES_AT
@@ -141,7 +114,7 @@ function cmdWhoami(): void {
 async function withSession(fn: (client: MediAssistClient) => Promise<void>): Promise<void> {
   const client = await loadSession();
   if (!client) {
-    console.error("No active session. Run: bun run cli login");
+    console.error("No active session. Run `mediassist-tui` to log in.");
     process.exitCode = 1;
     return;
   }
@@ -187,8 +160,7 @@ async function cmdClaims(client: MediAssistClient): Promise<void> {
   }
 }
 
-async function cmdExtract(): Promise<void> {
-  const args = process.argv.slice(3);
+async function cmdExtract(args: string[]): Promise<void> {
   if (args.length === 0) {
     console.error(
       "Usage: bun run cli extract <file> [<file> ...]\n" +
@@ -295,8 +267,8 @@ function basename(p: string): string {
   return i >= 0 ? p.slice(i + 1) : p;
 }
 
-async function cmdSubmit(client: MediAssistClient): Promise<void> {
-  const opts = parseSubmitArgs();
+async function cmdSubmit(client: MediAssistClient, args: string[]): Promise<void> {
+  const opts = parseSubmitArgs(args);
   if (opts.files.length === 0) {
     console.error(
       "Usage: bun run cli submit <file> [<file>...] [--for <name|relation>] [--yes]\n" +
@@ -479,9 +451,9 @@ type SubmitArgs = {
   yes: boolean;
 };
 
-function parseSubmitArgs(): SubmitArgs {
+function parseSubmitArgs(args: string[]): SubmitArgs {
   const { values, positionals } = parseArgs({
-    args: process.argv.slice(3),
+    args,
     options: {
       for: { type: "string" },
       yes: { type: "boolean", short: "y", default: false },
@@ -634,4 +606,8 @@ function formatINR(n: number): string {
   return n.toLocaleString("en-IN");
 }
 
-await main();
+// Allow `bun run src/cli.ts <args>` for dev convenience.
+if (import.meta.main) {
+  loadEnv();
+  await runCli(process.argv.slice(2));
+}

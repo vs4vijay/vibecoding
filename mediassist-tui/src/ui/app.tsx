@@ -1,5 +1,6 @@
 import { Box, Text, useApp, useInput } from "ink";
 import { createContext, useCallback, useEffect, useState } from "react";
+import { loadSession } from "../api/auth.ts";
 import { SessionExpiredError, type MediAssistClient } from "../api/client.ts";
 import { listClaims } from "../api/claims.ts";
 import { getOpdBalance, getPolicy, type OpdBalance } from "../api/policy.ts";
@@ -9,18 +10,73 @@ import { Header, type ViewKey } from "./components/header.tsx";
 import { KeybindingBar, type KeyHint } from "./components/keybinding-bar.tsx";
 import { CommandPalette, type Command } from "./components/command-palette.tsx";
 import { HelpOverlay } from "./components/help-overlay.tsx";
+import { LoginScreen } from "./login.tsx";
 import { Dashboard } from "./dashboard.tsx";
 import { ClaimsView } from "./claims-view.tsx";
 import { NewClaim } from "./new-claim.tsx";
 
 /**
- * Context that every view uses to bubble a `SessionExpiredError` up to the
- * shell, which in turn tells the outer `runTui()` loop in `index.ts` to
- * unmount and re-launch the login prompt.
+ * Views consume this context to bubble `SessionExpiredError` up to the
+ * shell, which transitions to the LoginScreen for re-auth — all within the
+ * same render tree, no process restart.
  */
 export const SessionContext = createContext<{ reportExpired: () => void }>({
   reportExpired: () => {},
 });
+
+type AuthState =
+  | { kind: "checking" }
+  | { kind: "login"; reason: "first" | "expired" }
+  | { kind: "ready"; client: MediAssistClient };
+
+export function App(): JSX.Element {
+  const [auth, setAuth] = useState<AuthState>({ kind: "checking" });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const client = await loadSession();
+        if (cancelled) return;
+        setAuth(client ? { kind: "ready", client } : { kind: "login", reason: "first" });
+      } catch {
+        if (!cancelled) setAuth({ kind: "login", reason: "first" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (auth.kind === "checking") {
+    return (
+      <Box padding={1}>
+        <Text color="cyan">Checking session…</Text>
+      </Box>
+    );
+  }
+
+  if (auth.kind === "login") {
+    return (
+      <LoginScreen
+        reason={auth.reason}
+        onSuccess={(client) => setAuth({ kind: "ready", client })}
+      />
+    );
+  }
+
+  return (
+    <Shell
+      key={auth.client.cookieString}
+      client={auth.client}
+      onSessionExpired={() => setAuth({ kind: "login", reason: "expired" })}
+    />
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Authenticated shell: header / body / footer with all the views
+// ----------------------------------------------------------------------------
 
 type GlobalData = {
   user: UserContext;
@@ -29,13 +85,12 @@ type GlobalData = {
   claims: Claim[];
 };
 
-type AppProps = {
+type ShellProps = {
   client: MediAssistClient;
-  /** Called when a session-expired response is detected anywhere in the app. */
   onSessionExpired: () => void;
 };
 
-export function App({ client, onSessionExpired }: AppProps): JSX.Element {
+function Shell({ client, onSessionExpired }: ShellProps): JSX.Element {
   const { exit } = useApp();
   const [view, setView] = useState<ViewKey>("dashboard");
   const [data, setData] = useState<GlobalData | null>(null);
@@ -121,6 +176,7 @@ export function App({ client, onSessionExpired }: AppProps): JSX.Element {
     { name: "new", aliases: ["new-claim", "submit", "3"], description: "Start a new claim", action: () => setView("newClaim") },
     { name: "refresh", aliases: ["r"], description: "Refresh data", action: () => setRefreshKey((n) => n + 1) },
     { name: "help", aliases: ["h", "?"], description: "Show help overlay", action: () => setHelp(true) },
+    { name: "logout", description: "Sign out and return to the login screen", action: () => onSessionExpired() },
     { name: "quit", aliases: ["q", "exit"], description: "Quit the app", action: () => exit() },
   ];
 
@@ -132,49 +188,49 @@ export function App({ client, onSessionExpired }: AppProps): JSX.Element {
 
   return (
     <SessionContext.Provider value={{ reportExpired }}>
-    <Box flexDirection="column">
-      {data ? (
-        <Header user={data.user} policy={data.policy} balance={data.balance} activeView={view} />
-      ) : (
-        <SimpleHeader status={loadError ? `error: ${loadError}` : "loading…"} />
-      )}
-      <Box flexGrow={1} flexDirection="column">
-        {!data && !loadError ? (
-          <Box paddingX={1}>
-            <Text color="cyan">Loading…</Text>
-          </Box>
-        ) : loadError ? (
-          <Box paddingX={1} flexDirection="column">
-            <Text color="red">Failed to load: {loadError}</Text>
-            <Text dimColor>Press [r] to retry · [q] to quit</Text>
-          </Box>
+      <Box flexDirection="column">
+        {data ? (
+          <Header user={data.user} policy={data.policy} balance={data.balance} activeView={view} />
         ) : (
-          <>
-            {view === "dashboard" && (
-              <Dashboard policy={data!.policy} balance={data!.balance} claims={data!.claims} />
-            )}
-            {view === "claims" && (
-              <ClaimsView client={client} refreshKey={refreshKey} isActive={isInteractive} />
-            )}
-            {view === "newClaim" && (
-              <NewClaim
-                client={client}
-                user={data!.user}
-                isActive={isInteractive}
-                onContextHintsChange={onContextHintsChange}
-              />
-            )}
-          </>
+          <SimpleHeader status={loadError ? `error: ${loadError}` : "loading…"} />
         )}
-      </Box>
-      <KeybindingBar contextHints={contextHintsFor(view, viewHints)} />
-      {help ? <HelpOverlayContainer onClose={() => setHelp(false)} /> : null}
-      {palette ? (
-        <Box marginTop={1}>
-          <CommandPalette commands={commands} onClose={() => setPalette(false)} />
+        <Box flexGrow={1} flexDirection="column">
+          {!data && !loadError ? (
+            <Box paddingX={1}>
+              <Text color="cyan">Loading…</Text>
+            </Box>
+          ) : loadError ? (
+            <Box paddingX={1} flexDirection="column">
+              <Text color="red">Failed to load: {loadError}</Text>
+              <Text dimColor>Press [r] to retry · [q] to quit</Text>
+            </Box>
+          ) : (
+            <>
+              {view === "dashboard" && (
+                <Dashboard policy={data!.policy} balance={data!.balance} claims={data!.claims} />
+              )}
+              {view === "claims" && (
+                <ClaimsView client={client} refreshKey={refreshKey} isActive={isInteractive} />
+              )}
+              {view === "newClaim" && (
+                <NewClaim
+                  client={client}
+                  user={data!.user}
+                  isActive={isInteractive}
+                  onContextHintsChange={onContextHintsChange}
+                />
+              )}
+            </>
+          )}
         </Box>
-      ) : null}
-    </Box>
+        <KeybindingBar contextHints={contextHintsFor(view, viewHints)} />
+        {help ? <HelpOverlayContainer onClose={() => setHelp(false)} /> : null}
+        {palette ? (
+          <Box marginTop={1}>
+            <CommandPalette commands={commands} onClose={() => setPalette(false)} />
+          </Box>
+        ) : null}
+      </Box>
     </SessionContext.Provider>
   );
 }

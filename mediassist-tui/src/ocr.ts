@@ -4,9 +4,6 @@ import { extname, join, basename } from "node:path";
 import { parseArgs } from "node:util";
 import { getOcrEngine, getTextExtractor } from "./engines/registry.ts";
 import { extractFieldsFromText, type FieldsFromTextResult } from "./extract/index.ts";
-import { loadEnv } from "./config.ts";
-
-loadEnv();
 
 type Cli = {
   lang?: string;
@@ -33,11 +30,13 @@ type FileResult = {
   fields?: FieldsFromTextResult;
 };
 
-async function main(): Promise<void> {
-  const { cli, files } = parseCli();
+export async function runOcr(args: string[]): Promise<void> {
+  const { cli, files } = parseCli(args);
   if (cli.help || files.length === 0) {
     printHelp();
-    process.exit(cli.help ? 0 : 1);
+    if (cli.help) return;
+    process.exitCode = 1;
+    return;
   }
 
   if (cli.lang) process.env.TESSERACT_LANGS = cli.lang;
@@ -166,9 +165,9 @@ function printOutputs(results: FileResult[], cli: Cli): void {
   }
 }
 
-function parseCli(): { cli: Cli; files: string[] } {
+function parseCli(args: string[]): { cli: Cli; files: string[] } {
   const { values, positionals } = parseArgs({
-    args: process.argv.slice(2),
+    args,
     options: {
       lang: { type: "string" },
       langs: { type: "string" },
@@ -240,7 +239,7 @@ function printHelp(): void {
 - PDFs   → text-layer extraction via the configured extractor (default: unpdf)
 
 Usage:
-  bun run ocr [options] <file...>
+  mediassist-tui ocr [options] <file...>
 
 Options:
   --lang <codes>      Comma-separated language codes (default: eng,hin)
@@ -254,11 +253,16 @@ Options:
 Supported: ${ALL_EXTS.join(", ")}
 
 Examples:
-  bun run ocr photo.jpg
-  bun run ocr "./scans/*.pdf"
-  bun run ocr -o ./txt "./samples/*"
-  bun run ocr --json "./mixed/*" > out.json
+  mediassist-tui ocr photo.jpg
+  mediassist-tui ocr "./scans/*.pdf"
+  mediassist-tui ocr -o ./txt "./samples/*"
+  mediassist-tui ocr --json "./mixed/*" > out.json
 `);
 }
 
-await main();
+// Allow `bun run src/ocr.ts <args>` for dev convenience.
+if (import.meta.main) {
+  const { loadEnv } = await import("./config.ts");
+  loadEnv();
+  await runOcr(process.argv.slice(2));
+}
