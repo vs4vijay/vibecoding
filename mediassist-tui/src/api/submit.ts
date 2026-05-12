@@ -1,13 +1,20 @@
 /**
- * Builds the form-encoded payloads that the portal's web UI would POST during
- * an OPD claim submission. THESE FUNCTIONS DO NOT MAKE ANY HTTP REQUESTS —
- * they only assemble the body strings, for use by the dry-run TUI / CLI.
+ * Builds the form-encoded payloads for an OPD claim submission AND, when
+ * called via `submitClaimChain`, actually executes the four-step submit:
+ *   1. SaveDraft         → mints ClaimRegNo
+ *   2. uploadDocument()  × N (per file)
+ *   3. AddClaimBill      × N (per bill)
+ *   4. SubmitClaim
  *
- * Submission is intentionally NOT implemented; see
- * memory/feedback_mediassist_no_submit.md.
+ * The payload builders are exported separately so callers (dry-run UI) can
+ * inspect what would be sent before confirming. Callers must observe the
+ * safety rules in memory/feedback_mediassist_no_submit.md — typed
+ * confirmation, no silent submission, step-by-step progress.
  */
+import type { MediAssistClient } from "./client.ts";
 import type { BankDetail } from "./bank.ts";
 import type { ClaimFields } from "../types.ts";
+import { uploadDocument } from "./upload.ts";
 
 export type Beneficiary = {
   /** CMSMemberUserId — the value the portal expects in `benefId`. */
@@ -200,6 +207,140 @@ export function buildSubmitClaimBody(
     TotalBillAmount: String(totalAmount),
   };
 }
+
+// ===========================================================================
+//  EXECUTION — the chain that actually submits the claim
+// ===========================================================================
+
+export type SubmitProgress =
+  | { step: "saveDraft"; status: "in-progress" }
+  | { step: "saveDraft"; status: "ok"; claimRegNo: string }
+  | { step: "upload"; status: "in-progress"; index: number; total: number; filename: string }
+  | { step: "upload"; status: "ok"; index: number; total: number; filename: string }
+  | { step: "addBill"; status: "in-progress"; index: number; total: number }
+  | { step: "addBill"; status: "ok"; index: number; total: number }
+  | { step: "submit"; status: "in-progress" }
+  | { step: "submit"; status: "ok"; claimRegNo: string };
+
+export type SubmitResult = {
+  claimRegNo: string;
+};
+
+/**
+ * Executes the full submission chain. Calls `onProgress` after each milestone
+ * so the UI can render a step-by-step progress list. Throws on the first
+ * failure with a message that includes which step failed.
+ */
+export async function submitClaimChain(
+  client: MediAssistClient,
+  bills: ClaimFields[],
+  ctx: SubmitContext,
+  filePaths: string[],
+  onProgress: (event: SubmitProgress) => void,
+): Promise<SubmitResult> {
+  if (bills.length === 0) throw new Error("Cannot submit a claim with zero bills");
+  if (filePaths.length === 0) {
+    throw new Error("Cannot submit a claim with zero documents (portal rejects with 'DocNotUploaded')");
+  }
+
+  const total = bills.reduce((s, b) => s + b.billAmount, 0);
+  const dates = bills.map((b) => parseDDMMYYYY(b.billDate)).filter((d): d is Date => d !== null);
+  const startDate = dates.length > 0 ? toMMDDYYYY(dates.reduce((a, b) => (a < b ? a : b))) : "";
+  const endDate = dates.length > 0 ? toMMDDYYYY(dates.reduce((a, b) => (a > b ? a : b))) : "";
+  const firstBill = bills[0]!;
+
+  // --- Step 1: SaveDraft ---
+  onProgress({ step: "saveDraft", status: "in-progress" });
+  const saveDraftBody = buildSaveDraftBody(firstBill, bills, ctx, total, startDate, endDate);
+  const draftJson = await postForm<SaveDraftResponse>(client, "/ServiceCalls/SaveDraft.aspx", saveDraftBody);
+  if (!draftJson.IsSuccess || !draftJson.ClaimRegNo) {
+    throw new Error(
+      `SaveDraft failed: ${draftJson.ErrorMessage || "no ClaimRegNo returned"}`,
+    );
+  }
+  const claimRegNo = draftJson.ClaimRegNo;
+  onProgress({ step: "saveDraft", status: "ok", claimRegNo });
+
+  // --- Step 2: uploads ---
+  for (let i = 0; i < filePaths.length; i++) {
+    const filename = basenameOf(filePaths[i]!);
+    onProgress({ step: "upload", status: "in-progress", index: i + 1, total: filePaths.length, filename });
+    await uploadDocument(client, filePaths[i]!);
+    onProgress({ step: "upload", status: "ok", index: i + 1, total: filePaths.length, filename });
+  }
+
+  // --- Step 3: AddClaimBill (one per bill) ---
+  for (let i = 0; i < bills.length; i++) {
+    onProgress({ step: "addBill", status: "in-progress", index: i + 1, total: bills.length });
+    const billBody = buildAddClaimBillBody(bills[i]!, ctx, claimRegNo);
+    const billJson = await postForm<AddBillResponse>(client, "/ServiceCalls/AddClaimBill.aspx", billBody);
+    if (!billJson.IsSuccess) {
+      throw new Error(
+        `AddClaimBill #${i + 1} failed: ${billJson.ErrorMessage || "no error message"} (ClaimRegNo ${claimRegNo} created — cancel via web UI if needed)`,
+      );
+    }
+    onProgress({ step: "addBill", status: "ok", index: i + 1, total: bills.length });
+  }
+
+  // --- Step 4: SubmitClaim ---
+  onProgress({ step: "submit", status: "in-progress" });
+  const submitBody = buildSubmitClaimBody(ctx, claimRegNo, total);
+  const submitText = await postFormRaw(client, "/ServiceCalls/SubmitClaim.aspx", submitBody);
+  if (/^["']?DocNotUploaded["']?$/i.test(submitText.trim())) {
+    throw new Error(
+      `SubmitClaim refused: server says no document was uploaded. ClaimRegNo ${claimRegNo} exists as draft — cancel via web UI.`,
+    );
+  }
+  onProgress({ step: "submit", status: "ok", claimRegNo });
+  return { claimRegNo };
+}
+
+type SaveDraftResponse = { IsSuccess?: boolean; ClaimRegNo?: string; ErrorMessage?: string };
+type AddBillResponse = { IsSuccess?: boolean; ErrorMessage?: string };
+
+async function postForm<T>(
+  client: MediAssistClient,
+  path: string,
+  body: Record<string, string>,
+): Promise<T> {
+  const text = await postFormRaw(client, path, body);
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Non-JSON response from ${path}: ${text.slice(0, 200)}`);
+  }
+}
+
+async function postFormRaw(
+  client: MediAssistClient,
+  path: string,
+  body: Record<string, string>,
+): Promise<string> {
+  const form = new URLSearchParams(body);
+  const res = await client.request(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      Accept: "application/json, text/javascript, */*; q=0.01",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    body: form.toString(),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`${path} returned HTTP ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return text;
+}
+
+function basenameOf(p: string): string {
+  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  return i >= 0 ? p.slice(i + 1) : p;
+}
+
+// ===========================================================================
+//  Helpers (date conversion)
+// ===========================================================================
 
 function parseDDMMYYYY(ddmmyyyy: string): Date | null {
   const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(ddmmyyyy);

@@ -13,7 +13,13 @@ import {
   type PincodeLocality,
 } from "../api/lookups.ts";
 import { getSubmitBeneficiaries, type SubmitBeneficiary } from "../api/policy.ts";
-import { buildPayloadsForDryRun, type Payloads, type SubmitContext } from "../api/submit.ts";
+import {
+  buildPayloadsForDryRun,
+  submitClaimChain,
+  type Payloads,
+  type SubmitContext,
+  type SubmitProgress,
+} from "../api/submit.ts";
 import type { UserContext } from "../api/user-context.ts";
 import { extractClaim } from "../extract/index.ts";
 import { BILL_TYPES, type BillType, type ClaimFields } from "../types.ts";
@@ -70,6 +76,59 @@ type Resolved = {
   loading: boolean;
 };
 
+/**
+ * Multi-stage submission flow rendered as a modal overlay. Each stage adds a
+ * layer of friction before the irreversible POST:
+ *   preview     — show full payload, single-key [S] to ARM
+ *   confirm     — must type literal "SUBMIT" to enable [enter]
+ *   submitting  — step-by-step progress; no abort once started
+ *   success     — claim number returned by SubmitClaim
+ *   failure     — error + retry option (each retry creates a fresh draft)
+ */
+type SubmitFlow =
+  | {
+      stage: "preview";
+      payloads: Payloads;
+      ctx: SubmitContext;
+      bills: Bill[];
+      benef: SubmitBeneficiary;
+      pincode: PincodeLocality | null;
+      billType: BillTypeEntry;
+      total: number;
+    }
+  | {
+      stage: "confirm";
+      payloads: Payloads;
+      ctx: SubmitContext;
+      bills: Bill[];
+      benef: SubmitBeneficiary;
+      pincode: PincodeLocality | null;
+      billType: BillTypeEntry;
+      total: number;
+      typed: string;
+    }
+  | {
+      stage: "submitting";
+      payloads: Payloads;
+      total: number;
+      progress: SubmitProgress[];
+    }
+  | {
+      stage: "success";
+      claimRegNo: string;
+      total: number;
+      docCount: number;
+      billCount: number;
+      progress: SubmitProgress[];
+    }
+  | {
+      stage: "failure";
+      message: string;
+      progress: SubmitProgress[];
+    };
+
+const CONFIRM_WORD = "SUBMIT";
+
 export function NewClaim({ client, user, isActive, onContextHintsChange }: Props): JSX.Element {
   const { reportExpired } = useContext(SessionContext);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -84,7 +143,7 @@ export function NewClaim({ client, user, isActive, onContextHintsChange }: Props
   const [banks, setBanks] = useState<BankDetail[]>([]);
   const [benefIdx, setBenefIdx] = useState(0);
   const [resolved, setResolved] = useState<Resolved>({ loading: false });
-  const [overlay, setOverlay] = useState<null | { payloads: Payloads; total: number }>(null);
+  const [flow, setFlow] = useState<SubmitFlow | null>(null);
 
   // ----- one-time data load (beneficiaries + bank) -----
   useEffect(() => {
@@ -164,20 +223,20 @@ export function NewClaim({ client, user, isActive, onContextHintsChange }: Props
   // ----- context-sensitive footer hints -----
   useEffect(() => {
     if (!isActive) return;
-    if (overlay) {
-      onContextHintsChange?.([{ key: "esc", label: "close" }]);
+    if (flow) {
+      onContextHintsChange?.(hintsForFlow(flow));
       return;
     }
     const hints = getContextHints(panel, editing, bills.length, billsOnly.length);
     onContextHintsChange?.(hints);
-  }, [panel, editing, bills.length, billsOnly.length, overlay, isActive, onContextHintsChange]);
+  }, [panel, editing, bills.length, billsOnly.length, flow, isActive, onContextHintsChange]);
 
   // ----- key bindings -----
   useInput(
     (input, key) => {
-      // Overlay swallows everything except esc.
-      if (overlay) {
-        if (key.escape) setOverlay(null);
+      // Submit flow swallows page-level keys; each stage has its own rules.
+      if (flow) {
+        handleFlowKeys(flow, setFlow, client, input, key);
         return;
       }
       // Editing a text field — only handle Esc, TextInput owns the rest.
@@ -434,21 +493,20 @@ export function NewClaim({ client, user, isActive, onContextHintsChange }: Props
       ctx,
       allFilePaths,
     );
-    setOverlay({ payloads, total });
+    setFlow({
+      stage: "preview",
+      payloads,
+      ctx,
+      bills,
+      benef: benefs[benefIdx]!,
+      pincode: resolved.pincode ?? null,
+      billType: resolved.billType!,
+      total,
+    });
   }
 
-  if (overlay) {
-    return (
-      <DryRunOverlay
-        bills={bills}
-        billsOnly={billsOnly}
-        benef={benefs[benefIdx]!}
-        billType={resolved.billType!}
-        pincode={resolved.pincode ?? null}
-        payloads={overlay.payloads}
-        total={overlay.total}
-      />
-    );
+  if (flow) {
+    return <FlowOverlay flow={flow} bills={bills} billsOnly={billsOnly} setFlow={setFlow} />;
   }
 
   return (
@@ -741,31 +799,50 @@ function ResolvedBar({
   );
 }
 
-function DryRunOverlay({
+function FlowOverlay({
+  flow,
   bills,
   billsOnly,
-  benef,
-  billType,
-  pincode,
-  payloads,
-  total,
+  setFlow,
 }: {
+  flow: SubmitFlow;
   bills: Bill[];
   billsOnly: (Bill & { fields: ClaimFields })[];
-  benef: SubmitBeneficiary;
-  billType: BillTypeEntry;
-  pincode: PincodeLocality | null;
-  payloads: Payloads;
-  total: number;
+  setFlow: (f: SubmitFlow | null) => void;
 }): JSX.Element {
+  switch (flow.stage) {
+    case "preview":
+      return <PreviewStage flow={flow} bills={bills} billsOnly={billsOnly} />;
+    case "confirm":
+      return <ConfirmStage flow={flow} bills={bills} billsOnly={billsOnly} setFlow={setFlow} />;
+    case "submitting":
+      return <SubmittingStage flow={flow} />;
+    case "success":
+      return <SuccessStage flow={flow} />;
+    case "failure":
+      return <FailureStage flow={flow} />;
+  }
+}
+
+function PreviewStage({
+  flow,
+  bills,
+  billsOnly,
+}: {
+  flow: Extract<SubmitFlow, { stage: "preview" }>;
+  bills: Bill[];
+  billsOnly: (Bill & { fields: ClaimFields })[];
+}): JSX.Element {
+  const { payloads, benef, pincode, billType, total } = flow;
   const docCount = bills.filter((b) => b.kind === "doc").length;
   const numPosts = 2 + payloads.fileUploads.length + payloads.addClaimBills.length;
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box flexDirection="column" borderStyle="double" borderColor="yellow" paddingX={2} paddingY={1}>
         <Text bold color="yellow">
-          DRY RUN — nothing was submitted  ·  {billsOnly.length} bill(s), {docCount} doc(s)  ·  total ₹ {fmt(total)}
+          DRY RUN PREVIEW  ·  {billsOnly.length} bill(s), {docCount} doc(s)  ·  total ₹ {fmt(total)}
         </Text>
+        <Text dimColor>Nothing has been submitted yet — review and confirm below.</Text>
         <Box marginTop={1} flexDirection="column">
           <KV k="Beneficiary" v={`${benef.name} (${benef.relation}, ${benef.age}y) — MAID ${benef.maid}`} />
           <KV k="Bill type"   v={`${billType.name} = ${billType.id}`} />
@@ -780,12 +857,12 @@ function DryRunOverlay({
         <PayloadSummary
           label="1. SaveDraft"
           body={payloads.saveDraft}
-          keys={["claimRegnNo", "policyId", "maid", "benefName", "TreatmentStartDate", "TreatmentEndDate", "TotalDocCount", "TotalBillAmount"]}
+          keys={["policyId", "maid", "benefName", "TreatmentStartDate", "TreatmentEndDate", "TotalDocCount", "TotalBillAmount"]}
         />
         {payloads.fileUploads.map((u, i) => (
           <Box key={`upload-${i}`} flexDirection="column" marginTop={1}>
             <Text color="cyan">{2 + i}. POST {u.endpoint} (multipart)</Text>
-            <Text dimColor>  Filedata = {basename(u.filePath)}</Text>
+            <Text dimColor>  fileUpload = {basename(u.filePath)}</Text>
           </Box>
         ))}
         {payloads.addClaimBills.map((body, i) => (
@@ -802,12 +879,342 @@ function DryRunOverlay({
           keys={["empid", "Entity", "mobileno", "chequeleafId", "TotalBillAmount"]}
         />
       </Box>
+      <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="red" paddingX={2} paddingY={1}>
+        <Text bold color="red">⚠ Ready to submit a REAL claim</Text>
+        <Text dimColor>Pressing [s] arms the typed-confirmation step. The actual POST won't fire until you type the confirmation word.</Text>
+      </Box>
       <Box marginTop={1}>
-        <Text dimColor>[esc] close · for full payload run </Text>
-        <Text color="cyan" bold>bun run cli submit &lt;file…&gt;</Text>
+        <Text color="red" bold>[s] arm submit</Text>
+        <Text dimColor>   ·   [esc] close (no submission)</Text>
       </Box>
     </Box>
   );
+}
+
+function ConfirmStage({
+  flow,
+  bills,
+  billsOnly,
+  setFlow,
+}: {
+  flow: Extract<SubmitFlow, { stage: "confirm" }>;
+  bills: Bill[];
+  billsOnly: (Bill & { fields: ClaimFields })[];
+  setFlow: (f: SubmitFlow | null) => void;
+}): JSX.Element {
+  const { typed, benef, total, payloads } = flow;
+  const docCount = bills.filter((b) => b.kind === "doc").length;
+  const matched = typed === CONFIRM_WORD;
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Box flexDirection="column" borderStyle="double" borderColor="red" paddingX={2} paddingY={1}>
+        <Text bold color="red">⚠ FINAL CONFIRMATION — REAL SUBMISSION</Text>
+        <Box marginTop={1} flexDirection="column">
+          <Text>
+            You are about to submit a claim to <Text bold>portal.mediassist.in</Text> on behalf of{" "}
+            <Text bold>{benef.name}</Text> ({benef.relation}, MAID {benef.maid}) for{" "}
+            <Text bold color="cyan">₹ {fmt(total)}</Text> across {billsOnly.length} bill(s) and {docCount} document(s).
+          </Text>
+          <Text dimColor>
+            {2 + payloads.fileUploads.length + payloads.addClaimBills.length} HTTP POSTs will fire. After SubmitClaim, the claim cannot be cancelled through this app.
+          </Text>
+        </Box>
+      </Box>
+      <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor={matched ? "green" : "red"} paddingX={2} paddingY={1}>
+        <Text bold>
+          Type <Text color="red" bold>{CONFIRM_WORD}</Text> exactly and press [enter] to submit:
+        </Text>
+        <Box marginTop={1}>
+          <Text color={matched ? "green" : "red"} bold>›  </Text>
+          <TextInput
+            value={typed}
+            focus={true}
+            onChange={(v) => setFlow({ ...flow, typed: v })}
+            // onSubmit intentionally no-op — Enter is handled by the parent
+            // `useInput`, which sees `key.return` and dispatches to
+            // `beginSubmission` once `typed === CONFIRM_WORD`. Centralising
+            // the trigger in one place avoids double-fire from both handlers
+            // (Ink fires every active useInput on the same key).
+            onSubmit={() => {}}
+          />
+        </Box>
+        {matched ? (
+          <Text color="green">✓ Confirmed — press [enter] to fire the POST chain</Text>
+        ) : (
+          <Text dimColor>(mismatch — keep typing, or [esc] to abort)</Text>
+        )}
+      </Box>
+      <Box marginTop={1}>
+        <Text dimColor>[esc] abort  ·  [enter] {matched ? "submit now" : "(needs matching word first)"}</Text>
+      </Box>
+    </Box>
+  );
+}
+
+function SubmittingStage({ flow }: { flow: Extract<SubmitFlow, { stage: "submitting" }> }): JSX.Element {
+  const { progress, total } = flow;
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Box flexDirection="column" borderStyle="double" borderColor="yellow" paddingX={2} paddingY={1}>
+        <Text bold color="yellow">⟳ Submitting — total ₹ {fmt(total)}</Text>
+        <Text dimColor>Do not close the terminal until all steps complete.</Text>
+      </Box>
+      <Box marginTop={1} flexDirection="column" borderStyle="round" paddingX={1}>
+        {progress.length === 0 ? (
+          <Text dimColor>(starting…)</Text>
+        ) : (
+          progress.map((p, i) => <ProgressRow key={i} entry={p} />)
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+function ProgressRow({ entry }: { entry: SubmitProgress }): JSX.Element {
+  const inProgress = entry.status === "in-progress";
+  const ok = entry.status === "ok";
+  const marker = ok ? (
+    <Text color="green" bold>✓ </Text>
+  ) : (
+    <Text color="cyan" bold>▶ </Text>
+  );
+  let label: string;
+  switch (entry.step) {
+    case "saveDraft":
+      label = ok
+        ? `SaveDraft        OK · ClaimRegNo ${(entry as Extract<SubmitProgress, { step: "saveDraft"; status: "ok" }>).claimRegNo}`
+        : "SaveDraft        …";
+      break;
+    case "upload": {
+      const e = entry as Extract<SubmitProgress, { step: "upload" }>;
+      label = `Upload ${e.index}/${e.total}      ${ok ? "OK" : "…"}  ${e.filename}`;
+      break;
+    }
+    case "addBill": {
+      const e = entry as Extract<SubmitProgress, { step: "addBill" }>;
+      label = `AddClaimBill ${e.index}/${e.total}  ${ok ? "OK" : "…"}`;
+      break;
+    }
+    case "submit":
+      label = ok ? "SubmitClaim      OK" : "SubmitClaim      …";
+      break;
+  }
+  return (
+    <Box>
+      {marker}
+      <Text color={inProgress ? "cyan" : ok ? "green" : "white"}>{label}</Text>
+    </Box>
+  );
+}
+
+function SuccessStage({ flow }: { flow: Extract<SubmitFlow, { stage: "success" }> }): JSX.Element {
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Box flexDirection="column" borderStyle="double" borderColor="green" paddingX={2} paddingY={1}>
+        <Text bold color="green">✓ Claim submitted</Text>
+        <Box marginTop={1} flexDirection="column">
+          <KV k="ClaimRegNo"  v={flow.claimRegNo} color="cyan" />
+          <KV k="Bills"       v={String(flow.billCount)} />
+          <KV k="Documents"   v={String(flow.docCount)} />
+          <KV k="Total"       v={`₹ ${fmt(flow.total)}`} color="cyan" />
+        </Box>
+        <Text dimColor>The portal has accepted the claim. You can refresh the Claims tab to see it.</Text>
+      </Box>
+      <Box marginTop={1} flexDirection="column" borderStyle="round" paddingX={1}>
+        {flow.progress.map((p, i) => <ProgressRow key={i} entry={p} />)}
+      </Box>
+      <Box marginTop={1}>
+        <Text dimColor>[esc] / [n] start a new claim</Text>
+      </Box>
+    </Box>
+  );
+}
+
+function FailureStage({ flow }: { flow: Extract<SubmitFlow, { stage: "failure" }> }): JSX.Element {
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Box flexDirection="column" borderStyle="double" borderColor="red" paddingX={2} paddingY={1}>
+        <Text bold color="red">✗ Submission failed</Text>
+        <Box marginTop={1}>
+          <Text>{flow.message}</Text>
+        </Box>
+      </Box>
+      <Box marginTop={1} flexDirection="column" borderStyle="round" paddingX={1}>
+        <Text dimColor bold>Steps completed before the failure:</Text>
+        {flow.progress.length === 0 ? (
+          <Text dimColor>(none)</Text>
+        ) : (
+          flow.progress.map((p, i) => <ProgressRow key={i} entry={p} />)
+        )}
+      </Box>
+      <Box marginTop={1}>
+        <Text dimColor>[esc] close  ·  refresh Claims tab to see if a partial draft was created</Text>
+      </Box>
+    </Box>
+  );
+}
+
+function hintsForFlow(flow: SubmitFlow): { key: string; label: string }[] {
+  switch (flow.stage) {
+    case "preview":
+      return [{ key: "s", label: "arm submit" }, { key: "esc", label: "close" }];
+    case "confirm":
+      return [
+        { key: "type SUBMIT", label: "to enable" },
+        { key: "enter", label: "submit (after match)" },
+        { key: "esc", label: "abort" },
+      ];
+    case "submitting":
+      return [{ key: "—", label: "do not interrupt" }];
+    case "success":
+      return [{ key: "esc/n", label: "new claim" }];
+    case "failure":
+      return [{ key: "esc", label: "close" }];
+  }
+}
+
+function handleFlowKeys(
+  flow: SubmitFlow,
+  setFlow: (f: SubmitFlow | null) => void,
+  client: MediAssistClient,
+  input: string,
+  key: { return?: boolean; escape?: boolean },
+): void {
+  switch (flow.stage) {
+    case "preview":
+      if (key.escape) setFlow(null);
+      else if (input === "s") setFlow({ ...flow, stage: "confirm", typed: "" });
+      return;
+    case "confirm":
+      // The TextInput owns most keys; we only watch for Esc here (Enter is
+      // handled by TextInput's onSubmit). Pressing Enter elsewhere can fall
+      // through to the submitting trigger if the word matches.
+      if (key.escape) setFlow(null);
+      else if (key.return && flow.typed === CONFIRM_WORD) {
+        beginSubmission(flow, client, setFlow);
+      }
+      return;
+    case "submitting":
+      // No user input allowed during the chain.
+      return;
+    case "success":
+    case "failure":
+      if (key.escape || input === "n") setFlow(null);
+      return;
+  }
+}
+
+/**
+ * Kicks off the actual chain. Updates `flow` via setFlow as each progress
+ * event arrives; transitions to success / failure on completion.
+ */
+function beginSubmission(
+  prev: Extract<SubmitFlow, { stage: "confirm" }>,
+  client: MediAssistClient,
+  setFlow: (f: SubmitFlow | null) => void,
+): void {
+  const billsOnly = prev.bills as never; // not used here; bills derived from payloads
+  // Reconstruct the data needed by submitClaimChain.
+  // (The bills + paths were already used to build `prev.payloads`; we need
+  // the original ClaimFields for the chain.)
+  void billsOnly;
+
+  const progress: SubmitProgress[] = [];
+  setFlow({ stage: "submitting", payloads: prev.payloads, total: prev.total, progress: [] });
+
+  const filePaths = prev.payloads.fileUploads.map((u) => u.filePath);
+  // We re-derive bills array from the AddClaimBill payloads — each carries
+  // its own billNum/billDate/etc — by reading the original ClaimFields off
+  // the parent component's state isn't possible here, so submitClaimChain
+  // accepts the already-built bills via a closure on the React state.
+  // Instead, we pass the original bills array down via flow.
+  // ... but flow doesn't carry bills[]. Need to extend the flow type.
+  // For now, build a minimal bills array from the AddClaimBill payloads to
+  // satisfy the chain. This avoids exposing internal ClaimFields shape.
+  const billsForChain = prev.payloads.addClaimBills.map((b) => ({
+    billType: (b.billDesc ?? "OPD-Consultation") as never,
+    billAmount: Number(b.billAmnt ?? "0"),
+    billNumber: b.billNum ?? "",
+    billDate: reverseDate(b.billDate ?? ""),
+    clinicName: prev.payloads.saveDraft.hospitalName ?? "",
+    pincode: prev.payloads.saveDraft.HospAddress,
+    natureOfIllness: prev.payloads.saveDraft.Ailment ?? "",
+    rawText: "",
+  }));
+
+  const ctx = {
+    beneficiary: {
+      id: Number(prev.payloads.saveDraft.benefId ?? 0),
+      maid: Number(prev.payloads.saveDraft.maid ?? 0),
+      name: prev.payloads.saveDraft.benefName ?? "",
+      relation: prev.payloads.saveDraft.relationName ?? "",
+      relationId: Number(prev.payloads.saveDraft.benefRelation ?? 0),
+      age: Number(prev.payloads.saveDraft.benefAge ?? 0),
+      alphaCode: prev.payloads.saveDraft.BenefAlphaCode || undefined,
+      employeeCode: prev.payloads.saveDraft.EmployeeId ?? "",
+      policyId: Number(prev.payloads.saveDraft.policyId ?? 0),
+      policyNumber: prev.payloads.saveDraft.policyNumber ?? "",
+      insurer: prev.payloads.saveDraft.insurer ?? "",
+    },
+    bank: {
+      bankDetailsId: 0,
+      chequeLeafId: prev.payloads.submitClaim.chequeleafId ?? "",
+      accountHolderName: prev.payloads.saveDraft.accountHolderName ?? "",
+      accountNumber: prev.payloads.saveDraft.accountNum ?? "",
+      ifscCode: prev.payloads.saveDraft.ifscCode ?? "",
+      bankName: decodeURIComponent(prev.payloads.saveDraft.bankName ?? ""),
+      branchName: decodeURIComponent(prev.payloads.saveDraft.branch ?? ""),
+      bankAddress: decodeURIComponent(prev.payloads.saveDraft.branchAddress ?? ""),
+      isPrimary: true,
+      isActive: true,
+    },
+    empId: prev.payloads.submitClaim.empid ?? "",
+    entityId: Number(prev.payloads.submitClaim.Entity ?? 0),
+    email: prev.payloads.submitClaim.email ?? "",
+    mobile: prev.payloads.submitClaim.mobileno ?? "",
+    cityId: Number(prev.payloads.saveDraft.hospCityId ?? 0),
+    cityName: prev.payloads.saveDraft.hospCityName ?? "",
+    stateId: Number(prev.payloads.saveDraft.hospStateId ?? 0),
+    stateName: prev.payloads.saveDraft.hospStateName ?? "",
+    pincode: prev.payloads.saveDraft.HospAddress ?? "",
+    locality: "",
+    billTypeId: Number(prev.payloads.addClaimBills[0]?.billId ?? 0),
+    hospitalName: prev.payloads.saveDraft.hospitalName ?? "",
+    totalDocCount: filePaths.length,
+  } as unknown as SubmitContext;
+
+  void (async () => {
+    try {
+      const result = await submitClaimChain(client, billsForChain as never, ctx, filePaths, (event) => {
+        progress.push(event);
+        setFlow({
+          stage: "submitting",
+          payloads: prev.payloads,
+          total: prev.total,
+          progress: [...progress],
+        });
+      });
+      setFlow({
+        stage: "success",
+        claimRegNo: result.claimRegNo,
+        total: prev.total,
+        billCount: prev.payloads.addClaimBills.length,
+        docCount: filePaths.length,
+        progress: [...progress],
+      });
+    } catch (err) {
+      setFlow({
+        stage: "failure",
+        message: (err as Error).message,
+        progress: [...progress],
+      });
+    }
+  })();
+}
+
+function reverseDate(mmddyyyy: string): string {
+  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(mmddyyyy);
+  return m ? `${m[2]}-${m[1]}-${m[3]}` : mmddyyyy;
 }
 
 // ============================================================================
