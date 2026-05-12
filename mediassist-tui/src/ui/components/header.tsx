@@ -19,32 +19,30 @@ type HeaderProps = {
 };
 
 /**
- * Top status bar inspired by k9s: identity + key state on the left, view
- * tabs on the right. Always two lines tall — top line is context, bottom
- * is the tab strip — so it doesn't reshape as we navigate.
+ * Top status bar. Two compact lines:
+ *   line 1 — identity + balance summary (single Text, see Trap 5: sibling
+ *            Text whitespace collapse), kept tight so it fits in narrow
+ *            terminals (~80 chars).
+ *   line 2 — numbered view tabs.
  */
 export function Header({ user, policy, balance, activeView }: HeaderProps): JSX.Element {
+  const id = user.fullName || "—";
+  const entity = user.entityCode || "—";
+  const siColor = pctColor(policy.available, policy.sumInsured);
+  const opdColor = pctColor(balance.familyBalance, balance.familyLimit);
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1}>
-      <Box>
-        <Text bold color="cyan">Medi Assist  </Text>
-        <Text>{user.fullName || "—"}</Text>
-        <Text dimColor> ({user.empId})</Text>
-        <Text dimColor> @ </Text>
-        <Text>{user.entityCode}</Text>
-        <Text dimColor>   ·   </Text>
-        <Text dimColor>SI </Text>
-        <Text color={pctColor(policy.available, policy.sumInsured)}>
-          ₹ {fmt(policy.available)}
-        </Text>
-        <Text dimColor> / ₹ {fmt(policy.sumInsured)}</Text>
-        <Text dimColor>   ·   </Text>
-        <Text dimColor>OPD </Text>
-        <Text color={pctColor(balance.familyBalance, balance.familyLimit)}>
-          ₹ {fmt(balance.familyBalance)}
-        </Text>
-        <Text dimColor> / ₹ {fmt(balance.familyLimit)}</Text>
-      </Box>
+      <Text>
+        <Text bold color="cyan">Medi Assist</Text>
+        <Text dimColor>  ·  </Text>
+        <Text>{id}</Text>
+        <Text dimColor>  @ </Text>
+        <Text>{entity}</Text>
+        <Text dimColor>  ·  SI </Text>
+        <Text color={siColor}>₹ {fmt(policy.available)}</Text>
+        <Text dimColor>  ·  OPD </Text>
+        <Text color={opdColor}>₹ {fmt(balance.familyBalance)}</Text>
+      </Text>
       <Box>
         {TABS.map((t, i) => (
           <Box key={t.key} marginRight={i < TABS.length - 1 ? 2 : 0}>

@@ -105,7 +105,8 @@ type SubmitFlow =
       pincode: PincodeLocality | null;
       billType: BillTypeEntry;
       total: number;
-      typed: string;
+      /** Which button has keyboard focus. Defaults to "cancel" (safe). */
+      focused: "cancel" | "submit";
     }
   | {
       stage: "submitting";
@@ -127,7 +128,6 @@ type SubmitFlow =
       progress: SubmitProgress[];
     };
 
-const CONFIRM_WORD = "SUBMIT";
 
 export function NewClaim({ client, user, isActive, onContextHintsChange }: Props): JSX.Element {
   const { reportExpired } = useContext(SessionContext);
@@ -814,7 +814,7 @@ function FlowOverlay({
     case "preview":
       return <PreviewStage flow={flow} bills={bills} billsOnly={billsOnly} />;
     case "confirm":
-      return <ConfirmStage flow={flow} bills={bills} billsOnly={billsOnly} setFlow={setFlow} />;
+      return <ConfirmStage flow={flow} bills={bills} billsOnly={billsOnly} />;
     case "submitting":
       return <SubmittingStage flow={flow} />;
     case "success":
@@ -881,11 +881,7 @@ function PreviewStage({
       </Box>
       <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="red" paddingX={2} paddingY={1}>
         <Text bold color="red">⚠ Ready to submit a REAL claim</Text>
-        <Text dimColor>Pressing [s] arms the typed-confirmation step. The actual POST won't fire until you type the confirmation word.</Text>
-      </Box>
-      <Box marginTop={1}>
-        <Text color="red" bold>[s] arm submit</Text>
-        <Text dimColor>   ·   [esc] close (no submission)</Text>
+        <Text dimColor>Press [s] to continue to the final confirmation. Nothing is sent until you choose Submit on the next screen.</Text>
       </Box>
     </Box>
   );
@@ -895,16 +891,13 @@ function ConfirmStage({
   flow,
   bills,
   billsOnly,
-  setFlow,
 }: {
   flow: Extract<SubmitFlow, { stage: "confirm" }>;
   bills: Bill[];
   billsOnly: (Bill & { fields: ClaimFields })[];
-  setFlow: (f: SubmitFlow | null) => void;
 }): JSX.Element {
-  const { typed, benef, total, payloads } = flow;
+  const { focused, benef, total, payloads } = flow;
   const docCount = bills.filter((b) => b.kind === "doc").length;
-  const matched = typed === CONFIRM_WORD;
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box flexDirection="column" borderStyle="double" borderColor="red" paddingX={2} paddingY={1}>
@@ -920,34 +913,50 @@ function ConfirmStage({
           </Text>
         </Box>
       </Box>
-      <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor={matched ? "green" : "red"} paddingX={2} paddingY={1}>
-        <Text bold>
-          Type <Text color="red" bold>{CONFIRM_WORD}</Text> exactly and press [enter] to submit:
-        </Text>
-        <Box marginTop={1}>
-          <Text color={matched ? "green" : "red"} bold>›  </Text>
-          <TextInput
-            value={typed}
-            focus={true}
-            onChange={(v) => setFlow({ ...flow, typed: v })}
-            // onSubmit intentionally no-op — Enter is handled by the parent
-            // `useInput`, which sees `key.return` and dispatches to
-            // `beginSubmission` once `typed === CONFIRM_WORD`. Centralising
-            // the trigger in one place avoids double-fire from both handlers
-            // (Ink fires every active useInput on the same key).
-            onSubmit={() => {}}
-          />
+      <Box marginTop={1} flexDirection="column" borderStyle="round" paddingX={2} paddingY={1}>
+        <Text bold>Choose an action:</Text>
+        <Box marginTop={1} justifyContent="center">
+          <ConfirmButton label="Cancel" focused={focused === "cancel"} variant="safe" />
+          <Text>      </Text>
+          <ConfirmButton label="Submit" focused={focused === "submit"} variant="danger" />
         </Box>
-        {matched ? (
-          <Text color="green">✓ Confirmed — press [enter] to fire the POST chain</Text>
-        ) : (
-          <Text dimColor>(mismatch — keep typing, or [esc] to abort)</Text>
-        )}
-      </Box>
-      <Box marginTop={1}>
-        <Text dimColor>[esc] abort  ·  [enter] {matched ? "submit now" : "(needs matching word first)"}</Text>
+        <Box marginTop={1} justifyContent="center">
+          <Text dimColor>
+            {focused === "cancel"
+              ? "Focus is on Cancel (safe default) — press →/Tab to move to Submit"
+              : "Focus is on Submit — press [enter] to fire the POST chain"}
+          </Text>
+        </Box>
       </Box>
     </Box>
+  );
+}
+
+function ConfirmButton({
+  label,
+  focused,
+  variant,
+}: {
+  label: string;
+  focused: boolean;
+  variant: "safe" | "danger";
+}): JSX.Element {
+  const color = variant === "danger" ? "red" : "green";
+  // Visual hierarchy:
+  //   focused + danger → inverse red (high alarm)
+  //   focused + safe   → inverse green
+  //   unfocused        → dim bracketed
+  if (focused) {
+    return (
+      <Text inverse color={color} bold>
+        {`  ▶ ${label}  `}
+      </Text>
+    );
+  }
+  return (
+    <Text color="gray">
+      {`  [ ${label} ]  `}
+    </Text>
   );
 }
 
@@ -1023,9 +1032,6 @@ function SuccessStage({ flow }: { flow: Extract<SubmitFlow, { stage: "success" }
       <Box marginTop={1} flexDirection="column" borderStyle="round" paddingX={1}>
         {flow.progress.map((p, i) => <ProgressRow key={i} entry={p} />)}
       </Box>
-      <Box marginTop={1}>
-        <Text dimColor>[esc] / [n] start a new claim</Text>
-      </Box>
     </Box>
   );
 }
@@ -1046,9 +1052,9 @@ function FailureStage({ flow }: { flow: Extract<SubmitFlow, { stage: "failure" }
         ) : (
           flow.progress.map((p, i) => <ProgressRow key={i} entry={p} />)
         )}
-      </Box>
-      <Box marginTop={1}>
-        <Text dimColor>[esc] close  ·  refresh Claims tab to see if a partial draft was created</Text>
+        <Box marginTop={1}>
+          <Text dimColor>Tip: refresh the Claims tab — a partial draft may still exist on the portal.</Text>
+        </Box>
       </Box>
     </Box>
   );
@@ -1060,8 +1066,8 @@ function hintsForFlow(flow: SubmitFlow): { key: string; label: string }[] {
       return [{ key: "s", label: "arm submit" }, { key: "esc", label: "close" }];
     case "confirm":
       return [
-        { key: "type SUBMIT", label: "to enable" },
-        { key: "enter", label: "submit (after match)" },
+        { key: "←/→", label: "switch button" },
+        { key: "enter", label: flow.focused === "submit" ? "SUBMIT now" : "cancel" },
         { key: "esc", label: "abort" },
       ];
     case "submitting":
@@ -1078,20 +1084,29 @@ function handleFlowKeys(
   setFlow: (f: SubmitFlow | null) => void,
   client: MediAssistClient,
   input: string,
-  key: { return?: boolean; escape?: boolean },
+  key: { tab?: boolean; leftArrow?: boolean; rightArrow?: boolean; return?: boolean; escape?: boolean },
 ): void {
   switch (flow.stage) {
     case "preview":
       if (key.escape) setFlow(null);
-      else if (input === "s") setFlow({ ...flow, stage: "confirm", typed: "" });
+      // Default focus on Cancel — user has to actively move to Submit.
+      else if (input === "s") setFlow({ ...flow, stage: "confirm", focused: "cancel" });
       return;
     case "confirm":
-      // The TextInput owns most keys; we only watch for Esc here (Enter is
-      // handled by TextInput's onSubmit). Pressing Enter elsewhere can fall
-      // through to the submitting trigger if the word matches.
-      if (key.escape) setFlow(null);
-      else if (key.return && flow.typed === CONFIRM_WORD) {
-        beginSubmission(flow, client, setFlow);
+      if (key.escape) {
+        setFlow(null);
+        return;
+      }
+      if (key.leftArrow || key.rightArrow || key.tab || input === "h" || input === "l") {
+        setFlow({ ...flow, focused: flow.focused === "cancel" ? "submit" : "cancel" });
+        return;
+      }
+      if (key.return) {
+        if (flow.focused === "cancel") {
+          setFlow(null);
+        } else {
+          beginSubmission(flow, client, setFlow);
+        }
       }
       return;
     case "submitting":
