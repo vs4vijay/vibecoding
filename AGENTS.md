@@ -1,3 +1,8 @@
+# AGENTS.md
+
+- make use of `bun` instead of `npm`
+- make use of `uv` instread of `python`
+
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands
 

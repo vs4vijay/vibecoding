@@ -6,6 +6,31 @@ import {
   getTextExtractor,
 } from "../engines/registry.ts";
 
+export type FieldsFromTextResult = ClaimFields & { engines: { fields: string[] } };
+
+/**
+ * Runs the configured field-extractor chain on a piece of already-extracted
+ * text. Useful when text has been obtained from another source (e.g. the
+ * `bun run ocr --fields` command which loads text itself).
+ */
+export async function extractFieldsFromText(
+  text: string,
+  opts: { fieldExtractors?: string } = {},
+): Promise<FieldsFromTextResult> {
+  if (opts.fieldExtractors) process.env.FIELD_EXTRACTORS = opts.fieldExtractors;
+
+  const chain = await getFieldExtractorChain();
+  let fields: ClaimFields | undefined;
+  const used: string[] = [];
+  for (const engine of chain) {
+    if (fields && !hasLowConfidence(fields)) break;
+    fields = await engine.extract(text, fields);
+    used.push(engine.name);
+  }
+  if (!fields) throw new Error("No field extractor available");
+  return { ...fields, engines: { fields: used } };
+}
+
 export type ExtractOptions = {
   /** Force OCR even if the PDF has a text layer. */
   forceOcr?: boolean;
@@ -30,31 +55,15 @@ export async function extractClaim(
   filePath: string,
   opts: ExtractOptions = {},
 ): Promise<ExtractResult> {
-  if (opts.fieldExtractors) process.env.FIELD_EXTRACTORS = opts.fieldExtractors;
-
   const ext = extname(filePath).toLowerCase();
   const { text, source } = await loadText(filePath, ext, opts.forceOcr ?? false);
-
-  const chain = await getFieldExtractorChain();
-  let fields: ClaimFields | undefined;
-  const used: string[] = [];
-  for (const engine of chain) {
-    if (fields && !hasLowConfidence(fields)) break;
-    fields = await engine.extract(text, fields);
-    used.push(engine.name);
-  }
-
-  if (!fields) {
-    // Should never happen: registry guarantees at least the heuristic engine.
-    throw new Error("No field extractor available");
-  }
-
+  const fields = await extractFieldsFromText(text, opts);
   return {
     ...fields,
     engines: {
       text: source.text,
       ocr: source.ocr,
-      fields: used,
+      fields: fields.engines.fields,
     },
   };
 }

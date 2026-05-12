@@ -10,3 +10,5 @@ dist/
 debug-*.txt
 debug_*.txt
 src/debug*.ts
+
+eng.traineddata

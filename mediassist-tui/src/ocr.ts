@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { extname, join, basename } from "node:path";
 import { parseArgs } from "node:util";
 import { getOcrEngine, getTextExtractor } from "./engines/registry.ts";
+import { extractFieldsFromText, type FieldsFromTextResult } from "./extract/index.ts";
 import { loadEnv } from "./config.ts";
 
 loadEnv();
@@ -13,6 +14,7 @@ type Cli = {
   out?: string;
   json: boolean;
   quiet: boolean;
+  fields: boolean;
   help: boolean;
 };
 
@@ -28,6 +30,7 @@ type FileResult = {
   source: "ocr" | "pdf-text" | "skip";
   pages?: number;
   error?: string;
+  fields?: FieldsFromTextResult;
 };
 
 async function main(): Promise<void> {
@@ -50,7 +53,15 @@ async function main(): Promise<void> {
 
   const results: FileResult[] = [];
   for (const file of expanded) {
-    results.push(await processFile(file));
+    const r = await processFile(file);
+    if (r.ok && cli.fields) {
+      try {
+        r.fields = await extractFieldsFromText(r.text);
+      } catch (err) {
+        r.error = `Field extraction failed: ${(err as Error).message}`;
+      }
+    }
+    results.push(r);
   }
 
   await writeOutputs(results, cli);
@@ -139,8 +150,12 @@ function printOutputs(results: FileResult[], cli: Cli): void {
     console.log("");
     console.log(header);
     console.log("-".repeat(Math.min(80, header.length)));
-    if (r.ok) console.log(r.text);
-    else console.log(`ERROR: ${r.error}`);
+    if (r.ok) {
+      console.log(r.text);
+      if (r.fields) printFields(r.fields);
+    } else {
+      console.log(`ERROR: ${r.error}`);
+    }
   }
 
   if (!cli.quiet) {
@@ -161,6 +176,7 @@ function parseCli(): { cli: Cli; files: string[] } {
       out: { type: "string", short: "o" },
       json: { type: "boolean", default: false },
       quiet: { type: "boolean", short: "q", default: false },
+      fields: { type: "boolean", short: "f", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
     allowPositionals: true,
@@ -173,6 +189,7 @@ function parseCli(): { cli: Cli; files: string[] } {
       out: values.out,
       json: !!values.json,
       quiet: !!values.quiet,
+      fields: !!values.fields,
       help: !!values.help,
     },
     files: positionals,
@@ -198,6 +215,25 @@ function ms(t0: number): number {
   return Math.round(performance.now() - t0);
 }
 
+function printFields(f: FieldsFromTextResult): void {
+  console.log("");
+  console.log("--- Extracted fields ---");
+  console.log(`Bill Type:    ${f.billType}`);
+  console.log(`Bill Number:  ${f.billNumber || "—"}`);
+  console.log(`Bill Date:    ${f.billDate || "—"}`);
+  console.log(`Bill Amount:  ₹ ${(f.billAmount ?? 0).toLocaleString("en-IN")}`);
+  console.log(`Clinic:       ${f.clinicName || "—"}`);
+  console.log(`Pincode:      ${f.pincode ?? "—"}`);
+  console.log(`Patient:      ${f.beneficiaryHint ?? "—"}`);
+  console.log(`Nature:       ${f.natureOfIllness || "—"}`);
+  const lowConf = Object.entries(f.confidence ?? {})
+    .filter(([, c]) => (c as number) < 0.7)
+    .map(([k, c]) => `${k}=${(c as number).toFixed(2)}`)
+    .join(", ");
+  if (lowConf) console.log(`Low confidence: ${lowConf}`);
+  console.log(`Field engines: ${f.engines.fields.join(" → ")}`);
+}
+
 function printHelp(): void {
   console.log(`Convert any supported file to text.
 - Images → OCR via the configured engine (default: tesseract.js)
@@ -210,8 +246,9 @@ Options:
   --lang <codes>      Comma-separated language codes (default: eng,hin)
   --engine <name>     OCR engine (default: tesseract)
   -o, --out <dir>     Write each file's text to <dir>/<basename>.txt
-  --json              Output JSON [{ file, text, ms, ok, source, pages, error? }]
+  --json              Output JSON [{ file, text, ms, ok, source, pages, error?, fields? }]
   -q, --quiet         Suppress headers/footers; print only the text
+  -f, --fields        Also run the field extractor and print ClaimFields
   -h, --help          Show this message
 
 Supported: ${ALL_EXTS.join(", ")}
