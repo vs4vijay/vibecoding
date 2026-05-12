@@ -45,6 +45,8 @@ bun x skills add heygen-com/hyperframes
 bun x skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
 
 
+bun x skills@latest add mattpocock/skills
+
 android init
 android skills add --skill base
 
