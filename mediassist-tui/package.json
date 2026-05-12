@@ -10,7 +10,14 @@
     "ocr": "bun run src/ocr.ts",
     "dev": "bun --watch src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test:samples": "bun run src/cli.ts extract \"C:/Users/vijaysoni/OneDrive - Microsoft/aaa___TempSharing/*.pdf\""
+    "test:samples": "bun run src/cli.ts extract \"doc.pdf\"",
+    "build": "bun run build.ts",
+    "build:all": "bun run build.ts tui cli ocr",
+    "build:windows": "bun run build.ts tui cli ocr --target=bun-windows-x64",
+    "build:linux": "bun run build.ts tui cli ocr --target=bun-linux-x64",
+    "build:macos-intel": "bun run build.ts tui cli ocr --target=bun-darwin-x64",
+    "build:macos-arm": "bun run build.ts tui cli ocr --target=bun-darwin-arm64",
+    "build:all-platforms": "bun run build:windows && bun run build:linux && bun run build:macos-intel && bun run build:macos-arm"
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",
