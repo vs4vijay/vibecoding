@@ -9,8 +9,8 @@ type Props = {
 
 const GLOBAL: KeyHint[] = [
   { key: "1-3", label: "tabs" },
-  { key: "tab", label: "cycle panel" },
   { key: ":", label: "cmd" },
+  { key: "r", label: "refresh" },
   { key: "?", label: "help" },
   { key: "q", label: "quit" },
 ];

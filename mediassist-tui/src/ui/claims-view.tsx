@@ -1,63 +1,40 @@
 import { Box, Text, useInput } from "ink";
-import { useContext, useEffect, useState } from "react";
-import { SessionExpiredError, type MediAssistClient } from "../api/client.ts";
-import { listClaims } from "../api/claims.ts";
+import { useEffect, useState } from "react";
 import type { Claim } from "../types.ts";
+import type { KeyHint } from "./components/keybinding-bar.tsx";
 import { FocusableList, type Column } from "./components/focusable-list.tsx";
-import { SessionContext } from "./app.tsx";
 
 type Props = {
-  client: MediAssistClient;
-  refreshKey: number;
+  /**
+   * The full claims list comes from the App shell so navigating away and
+   * back doesn't re-trigger the network call. Use the global `[r]` key (or
+   * the `:refresh` command) to force a refresh.
+   */
+  claims: Claim[];
   isActive: boolean;
+  onContextHintsChange?: (hints: KeyHint[]) => void;
 };
-
-type State =
-  | { kind: "loading" }
-  | { kind: "error"; message: string }
-  | { kind: "ready"; claims: Claim[] };
 
 /**
  * lazygit-style split pane:
  *  - left  (50%): scrollable claims list (focusable)
  *  - right (50%): auto-syncs to show the selected claim's detail
  *
- * Tab cycles focus between the two panels (the right panel is read-only,
- * so cycling onto it just dims the list cursor).
+ * Tab cycles focus between the two panes. Selection state lives in the
+ * component, so it resets on remount but the claims data does not.
  */
-export function ClaimsView({ client, refreshKey, isActive }: Props): JSX.Element {
-  const { reportExpired } = useContext(SessionContext);
-  const [state, setState] = useState<State>({ kind: "loading" });
+export function ClaimsView({ claims, isActive, onContextHintsChange }: Props): JSX.Element {
   const [selected, setSelected] = useState(0);
   const [pane, setPane] = useState<"list" | "detail">("list");
 
+  // Surface pane-aware hints to the App so the footer reflects what works now.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setState({ kind: "loading" });
-      try {
-        const claims = await listClaims(client);
-        if (!cancelled) {
-          setState({ kind: "ready", claims });
-          setSelected(0);
-        }
-      } catch (err) {
-        if (cancelled) return;
-        if (err instanceof SessionExpiredError) {
-          reportExpired();
-          return;
-        }
-        setState({ kind: "error", message: (err as Error).message });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [client, refreshKey, reportExpired]);
+    if (!isActive) return;
+    onContextHintsChange?.(pane === "list" ? LIST_HINTS : DETAIL_HINTS);
+  }, [pane, isActive, onContextHintsChange]);
 
   useInput(
     (input, key) => {
-      if (state.kind !== "ready") return;
       if (key.tab) {
         setPane((p) => (p === "list" ? "detail" : "list"));
         return;
@@ -66,7 +43,7 @@ export function ClaimsView({ client, refreshKey, isActive }: Props): JSX.Element
         if (key.escape || input === "h" || key.leftArrow) setPane("list");
         return;
       }
-      const count = state.claims.length;
+      const count = claims.length;
       if (count === 0) return;
       if (key.downArrow || input === "j") setSelected((s) => Math.min(s + 1, count - 1));
       else if (key.upArrow || input === "k") setSelected((s) => Math.max(s - 1, 0));
@@ -79,10 +56,7 @@ export function ClaimsView({ client, refreshKey, isActive }: Props): JSX.Element
     { isActive },
   );
 
-  if (state.kind === "loading") return <Text color="cyan">Loading claims…</Text>;
-  if (state.kind === "error") return <Text color="red">Error: {state.message}</Text>;
-
-  const claim = state.claims[selected];
+  const claim = claims[Math.min(selected, claims.length - 1)];
   const columns: Column<Claim>[] = [
     { header: "Date", width: 11, render: (c) => c.submittedOn },
     { header: "Beneficiary", width: 18, render: (c) => c.beneficiary },
@@ -100,27 +74,30 @@ export function ClaimsView({ client, refreshKey, isActive }: Props): JSX.Element
     <Box flexDirection="row" gap={1} paddingX={1}>
       <Box
         flexDirection="column"
-        flexBasis="50%"
+        flexBasis={0}
+        flexGrow={1}
         borderStyle="round"
         borderColor={pane === "list" ? "cyan" : "gray"}
         paddingX={1}
       >
         <Box>
           <Text bold>Claims </Text>
-          <Text dimColor>({state.claims.length})</Text>
+          <Text dimColor>({claims.length})</Text>
         </Box>
         <Box marginTop={1}>
           <FocusableList
-            rows={state.claims}
+            rows={claims}
             columns={columns}
             selectedIndex={selected}
             viewportHeight={16}
+            emptyText="No claims yet."
           />
         </Box>
       </Box>
       <Box
         flexDirection="column"
-        flexBasis="50%"
+        flexBasis={0}
+        flexGrow={1}
         borderStyle="round"
         borderColor={pane === "detail" ? "cyan" : "gray"}
         paddingX={1}
@@ -163,6 +140,19 @@ function KV({ k, v, color }: { k: string; v: string; color?: string }): JSX.Elem
     </Box>
   );
 }
+
+const LIST_HINTS: KeyHint[] = [
+  { key: "j/k", label: "move" },
+  { key: "g/G", label: "top/bot" },
+  { key: "PgUp/Dn", label: "jump 10" },
+  { key: "enter", label: "detail" },
+  { key: "tab", label: "detail pane" },
+];
+
+const DETAIL_HINTS: KeyHint[] = [
+  { key: "esc/h", label: "back to list" },
+  { key: "tab", label: "list pane" },
+];
 
 function statusColor(s: string): "green" | "yellow" | "red" | "white" {
   switch (s) {

@@ -1,4 +1,5 @@
 import { Box, Text } from "ink";
+import type { ReactNode } from "react";
 import type { Claim, Policy } from "../types.ts";
 import type { OpdBalance } from "../api/policy.ts";
 
@@ -9,62 +10,82 @@ type DashboardProps = {
 };
 
 /**
- * Read-only summary view, k9s-dashboard style. Most identity/balance info
- * lives in the header now; this view focuses on benefits + recent activity.
+ * Read-only summary view, k9s-dashboard style. All rows use the same
+ * `flexBasis={0} flexGrow={1}` pattern so the panels align to identical
+ * widths across the rows — no ragged right edge.
  */
 export function Dashboard({ policy, balance, claims }: DashboardProps): JSX.Element {
   return (
     <Box flexDirection="column" paddingX={1}>
-      <BalancePanel policy={policy} balance={balance} />
-      <Box marginTop={1} flexDirection="row" gap={1}>
-        <Box flexBasis="40%">
-          <BeneficiariesPanel policy={policy} />
-        </Box>
-        <Box flexBasis="60%">
-          <RecentClaimsPanel claims={claims} />
-        </Box>
-      </Box>
+      <Row>
+        <Bar
+          label="Sum Insured (family)"
+          total={policy.sumInsured}
+          used={policy.sumInsured - policy.available}
+          remaining={policy.available}
+        />
+        <Bar
+          label="OPD (family)"
+          total={balance.familyLimit}
+          used={balance.familyLimit - balance.familyBalance}
+          remaining={balance.familyBalance}
+        />
+      </Row>
+      <Box marginTop={1} />
+      <Row>
+        <BeneficiariesPanel policy={policy} />
+        <RecentClaimsPanel claims={claims} />
+      </Row>
     </Box>
   );
 }
 
-function BalancePanel({ policy, balance }: { policy: Policy; balance: OpdBalance }): JSX.Element {
+/**
+ * Two-column row layout — each child gets equal flex share so the row width
+ * matches the row above it.
+ */
+function Row({ children }: { children: ReactNode }): JSX.Element {
   return (
     <Box flexDirection="row" gap={1}>
-      <Bar
-        label="Sum Insured (family)"
-        total={policy.sumInsured}
-        used={policy.sumInsured - policy.available}
-        remaining={policy.available}
-      />
-      <Bar
-        label="OPD (family)"
-        total={balance.familyLimit}
-        used={balance.familyLimit - balance.familyBalance}
-        remaining={balance.familyBalance}
-      />
+      {Array.isArray(children)
+        ? children.map((c, i) => (
+            <Box key={i} flexBasis={0} flexGrow={1}>
+              {c}
+            </Box>
+          ))
+        : children}
     </Box>
   );
 }
 
-function Bar({ label, total, used, remaining }: { label: string; total: number; used: number; remaining: number }): JSX.Element {
-  const width = 30;
+function Bar({
+  label,
+  total,
+  used,
+  remaining,
+}: {
+  label: string;
+  total: number;
+  used: number;
+  remaining: number;
+}): JSX.Element {
+  const width = 28;
   const ratio = total > 0 ? Math.min(1, Math.max(0, used / total)) : 0;
   const filled = Math.round(ratio * width);
   const bar = "█".repeat(filled) + "░".repeat(width - filled);
   const color = ratio > 0.9 ? "red" : ratio > 0.7 ? "yellow" : "green";
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1} flexGrow={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1}>
       <Text bold>{label}</Text>
       <Text color={color}>{bar}</Text>
-      <Box>
+      <Text>
         <Text dimColor>total </Text>
-        <Text>₹ {fmt(total)}</Text>
+        ₹ {fmt(total)}
         <Text dimColor>  ·  used </Text>
-        <Text>₹ {fmt(used)}</Text>
+        ₹ {fmt(used)}
         <Text dimColor>  ·  left </Text>
         <Text color={color}>₹ {fmt(remaining)}</Text>
-      </Box>
+      </Text>
     </Box>
   );
 }
@@ -74,11 +95,12 @@ function BeneficiariesPanel({ policy }: { policy: Policy }): JSX.Element {
     <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1}>
       <Text bold>Beneficiaries ({policy.beneficiaries.length})</Text>
       {policy.beneficiaries.map((b) => (
-        <Box key={b.id}>
-          <Text>{b.name.padEnd(28)}</Text>
-          <Text dimColor>{b.relation.padEnd(10)}</Text>
-          <Text dimColor>{b.dob ?? ""}</Text>
-        </Box>
+        // Single Text per row → Ink can't split it onto multiple visual lines
+        // (no blank-row artifacts) and the spaces from padEnd are preserved.
+        <Text key={b.id}>
+          {b.name.slice(0, 22).padEnd(22)}{"  "}
+          <Text dimColor>{b.relation.slice(0, 10).padEnd(10)}{"  "}{b.dob ?? ""}</Text>
+        </Text>
       ))}
     </Box>
   );
@@ -95,17 +117,17 @@ function RecentClaimsPanel({ claims }: { claims: Claim[] }): JSX.Element {
         <Text dimColor>No claims yet.</Text>
       ) : (
         <>
-          <Box>
-            <Text dimColor>{"Date".padEnd(13)}{"Beneficiary".padEnd(22)}{"Amount".padStart(10)}   Status</Text>
-          </Box>
+          <Text dimColor>
+            {"Date".padEnd(13)}{"Beneficiary".padEnd(22)}{"Amount".padStart(10)}   Status
+          </Text>
           {recent.map((c) => (
-            <Box key={c.claimNumber}>
-              <Text>{c.submittedOn.padEnd(13)}</Text>
-              <Text>{c.beneficiary.padEnd(22)}</Text>
+            <Text key={c.claimNumber}>
+              {c.submittedOn.padEnd(13)}
+              {c.beneficiary.slice(0, 20).padEnd(22)}
               <Text color="cyan">{`₹ ${fmt(c.amount)}`.padStart(10)}</Text>
-              <Text>   </Text>
+              {"   "}
               <Text color={statusColor(c.status)}>{c.status}</Text>
-            </Box>
+            </Text>
           ))}
           <Text dimColor>(press [2] to see all)</Text>
         </>

@@ -184,6 +184,12 @@ function Shell({ client, onSessionExpired }: ShellProps): JSX.Element {
     setViewHints(hints);
   }, []);
 
+  // Wipe view-specific hints on every tab change so we never display stale
+  // keys from a different view (the new view will re-publish its own).
+  useEffect(() => {
+    setViewHints([]);
+  }, [view]);
+
   const isInteractive = !help && !palette;
 
   return (
@@ -210,7 +216,11 @@ function Shell({ client, onSessionExpired }: ShellProps): JSX.Element {
                 <Dashboard policy={data!.policy} balance={data!.balance} claims={data!.claims} />
               )}
               {view === "claims" && (
-                <ClaimsView client={client} refreshKey={refreshKey} isActive={isInteractive} />
+                <ClaimsView
+                  claims={data!.claims}
+                  isActive={isInteractive}
+                  onContextHintsChange={onContextHintsChange}
+                />
               )}
               {view === "newClaim" && (
                 <NewClaim
@@ -236,17 +246,15 @@ function Shell({ client, onSessionExpired }: ShellProps): JSX.Element {
 }
 
 function contextHintsFor(view: ViewKey, viewHints: KeyHint[]): KeyHint[] {
+  // Views that have focusable panels (claims, newClaim) publish their own
+  // hints via `onContextHintsChange`. Use those when present; fall back to a
+  // small static set when the view hasn't reported yet (first render).
   if (viewHints.length > 0) return viewHints;
   switch (view) {
     case "dashboard":
-      return [];
+      return []; // global keys are enough — Dashboard is read-only
     case "claims":
-      return [
-        { key: "j/k", label: "move" },
-        { key: "enter", label: "detail" },
-        { key: "tab", label: "pane" },
-        { key: "g/G", label: "top/bot" },
-      ];
+      return [{ key: "loading…", label: "" }];
     case "newClaim":
       return [{ key: "drop file", label: "to start" }];
   }

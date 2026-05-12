@@ -816,33 +816,39 @@ function DryRunOverlay({
 
 function getContextHints(panel: Panel, editing: boolean, fileCount: number, billCount: number): { key: string; label: string }[] {
   if (editing) return [{ key: "enter", label: "save" }, { key: "esc", label: "cancel" }];
-  const proceed = billCount > 0 ? [{ key: "p", label: "preview" }] : [];
+  const proceed = billCount > 0 ? [{ key: "p", label: "preview dry-run" }] : [];
+  const nextPanel = [{ key: "tab", label: "next panel" }];
   switch (panel) {
     case "input":
       return [
-        { key: "enter", label: "add file(s)" },
-        { key: "tab", label: "queue" },
+        { key: "enter", label: fileCount > 0 ? "add file (empty → review)" : "add file(s)" },
+        ...nextPanel,
         ...proceed,
       ];
     case "files":
       return [
         { key: "↑/↓", label: "move" },
-        { key: "enter", label: "edit" },
-        { key: "t/b/d", label: "kind" },
+        { key: "enter", label: "edit selected" },
+        { key: "t/b/d", label: "set kind" },
         { key: "x", label: "remove" },
-        { key: "i", label: "input" },
+        { key: "i / esc", label: "back to input" },
+        ...nextPanel,
         ...proceed,
       ];
     case "edit":
       return [
         { key: "↑/↓", label: "field" },
         { key: "enter", label: "edit value" },
-        { key: "←/→", label: "cycle (select)" },
+        { key: "←/→", label: "cycle (select fields)" },
+        { key: "esc", label: "back to files" },
+        ...nextPanel,
         ...proceed,
       ];
     case "beneficiary":
       return [
-        { key: "←/→", label: "cycle" },
+        { key: "←/→", label: "cycle beneficiary" },
+        { key: "esc", label: "back to edit" },
+        ...nextPanel,
         ...proceed,
       ];
   }
