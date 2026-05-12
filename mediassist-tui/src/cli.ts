@@ -356,7 +356,7 @@ or "doc" (supporting document, upload only). Multiple files become multiple
 bills on a single claim (one beneficiary per claim).
 
 Options:
-  --for <name|relation>  Override beneficiary (e.g. --for spouse, --for "Anju Soni")
+  --for <name|relation>  Override beneficiary (e.g. --for spouse, --for "Name Here")
   --bill <path>          Force a file to be a bill
   --doc <path>           Force a file to be a doc
   --yes, -y              Skip the interactive beneficiary picker

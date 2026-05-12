@@ -46,7 +46,7 @@ export async function login(username: string, password: string): Promise<MediAss
     followRedirects: false,
   });
 
-  // Successful login typically responds with a 302 to indexmicrosoft1.aspx (or similar).
+  // Successful login typically responds with a 302 to index*.aspx (or similar).
   // Failure stays on Home.aspx with an error message in HTML.
   if (res.status === 302 || res.status === 303) {
     client.persist(username);

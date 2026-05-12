@@ -21,11 +21,11 @@ export const heuristicFieldExtractor: FieldExtractor = {
 function extractFromText(rawText: string): ClaimFields {
   const norm = rawText.replace(/ /g, " ").replace(/\s+/g, " ").trim();
 
-  const arjun = tryArjunOptical(norm);
-  if (arjun) return finalize(rawText, arjun.fields, arjun.confidence);
+  const optical = tryOptical(norm);
+  if (optical) return finalize(rawText, optical.fields, optical.confidence);
 
-  const augmenta = tryAugmentaHealth(norm);
-  if (augmenta) return finalize(rawText, augmenta.fields, augmenta.confidence);
+  const health = tryHealth(norm);
+  if (health) return finalize(rawText, health.fields, health.confidence);
 
   return finalize(rawText, ...extractGeneric(norm));
 }
@@ -64,9 +64,8 @@ function merge(prev: ClaimFields | undefined, next: ClaimFields): ClaimFields {
   return out;
 }
 
-// ---------- template: Arjun Optical ----------
-
-function tryArjunOptical(text: string): { fields: PartialFields; confidence: Confidence } | null {
+// ---------- template: Optical ----------
+function tryOptical(text: string): { fields: PartialFields; confidence: Confidence } | null {
   if (!/ARJUN\s+OPTICAL/i.test(text)) return null;
   const fields: PartialFields = { clinicName: "ARJUN OPTICAL INDUSTRIES", billType: "Vision & Dental" };
   const conf: Confidence = { clinicName: 1, billType: 1 };
@@ -113,9 +112,9 @@ function tryArjunOptical(text: string): { fields: PartialFields; confidence: Con
 
 // ---------- template: Augmenta Health ----------
 
-function tryAugmentaHealth(text: string): { fields: PartialFields; confidence: Confidence } | null {
+function tryHealth(text: string): { fields: PartialFields; confidence: Confidence } | null {
   if (!/Augmenta\s+Health/i.test(text)) return null;
-  const fields: PartialFields = { clinicName: "Augmenta Health Pvt Ltd", billType: "OPD-Consultation" };
+  const fields: PartialFields = { clinicName: " Health Pvt Ltd", billType: "OPD-Consultation" };
   const conf: Confidence = { clinicName: 1, billType: 1 };
 
   const inv = /Invoice\s*\/\s*Receipt\s+([A-Z0-9-]+)/i.exec(text);
