@@ -1,15 +1,15 @@
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import type { MediAssistClient } from "../api/client.ts";
 import { getOpdBalance, getPolicy, type OpdBalance } from "../api/policy.ts";
 import { listClaims } from "../api/claims.ts";
 import { getUserContext, type UserContext } from "../api/user-context.ts";
 import type { Claim, Policy } from "../types.ts";
-import type { Screen } from "./app.tsx";
 
 type DashboardProps = {
   client: MediAssistClient;
-  onNavigate: (s: Screen) => void;
+  /** Bumped by the app shell when the user hits `r`. */
+  refreshKey: number;
 };
 
 type State =
@@ -23,9 +23,8 @@ type State =
       claims: Claim[];
     };
 
-export function Dashboard({ client, onNavigate }: DashboardProps): JSX.Element {
+export function Dashboard({ client, refreshKey }: DashboardProps): JSX.Element {
   const [state, setState] = useState<State>({ kind: "loading" });
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,39 +47,24 @@ export function Dashboard({ client, onNavigate }: DashboardProps): JSX.Element {
     };
   }, [client, refreshKey]);
 
-  useInput((input) => {
-    const k = input.toLowerCase();
-    if (k === "r") setRefreshKey((n) => n + 1);
-    if (k === "n") onNavigate("newClaim");
-    if (k === "c") onNavigate("claims");
-  });
-
-  if (state.kind === "loading") {
-    return (
-      <Box>
-        <Text color="cyan">Loading dashboard…</Text>
-      </Box>
-    );
-  }
-
-  if (state.kind === "error") {
-    return (
-      <Box flexDirection="column">
-        <Text color="red">Error: {state.message}</Text>
-        <Text dimColor>Press [R] to retry  [Q] to quit</Text>
-      </Box>
-    );
-  }
+  if (state.kind === "loading") return <Text color="cyan">Loading dashboard…</Text>;
+  if (state.kind === "error") return <Text color="red">Error: {state.message}</Text>;
 
   const { user, policy, balance, claims } = state;
-
   return (
     <Box flexDirection="column">
       <Header user={user} policy={policy} />
-      <BalanceBox policy={policy} balance={balance} />
-      <BeneficiariesBox policy={policy} />
-      <RecentClaimsBox claims={claims} />
-      <Footer />
+      <Box marginTop={1}>
+        <BalancePanel policy={policy} balance={balance} />
+      </Box>
+      <Box marginTop={1} flexDirection="row">
+        <Box flexGrow={1}>
+          <BeneficiariesPanel policy={policy} />
+        </Box>
+      </Box>
+      <Box marginTop={1}>
+        <RecentClaimsSummary claims={claims} />
+      </Box>
     </Box>
   );
 }
@@ -89,9 +73,9 @@ function Header({ user, policy }: { user: UserContext; policy: Policy }): JSX.El
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
       <Box>
-        <Text bold color="cyan">Medi Assist </Text>
-        <Text>· </Text>
-        <Text bold>{user.fullName}</Text>
+        <Text bold color="cyan">Medi Assist</Text>
+        <Text dimColor> · </Text>
+        <Text bold>{user.fullName || "—"}</Text>
         <Text dimColor> ({user.empId})</Text>
         <Text dimColor> @ </Text>
         <Text>{user.entityCode}</Text>
@@ -99,30 +83,28 @@ function Header({ user, policy }: { user: UserContext; policy: Policy }): JSX.El
       <Box>
         <Text dimColor>Policy </Text>
         <Text>{policy.policyNumber}</Text>
-        <Text dimColor> · valid till </Text>
-        <Text>{policy.validTill ?? "—"}</Text>
         <Text dimColor> · </Text>
         <Text>{policy.insurer}</Text>
+        <Text dimColor> · valid till </Text>
+        <Text>{policy.validTill ?? "—"}</Text>
       </Box>
     </Box>
   );
 }
 
-function BalanceBox({ policy, balance }: { policy: Policy; balance: OpdBalance }): JSX.Element {
-  const usedSI = policy.sumInsured - policy.available;
-  const usedOpd = balance.familyLimit - balance.familyBalance;
+function BalancePanel({ policy, balance }: { policy: Policy; balance: OpdBalance }): JSX.Element {
   return (
-    <Box flexDirection="row" gap={2} marginTop={1}>
+    <Box flexDirection="row" gap={2}>
       <Bar
         label="Sum Insured (family)"
         total={policy.sumInsured}
-        used={usedSI}
+        used={policy.sumInsured - policy.available}
         remaining={policy.available}
       />
       <Bar
         label="OPD (family)"
         total={balance.familyLimit}
-        used={usedOpd}
+        used={balance.familyLimit - balance.familyBalance}
         remaining={balance.familyBalance}
       />
     </Box>
@@ -140,29 +122,34 @@ function Bar({
   used: number;
   remaining: number;
 }): JSX.Element {
-  const width = 32;
+  const width = 28;
   const ratio = total > 0 ? Math.min(1, Math.max(0, used / total)) : 0;
   const filled = Math.round(ratio * width);
   const bar = "█".repeat(filled) + "░".repeat(width - filled);
-  const remainingColor = ratio > 0.9 ? "red" : ratio > 0.7 ? "yellow" : "green";
+  const color = ratio > 0.9 ? "red" : ratio > 0.7 ? "yellow" : "green";
   return (
     <Box flexDirection="column" borderStyle="round" paddingX={1} flexGrow={1}>
       <Text bold>{label}</Text>
+      <Text color={color}>{bar}</Text>
       <Box>
-        <Text color={remainingColor}>{bar}</Text>
+        <Text dimColor>total: </Text>
+        <Text>₹ {fmt(total)}</Text>
       </Box>
       <Box>
-        <Text>Total ₹ {fmt(total)}</Text>
-        <Text dimColor>   ·   used ₹ {fmt(used)}   ·   </Text>
-        <Text color={remainingColor}>remaining ₹ {fmt(remaining)}</Text>
+        <Text dimColor>used:  </Text>
+        <Text>₹ {fmt(used)}</Text>
+      </Box>
+      <Box>
+        <Text dimColor>left:  </Text>
+        <Text color={color}>₹ {fmt(remaining)}</Text>
       </Box>
     </Box>
   );
 }
 
-function BeneficiariesBox({ policy }: { policy: Policy }): JSX.Element {
+function BeneficiariesPanel({ policy }: { policy: Policy }): JSX.Element {
   return (
-    <Box flexDirection="column" borderStyle="round" paddingX={1} marginTop={1}>
+    <Box flexDirection="column" borderStyle="round" paddingX={1} flexGrow={1}>
       <Text bold>Beneficiaries ({policy.beneficiaries.length})</Text>
       {policy.beneficiaries.map((b) => (
         <Box key={b.id}>
@@ -175,11 +162,11 @@ function BeneficiariesBox({ policy }: { policy: Policy }): JSX.Element {
   );
 }
 
-function RecentClaimsBox({ claims }: { claims: Claim[] }): JSX.Element {
-  const recent = claims.slice(0, 8);
+function RecentClaimsSummary({ claims }: { claims: Claim[] }): JSX.Element {
+  const recent = claims.slice(0, 5);
   return (
-    <Box flexDirection="column" borderStyle="round" paddingX={1} marginTop={1}>
-      <Text bold>Recent claims ({recent.length} of {claims.length})</Text>
+    <Box flexDirection="column" borderStyle="round" paddingX={1}>
+      <Text bold>Recent claims (showing {recent.length} of {claims.length})</Text>
       {recent.length === 0 ? (
         <Text dimColor>No claims yet.</Text>
       ) : (
@@ -196,23 +183,14 @@ function RecentClaimsBox({ claims }: { claims: Claim[] }): JSX.Element {
               <Text color={statusColor(c.status)}>{c.status}</Text>
             </Box>
           ))}
+          <Text dimColor>(press [2] to see all)</Text>
         </>
       )}
     </Box>
   );
 }
 
-function Footer(): JSX.Element {
-  return (
-    <Box marginTop={1}>
-      <Text dimColor>
-        [N] New claim   [C] Claims list   [R] Refresh   [Q] Quit
-      </Text>
-    </Box>
-  );
-}
-
-function statusColor(s: string): "green" | "yellow" | "red" | "gray" | "white" {
+function statusColor(s: string): "green" | "yellow" | "red" | "white" {
   switch (s) {
     case "Settled":
     case "Approved":

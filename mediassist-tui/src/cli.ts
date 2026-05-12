@@ -72,8 +72,9 @@ Commands:
   policy                 Fetch policy and sum-insured details
   claims                 List past claims
   extract <file...>      Extract claim fields from one or more PDFs/images (globs OK)
-  submit <file>          DRY-RUN: extract + resolve lookups + print the payloads
+  submit <file...>       DRY-RUN: extract + resolve lookups + print the payloads
                          that would be POSTed. Does NOT submit anything.
+                         Multiple files = multiple bills on one claim.
                          Options:
                            --for <name|relation>  Override beneficiary selection
                            --yes                  Skip interactive prompts
@@ -293,22 +294,36 @@ function basename(p: string): string {
 
 async function cmdSubmit(client: MediAssistClient): Promise<void> {
   const opts = parseSubmitArgs();
-  if (!opts.file) {
+  if (opts.files.length === 0) {
     console.error(
-      "Usage: bun run cli submit <file> [--for <name|relation>] [--yes]\n" +
-        "  --for <name|relation>  Beneficiary override (e.g. --for spouse, --for \"Anju Soni\")\n" +
-        "  --yes                  Skip the interactive confirmation prompt",
+      "Usage: bun run cli submit <file> [<file>...] [--for <name|relation>] [--yes]\n" +
+        "  --for <name|relation>  Beneficiary override (e.g. --for spouse)\n" +
+        "  --yes                  Skip the interactive confirmation prompt\n" +
+        "\nMultiple files become multiple bills on a single claim.",
     );
     process.exitCode = 1;
     return;
   }
 
-  console.log(`\n📄 Extracting ${opts.file}...`);
-  const fields = await extractClaim(opts.file);
-  console.log(
-    `   ${fields.billType} | ${fields.billNumber} | ${fields.billDate} | ₹ ${formatINR(fields.billAmount)} | ${fields.clinicName}`,
-  );
-  console.log(`   Patient hint: ${fields.beneficiaryHint ?? "—"}`);
+  console.log(`\n📄 Extracting ${opts.files.length} file(s)...`);
+  const bills: ClaimFieldsLike[] = [];
+  for (const f of opts.files) {
+    const fields = await extractClaim(f);
+    bills.push(fields);
+    console.log(
+      `   • ${basenameOf(f).padEnd(40)} ${fields.billType.padEnd(20)} ${fields.billNumber.padEnd(12)} ` +
+        `${fields.billDate.padEnd(11)} ₹ ${formatINR(fields.billAmount)}`,
+    );
+  }
+  console.log(`   Patient hints: ${[...new Set(bills.map((b) => b.beneficiaryHint).filter(Boolean))].join(", ") || "—"}`);
+
+  // Take the first bill's hint as the primary, but warn if hints differ.
+  const distinctHints = new Set(bills.map((b) => b.beneficiaryHint?.toLowerCase().trim()).filter(Boolean));
+  if (distinctHints.size > 1) {
+    console.log(`\n   ⚠  Bills have different patient hints (${[...distinctHints].join(", ")}).`);
+    console.log(`     A claim is per-beneficiary; use --for to pick one or split into separate runs.`);
+  }
+  const fields = bills[0]!;
 
   console.log("\n🔍 Resolving lookups...");
   const [user, benefs, banks] = await Promise.all([
@@ -398,18 +413,28 @@ async function cmdSubmit(client: MediAssistClient): Promise<void> {
     totalDocCount: 1,
   };
 
-  const payloads = buildPayloadsForDryRun(fields, ctx, opts.file);
+  ctx.totalDocCount = opts.files.length;
+  const payloads = buildPayloadsForDryRun(bills, ctx, opts.files);
 
+  const totalAmount = bills.reduce((s, b) => s + b.billAmount, 0);
   console.log("\n══════════════════════════════════════════════════════════════════");
-  console.log("                  DRY RUN — NO REQUESTS SENT");
+  console.log(`     DRY RUN — NO REQUESTS SENT  ·  ${bills.length} bill(s), total ₹ ${formatINR(totalAmount)}`);
   console.log("══════════════════════════════════════════════════════════════════");
   console.log("\n--- 1) POST /ServiceCalls/SaveDraft.aspx ---");
   printForm(payloads.saveDraft);
-  console.log(`\n--- 2) POST ${payloads.fileUpload.endpoint} (multipart) ---`);
-  console.log(`     field "${payloads.fileUpload.field}" = <file at ${payloads.fileUpload.filePath}>`);
-  console.log("\n--- 3) POST /ServiceCalls/AddClaimBill.aspx (clmRegNo from #1) ---");
-  printForm(payloads.addClaimBill);
-  console.log("\n--- 4) POST /ServiceCalls/SubmitClaim.aspx (ClmRegNo from #1) ---");
+  payloads.fileUploads.forEach((u, i) => {
+    console.log(`\n--- ${2 + i}) POST ${u.endpoint} (multipart) ---`);
+    console.log(`     field "${u.field}" = <file at ${u.filePath}>`);
+  });
+  payloads.addClaimBills.forEach((body, i) => {
+    console.log(
+      `\n--- ${2 + payloads.fileUploads.length + i}) POST /ServiceCalls/AddClaimBill.aspx (bill ${i + 1} of ${payloads.addClaimBills.length}) ---`,
+    );
+    printForm(body);
+  });
+  console.log(
+    `\n--- ${2 + payloads.fileUploads.length + payloads.addClaimBills.length}) POST /ServiceCalls/SubmitClaim.aspx ---`,
+  );
   printForm(payloads.submitClaim);
   console.log("\n══════════════════════════════════════════════════════════════════");
   console.log(" The above payloads were prepared but NOT sent.");
@@ -418,7 +443,7 @@ async function cmdSubmit(client: MediAssistClient): Promise<void> {
   console.log("══════════════════════════════════════════════════════════════════");
 }
 
-type SubmitArgs = { file?: string; for?: string; yes: boolean };
+type SubmitArgs = { files: string[]; for?: string; yes: boolean };
 
 function parseSubmitArgs(): SubmitArgs {
   const { values, positionals } = parseArgs({
@@ -430,7 +455,14 @@ function parseSubmitArgs(): SubmitArgs {
     allowPositionals: true,
     strict: true,
   });
-  return { file: positionals[0], for: values.for, yes: !!values.yes };
+  return { files: positionals, for: values.for, yes: !!values.yes };
+}
+
+type ClaimFieldsLike = Awaited<ReturnType<typeof extractClaim>>;
+
+function basenameOf(p: string): string {
+  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  return i >= 0 ? p.slice(i + 1) : p;
 }
 
 /**

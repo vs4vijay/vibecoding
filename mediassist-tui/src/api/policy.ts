@@ -74,7 +74,9 @@ export async function getSubmitBeneficiaries(
   const policy = data.Policies?.[0];
   if (!policy) return [];
   return (policy.Beneficiaries ?? []).map((b) => ({
-    id: b.CMSPriBenefId ?? 0,
+    // The submit payload's `benefId` field is the per-member CMSMemberUserId
+    // (verified from /js/OPDClaimSubmission.js — `benefs[id]` is keyed by it).
+    id: b.CMSMemberUserId ?? 0,
     maid: b.CMSMemberMAID ?? 0,
     name: b.CMSMemberName ?? "",
     relation: b.CMSMemberRelation ?? "",
@@ -122,8 +124,10 @@ export async function getOpdBalance(client: MediAssistClient): Promise<OpdBalanc
 }
 
 function mapBeneficiary(b: RawBeneficiary): Beneficiary {
+  // CMSPriBenefId is the employee's primary ID and is duplicated across every
+  // family member. CMSMemberMAID and CMSMemberUserId are unique per person.
   return {
-    id: String(b.CMSPriBenefId ?? b.CMSMemberMAID ?? b.CMSMemberName ?? ""),
+    id: String(b.CMSMemberMAID ?? b.CMSMemberUserId ?? b.CMSMemberName ?? ""),
     name: b.CMSMemberName ?? "—",
     relation: b.CMSMemberRelation ?? "—",
     dob: formatIsoDate(b.CMSMemberDOB),
@@ -152,6 +156,7 @@ type RawBeneficiary = {
   CMSEmployeeName?: string;
   CMSEmployeeCode?: string;
   CMSPriBenefId?: number;
+  CMSMemberUserId?: number;
   CMSMemberMAID?: number;
   CMSMemberName?: string;
   CMSMemberRelation?: string;

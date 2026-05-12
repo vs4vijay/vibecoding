@@ -1,7 +1,7 @@
 /**
  * Builds the form-encoded payloads that the portal's web UI would POST during
  * an OPD claim submission. THESE FUNCTIONS DO NOT MAKE ANY HTTP REQUESTS —
- * they only assemble the body strings, for use by the dry-run CLI.
+ * they only assemble the body strings, for use by the dry-run TUI / CLI.
  *
  * Submission is intentionally NOT implemented; see
  * memory/feedback_mediassist_no_submit.md.
@@ -10,9 +10,9 @@ import type { BankDetail } from "./bank.ts";
 import type { ClaimFields } from "../types.ts";
 
 export type Beneficiary = {
-  /** CMSPriBenefId */
+  /** CMSMemberUserId — the value the portal expects in `benefId`. */
   id: number;
-  /** CMSMemberMAID */
+  /** CMSMemberMAID — the master Medi Assist identifier for this person. */
   maid: number;
   name: string;
   relation: string;
@@ -39,31 +39,75 @@ export type SubmitContext = {
   stateName: string;
   pincode: string;
   locality: string;
-  /** Bill-type ID for the chosen BillType. */
+  /** Bill-type ID for the chosen BillType (per bill). */
   billTypeId: number;
   /** Hospital/clinic name as the user wants it on the claim. */
   hospitalName: string;
-  /** Document count uploaded so far (informational). */
+  /** Number of supporting documents uploaded. */
   totalDocCount: number;
+};
+
+export type FileUploadPlan = {
+  endpoint: string;
+  field: string;
+  filePath: string;
 };
 
 export type Payloads = {
   saveDraft: Record<string, string>;
-  addClaimBill: Record<string, string>;
+  /** One per bill — the order matches the input bills array. */
+  addClaimBills: Record<string, string>[];
   submitClaim: Record<string, string>;
-  /** Multipart upload — only the field names + the file path, not the wire body. */
-  fileUpload: { endpoint: string; field: string; filePath: string };
+  /** One per file to upload. */
+  fileUploads: FileUploadPlan[];
 };
+
+/**
+ * Builds the full chain of payloads for a single-beneficiary claim with one
+ * or more bills attached. `claimRegNoPlaceholder` stands in for the real
+ * value (minted server-side by SaveDraft) — useful for the dry-run printer.
+ */
+export function buildPayloadsForDryRun(
+  bills: ClaimFields[],
+  ctx: SubmitContext,
+  filePaths: string[],
+  claimRegNoPlaceholder = "<server-generated-after-SaveDraft>",
+): Payloads {
+  if (bills.length === 0) {
+    throw new Error("buildPayloadsForDryRun: at least one bill is required");
+  }
+  const total = bills.reduce((s, b) => s + b.billAmount, 0);
+  const dates = bills.map((b) => parseDDMMYYYY(b.billDate)).filter((d): d is Date => d !== null);
+  const startDate = dates.length > 0 ? toMMDDYYYY(dates.reduce((a, b) => (a < b ? a : b))) : "";
+  const endDate = dates.length > 0 ? toMMDDYYYY(dates.reduce((a, b) => (a > b ? a : b))) : "";
+  const firstBill = bills[0]!;
+
+  return {
+    saveDraft: buildSaveDraftBody(firstBill, bills, ctx, total, startDate, endDate),
+    addClaimBills: bills.map((b) => buildAddClaimBillBody(b, ctx, claimRegNoPlaceholder)),
+    submitClaim: buildSubmitClaimBody(ctx, claimRegNoPlaceholder, total),
+    fileUploads: filePaths.map((p) => ({
+      endpoint: "/fileuploaddomi2.aspx",
+      field: "Filedata",
+      filePath: p,
+    })),
+  };
+}
 
 /**
  * Builds the SaveDraft body. The portal calls this first to mint a
  * `ClaimRegNo` that ties together the bills and the document uploads.
  */
 export function buildSaveDraftBody(
-  fields: ClaimFields,
+  firstBill: ClaimFields,
+  allBills: ClaimFields[],
   ctx: SubmitContext,
+  totalAmount: number,
+  startDate: string,
+  endDate: string,
 ): Record<string, string> {
   const b = ctx.beneficiary;
+  const ailment = [...new Set(allBills.map((x) => x.natureOfIllness).filter(Boolean))].join(" || ");
   return {
     claimRegnNo: "", // empty → server generates a new one
     accountNum: ctx.bank.accountNumber,
@@ -76,8 +120,8 @@ export function buildSaveDraftBody(
     policyNumber: b.policyNumber,
     maid: String(b.maid),
     insurer: b.insurer,
-    TreatmentStartDate: toMMDDYYYY(fields.billDate),
-    TreatmentEndDate: toMMDDYYYY(fields.billDate),
+    TreatmentStartDate: startDate || toMMDDYYYY(parseDDMMYYYY(firstBill.billDate) ?? new Date()),
+    TreatmentEndDate: endDate || toMMDDYYYY(parseDDMMYYYY(firstBill.billDate) ?? new Date()),
     DOA: "",
     DOD: "",
     hospId: "0",
@@ -93,9 +137,9 @@ export function buildSaveDraftBody(
     relationName: b.relation,
     benefAge: String(b.age),
     benefMobileNo: ctx.mobile,
-    TotalBillAmount: String(fields.billAmount),
+    TotalBillAmount: String(totalAmount),
     InjuryDesc: "",
-    Ailment: fields.natureOfIllness,
+    Ailment: ailment,
     durationOfIllness: "",
     checklist: "",
     claimType: "Domi", // portal labels OPD claims as "Domi" internally
@@ -111,8 +155,9 @@ export function buildSaveDraftBody(
 }
 
 /**
- * Builds one AddClaimBill body — invoked once per invoice when there are
- * multiple bills on a single claim.
+ * Builds one AddClaimBill body — invoked once per invoice. Each bill carries
+ * its own bill-type ID (callers must set `ctx.billTypeId` per call if bills
+ * have different types) — usually bills in a single claim share a type.
  */
 export function buildAddClaimBillBody(
   fields: ClaimFields,
@@ -123,7 +168,7 @@ export function buildAddClaimBillBody(
     clmRegNo: claimRegNo,
     billNum: fields.billNumber,
     billAmnt: String(fields.billAmount),
-    billDate: toMMDDYYYY(fields.billDate),
+    billDate: toMMDDYYYY(parseDDMMYYYY(fields.billDate) ?? new Date()),
     billId: String(ctx.billTypeId),
     billDesc: fields.billType,
     VendorName: ctx.hospitalName,
@@ -140,9 +185,9 @@ export function buildAddClaimBillBody(
  * Builds the final SubmitClaim body.
  */
 export function buildSubmitClaimBody(
-  fields: ClaimFields,
   ctx: SubmitContext,
   claimRegNo: string,
+  totalAmount: number,
 ): Record<string, string> {
   return {
     ClmRegNo: claimRegNo,
@@ -152,34 +197,25 @@ export function buildSubmitClaimBody(
     mobileno: ctx.mobile,
     chequeleafId: ctx.bank.chequeLeafId,
     ReasonForlateClaim: "",
-    TotalBillAmount: String(fields.billAmount),
+    TotalBillAmount: String(totalAmount),
   };
 }
 
-/**
- * Builds the full chain of payloads for a single-bill claim. `claimRegNo`
- * is a placeholder string the dry-run uses; the real value is minted by
- * `SaveDraft` server-side.
- */
-export function buildPayloadsForDryRun(
-  fields: ClaimFields,
-  ctx: SubmitContext,
-  filePath: string,
-  claimRegNoPlaceholder = "<server-generated-after-SaveDraft>",
-): Payloads {
-  return {
-    saveDraft: buildSaveDraftBody(fields, ctx),
-    addClaimBill: buildAddClaimBillBody(fields, ctx, claimRegNoPlaceholder),
-    submitClaim: buildSubmitClaimBody(fields, ctx, claimRegNoPlaceholder),
-    fileUpload: {
-      endpoint: "/fileuploaddomi2.aspx",
-      field: "Filedata",
-      filePath,
-    },
-  };
-}
-
-function toMMDDYYYY(ddmmyyyy: string): string {
+function parseDDMMYYYY(ddmmyyyy: string): Date | null {
   const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(ddmmyyyy);
-  return m ? `${m[2]}-${m[1]}-${m[3]}` : ddmmyyyy;
+  if (!m) return null;
+  const [, d, mo, y] = m;
+  return new Date(Number(y), Number(mo) - 1, Number(d));
+}
+
+function toMMDDYYYY(input: string | Date): string {
+  if (input instanceof Date) {
+    const m = String(input.getMonth() + 1).padStart(2, "0");
+    const d = String(input.getDate()).padStart(2, "0");
+    const y = String(input.getFullYear());
+    return `${m}-${d}-${y}`;
+  }
+  // assume already DD-MM-YYYY
+  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(input);
+  return m ? `${m[2]}-${m[1]}-${m[3]}` : input;
 }
