@@ -8,8 +8,7 @@ import { FocusableList, type Column } from "./components/focusable-list.tsx";
 type Props = {
   client: MediAssistClient;
   refreshKey: number;
-  /** True when this screen owns keyboard input. */
-  isFocused: boolean;
+  isActive: boolean;
 };
 
 type State =
@@ -17,10 +16,18 @@ type State =
   | { kind: "error"; message: string }
   | { kind: "ready"; claims: Claim[] };
 
-export function ClaimsList({ client, refreshKey, isFocused }: Props): JSX.Element {
+/**
+ * lazygit-style split pane:
+ *  - left  (50%): scrollable claims list (focusable)
+ *  - right (50%): auto-syncs to show the selected claim's detail
+ *
+ * Tab cycles focus between the two panels (the right panel is read-only,
+ * so cycling onto it just dims the list cursor).
+ */
+export function ClaimsView({ client, refreshKey, isActive }: Props): JSX.Element {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [selected, setSelected] = useState(0);
-  const [detail, setDetail] = useState(false);
+  const [pane, setPane] = useState<"list" | "detail">("list");
 
   useEffect(() => {
     let cancelled = false;
@@ -44,19 +51,25 @@ export function ClaimsList({ client, refreshKey, isFocused }: Props): JSX.Elemen
   useInput(
     (input, key) => {
       if (state.kind !== "ready") return;
+      if (key.tab) {
+        setPane((p) => (p === "list" ? "detail" : "list"));
+        return;
+      }
+      if (pane !== "list") {
+        if (key.escape || input === "h" || key.leftArrow) setPane("list");
+        return;
+      }
       const count = state.claims.length;
       if (count === 0) return;
-
       if (key.downArrow || input === "j") setSelected((s) => Math.min(s + 1, count - 1));
       else if (key.upArrow || input === "k") setSelected((s) => Math.max(s - 1, 0));
       else if (input === "g") setSelected(0);
       else if (input === "G") setSelected(count - 1);
       else if (key.pageDown) setSelected((s) => Math.min(s + 10, count - 1));
       else if (key.pageUp) setSelected((s) => Math.max(s - 10, 0));
-      else if (key.return || input === "l") setDetail(true);
-      else if (key.escape || input === "h") setDetail(false);
+      else if (key.return || input === "l" || key.rightArrow) setPane("detail");
     },
-    { isActive: isFocused },
+    { isActive },
   );
 
   if (state.kind === "loading") return <Text color="cyan">Loading claims…</Text>;
@@ -64,10 +77,8 @@ export function ClaimsList({ client, refreshKey, isFocused }: Props): JSX.Elemen
 
   const claim = state.claims[selected];
   const columns: Column<Claim>[] = [
-    { header: "Claim #", width: 22, render: (c) => c.claimNumber },
-    { header: "Beneficiary", width: 22, render: (c) => c.beneficiary },
     { header: "Date", width: 11, render: (c) => c.submittedOn },
-    { header: "Type", width: 14, render: (c) => c.billType ?? "—" },
+    { header: "Beneficiary", width: 18, render: (c) => c.beneficiary },
     {
       header: "Amount",
       width: 10,
@@ -75,53 +86,63 @@ export function ClaimsList({ client, refreshKey, isFocused }: Props): JSX.Elemen
       render: (c) => `₹ ${c.amount.toLocaleString("en-IN")}`,
       color: () => "cyan",
     },
-    {
-      header: "Status",
-      render: (c) => c.status,
-      color: (c) => statusColor(c.status),
-    },
+    { header: "Status", render: (c) => c.status, color: (c) => statusColor(c.status) },
   ];
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="row" gap={1} paddingX={1}>
       <Box
         flexDirection="column"
+        flexBasis="50%"
         borderStyle="round"
-        borderColor={isFocused ? "cyan" : "gray"}
+        borderColor={pane === "list" ? "cyan" : "gray"}
         paddingX={1}
-        flexGrow={1}
       >
         <Box>
-          <Text bold>Claims</Text>
-          <Text dimColor> ({state.claims.length})</Text>
-          {isFocused ? (
-            <Text dimColor>  · [j/k] move  [enter] view  [esc] back  [r] refresh</Text>
-          ) : null}
+          <Text bold>Claims </Text>
+          <Text dimColor>({state.claims.length})</Text>
         </Box>
         <Box marginTop={1}>
-          <FocusableList rows={state.claims} columns={columns} selectedIndex={selected} viewportHeight={14} />
+          <FocusableList
+            rows={state.claims}
+            columns={columns}
+            selectedIndex={selected}
+            viewportHeight={16}
+          />
         </Box>
       </Box>
-      {detail && claim ? <ClaimDetail claim={claim} /> : null}
+      <Box
+        flexDirection="column"
+        flexBasis="50%"
+        borderStyle="round"
+        borderColor={pane === "detail" ? "cyan" : "gray"}
+        paddingX={1}
+      >
+        {claim ? <ClaimDetail claim={claim} /> : <Text dimColor>No claim selected.</Text>}
+      </Box>
     </Box>
   );
 }
 
 function ClaimDetail({ claim }: { claim: Claim }): JSX.Element {
   const raw = claim.raw as Record<string, unknown> | undefined;
-  const ail = (raw?.["Ailment"] as string | undefined)?.trim() || "—";
+  const ailment = (raw?.["Ailment"] as string | undefined)?.trim() || "—";
   const polId = (raw?.["PolicyId"] as number | string | undefined) ?? "—";
+  const relation = (raw?.["BenefRelation"] as string | undefined) ?? "—";
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} marginTop={1}>
-      <Text bold color="yellow">Claim detail</Text>
+    <Box flexDirection="column">
+      <Text bold color="cyan">Claim detail</Text>
       <KV k="Claim #"     v={claim.claimNumber} />
-      <KV k="Beneficiary" v={claim.beneficiary} />
+      <KV k="Beneficiary" v={`${claim.beneficiary} (${relation})`} />
       <KV k="Submitted"   v={claim.submittedOn} />
       <KV k="Type"        v={claim.billType ?? "—"} />
       <KV k="Claimed"     v={`₹ ${claim.amount.toLocaleString("en-IN")}`} />
-      <KV k="Approved"    v={claim.approvedAmount ? `₹ ${claim.approvedAmount.toLocaleString("en-IN")}` : "—"} />
+      <KV
+        k="Approved"
+        v={claim.approvedAmount ? `₹ ${claim.approvedAmount.toLocaleString("en-IN")}` : "—"}
+      />
       <KV k="Status"      v={claim.status} color={statusColor(claim.status)} />
-      <KV k="Ailment"     v={ail} />
+      <KV k="Ailment"     v={ailment} />
       <KV k="Policy"      v={String(polId)} />
     </Box>
   );

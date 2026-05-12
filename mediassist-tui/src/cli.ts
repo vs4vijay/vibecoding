@@ -72,11 +72,14 @@ Commands:
   policy                 Fetch policy and sum-insured details
   claims                 List past claims
   extract <file...>      Extract claim fields from one or more PDFs/images (globs OK)
-  submit <file...>       DRY-RUN: extract + resolve lookups + print the payloads
-                         that would be POSTed. Does NOT submit anything.
-                         Multiple files = multiple bills on one claim.
+  submit <file...>       DRY-RUN: extract + classify + resolve lookups + print
+                         the payloads that would be POSTed. Does NOT submit.
+                         Files are auto-classified as "bill" (invoice with
+                         number+amount+date/clinic) or "doc" (supporting only).
                          Options:
                            --for <name|relation>  Override beneficiary selection
+                           --bill <path>          Force a file to be a bill
+                           --doc <path>           Force a file to be a doc
                            --yes                  Skip interactive prompts
   help                   Show this message
 `);
@@ -306,18 +309,40 @@ async function cmdSubmit(client: MediAssistClient): Promise<void> {
   }
 
   console.log(`\n📄 Extracting ${opts.files.length} file(s)...`);
-  const bills: ClaimFieldsLike[] = [];
+  type Item = { file: string; fields: ClaimFieldsLike; kind: FileKind; override: boolean };
+  const items: Item[] = [];
   for (const f of opts.files) {
     const fields = await extractClaim(f);
-    bills.push(fields);
-    console.log(
-      `   • ${basenameOf(f).padEnd(40)} ${fields.billType.padEnd(20)} ${fields.billNumber.padEnd(12)} ` +
-        `${fields.billDate.padEnd(11)} ₹ ${formatINR(fields.billAmount)}`,
-    );
+    let kind: FileKind = inferKind(fields);
+    let override = false;
+    if (opts.docs.includes(f)) {
+      kind = "doc";
+      override = true;
+    } else if (opts.bills.includes(f)) {
+      kind = "bill";
+      override = true;
+    }
+    items.push({ file: f, fields, kind, override });
+    const tag = `[${kind}${override ? "*" : ""}]`.padEnd(8);
+    const detail =
+      kind === "bill"
+        ? `${fields.billType.padEnd(20)} ${fields.billNumber.padEnd(12)} ${fields.billDate.padEnd(11)} ₹ ${formatINR(fields.billAmount)}`
+        : "(supporting document, upload only)";
+    console.log(`   ${tag} ${basenameOf(f).padEnd(40)} ${detail}`);
   }
-  console.log(`   Patient hints: ${[...new Set(bills.map((b) => b.beneficiaryHint).filter(Boolean))].join(", ") || "—"}`);
 
-  // Take the first bill's hint as the primary, but warn if hints differ.
+  const billItems = items.filter((i) => i.kind === "bill");
+  if (billItems.length === 0) {
+    console.error(
+      "\n❌ No bills detected (every file was classified as a supporting doc).\n" +
+        "   Use --bill <path> to force a file to be treated as a bill.",
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const bills = billItems.map((i) => i.fields);
+
+  // Patient-hint coherence — bills should all be for the same person.
   const distinctHints = new Set(bills.map((b) => b.beneficiaryHint?.toLowerCase().trim()).filter(Boolean));
   if (distinctHints.size > 1) {
     console.log(`\n   ⚠  Bills have different patient hints (${[...distinctHints].join(", ")}).`);
@@ -417,8 +442,11 @@ async function cmdSubmit(client: MediAssistClient): Promise<void> {
   const payloads = buildPayloadsForDryRun(bills, ctx, opts.files);
 
   const totalAmount = bills.reduce((s, b) => s + b.billAmount, 0);
+  const docCount = items.filter((i) => i.kind === "doc").length;
   console.log("\n══════════════════════════════════════════════════════════════════");
-  console.log(`     DRY RUN — NO REQUESTS SENT  ·  ${bills.length} bill(s), total ₹ ${formatINR(totalAmount)}`);
+  console.log(
+    `     DRY RUN — NO REQUESTS SENT  ·  ${bills.length} bill(s), ${docCount} doc(s), total ₹ ${formatINR(totalAmount)}`,
+  );
   console.log("══════════════════════════════════════════════════════════════════");
   console.log("\n--- 1) POST /ServiceCalls/SaveDraft.aspx ---");
   printForm(payloads.saveDraft);
@@ -443,7 +471,13 @@ async function cmdSubmit(client: MediAssistClient): Promise<void> {
   console.log("══════════════════════════════════════════════════════════════════");
 }
 
-type SubmitArgs = { files: string[]; for?: string; yes: boolean };
+type SubmitArgs = {
+  files: string[];
+  docs: string[];
+  bills: string[];
+  for?: string;
+  yes: boolean;
+};
 
 function parseSubmitArgs(): SubmitArgs {
   const { values, positionals } = parseArgs({
@@ -451,14 +485,33 @@ function parseSubmitArgs(): SubmitArgs {
     options: {
       for: { type: "string" },
       yes: { type: "boolean", short: "y", default: false },
+      doc: { type: "string", multiple: true },
+      bill: { type: "string", multiple: true },
     },
     allowPositionals: true,
     strict: true,
   });
-  return { files: positionals, for: values.for, yes: !!values.yes };
+  const docs = (values.doc as string[] | undefined) ?? [];
+  const bills = (values.bill as string[] | undefined) ?? [];
+  return {
+    files: [...positionals, ...docs, ...bills],
+    docs,
+    bills,
+    for: values.for as string | undefined,
+    yes: !!values.yes,
+  };
 }
 
 type ClaimFieldsLike = Awaited<ReturnType<typeof extractClaim>>;
+
+type FileKind = "bill" | "doc";
+
+function inferKind(fields: ClaimFieldsLike): FileKind {
+  const hasNum = fields.billNumber.trim().length > 0;
+  const hasAmount = fields.billAmount > 0;
+  const hasContext = !!fields.billDate || !!fields.clinicName;
+  return hasNum && hasAmount && hasContext ? "bill" : "doc";
+}
 
 function basenameOf(p: string): string {
   const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));

@@ -2,7 +2,7 @@ import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MediAssistClient } from "../api/client.ts";
 import { getBankDetails, type BankDetail } from "../api/bank.ts";
 import {
@@ -14,285 +14,838 @@ import {
 } from "../api/lookups.ts";
 import { getSubmitBeneficiaries, type SubmitBeneficiary } from "../api/policy.ts";
 import { buildPayloadsForDryRun, type Payloads, type SubmitContext } from "../api/submit.ts";
-import { getUserContext, type UserContext } from "../api/user-context.ts";
+import type { UserContext } from "../api/user-context.ts";
 import { extractClaim } from "../extract/index.ts";
-import type { ClaimFields } from "../types.ts";
-import { FocusableList, type Column } from "./components/focusable-list.tsx";
+import { BILL_TYPES, type BillType, type ClaimFields } from "../types.ts";
+import { CycleSelector } from "./components/cycle-selector.tsx";
 
 type Props = {
   client: MediAssistClient;
-  isFocused: boolean;
+  user: UserContext;
+  /** True when this view is mounted and overlay (help/palette) isn't open. */
+  isActive: boolean;
+  /** Called when the user opens / closes the dry-run overlay so the parent's
+   *  keybinding bar can swap to overlay-specific hints. */
+  onContextHintsChange?: (hints: { key: string; label: string }[]) => void;
 };
+
+type FileKind = "bill" | "doc";
 
 type Bill = {
   file: string;
   fields?: ClaimFields;
   error?: string;
   extracting: boolean;
+  kind: FileKind;
+  manualKind?: boolean;
 };
 
-type Stage =
-  | { kind: "addFiles"; value: string; bills: Bill[]; error?: string }
-  | {
-      kind: "review";
-      bills: Bill[];
-      benefs: SubmitBeneficiary[];
-      selectedBenef: number;
-      user: UserContext;
-      banks: BankDetail[];
-    }
-  | { kind: "resolving"; message: string }
-  | {
-      kind: "dryRun";
-      bills: Bill[];
-      payloads: Payloads;
-      benef: SubmitBeneficiary;
-      pincode: PincodeLocality | null;
-      billType: BillTypeEntry;
-      total: number;
-    }
-  | { kind: "error"; message: string };
+type Panel = "input" | "files" | "edit" | "beneficiary";
 
-export function NewClaim({ client, isFocused }: Props): JSX.Element {
-  const [stage, setStage] = useState<Stage>({ kind: "addFiles", value: "", bills: [] });
+type EditableField =
+  | "billType"
+  | "billNumber"
+  | "billDate"
+  | "billAmount"
+  | "clinicName"
+  | "pincode"
+  | "beneficiaryHint"
+  | "natureOfIllness";
 
-  useInput(
-    (input, key) => {
-      if (stage.kind === "review") {
-        if (key.downArrow || input === "j") {
-          setStage({
-            ...stage,
-            selectedBenef: Math.min(stage.selectedBenef + 1, stage.benefs.length - 1),
-          });
-        } else if (key.upArrow || input === "k") {
-          setStage({ ...stage, selectedBenef: Math.max(stage.selectedBenef - 1, 0) });
-        } else if (key.return) {
-          void resolveAndShow(stage, client, setStage);
-        } else if (key.escape) {
-          setStage({ kind: "addFiles", value: "", bills: stage.bills });
-        }
-      } else if (stage.kind === "dryRun" || stage.kind === "error") {
-        if (key.escape || input === "n") setStage({ kind: "addFiles", value: "", bills: [] });
-      }
-    },
-    { isActive: isFocused },
-  );
+const FIELD_ORDER: { key: EditableField; label: string; kind: "text" | "number" | "select" }[] = [
+  { key: "billType", label: "Bill type", kind: "select" },
+  { key: "billNumber", label: "Bill #", kind: "text" },
+  { key: "billDate", label: "Date (DD-MM-YYYY)", kind: "text" },
+  { key: "billAmount", label: "Amount (₹)", kind: "number" },
+  { key: "clinicName", label: "Clinic", kind: "text" },
+  { key: "pincode", label: "Pincode", kind: "text" },
+  { key: "beneficiaryHint", label: "Patient hint", kind: "text" },
+  { key: "natureOfIllness", label: "Nature", kind: "text" },
+];
 
-  switch (stage.kind) {
-    case "addFiles":
-      return (
-        <AddFiles stage={stage} setStage={setStage} client={client} isFocused={isFocused} />
-      );
-    case "review":
-      return <Review stage={stage} />;
-    case "resolving":
-      return <Loading text={stage.message} />;
-    case "dryRun":
-      return <DryRun stage={stage} />;
-    case "error":
-      return <ErrorView message={stage.message} />;
-  }
-}
+type Resolved = {
+  billType?: BillTypeEntry;
+  pincode?: PincodeLocality;
+  loading: boolean;
+};
 
-// ---------- Stage: add files ----------
+export function NewClaim({ client, user, isActive, onContextHintsChange }: Props): JSX.Element {
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [pathInput, setPathInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [panel, setPanel] = useState<Panel>("input");
+  const [selectedFileIdx, setSelectedFileIdx] = useState(0);
+  const [fieldIdx, setFieldIdx] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [editBuffer, setEditBuffer] = useState("");
+  const [benefs, setBenefs] = useState<SubmitBeneficiary[]>([]);
+  const [banks, setBanks] = useState<BankDetail[]>([]);
+  const [benefIdx, setBenefIdx] = useState(0);
+  const [resolved, setResolved] = useState<Resolved>({ loading: false });
+  const [overlay, setOverlay] = useState<null | { payloads: Payloads; total: number }>(null);
 
-function AddFiles({
-  stage,
-  setStage,
-  client,
-  isFocused,
-}: {
-  stage: Extract<Stage, { kind: "addFiles" }>;
-  setStage: (s: Stage) => void;
-  client: MediAssistClient;
-  isFocused: boolean;
-}): JSX.Element {
-  const removeBill = (idx: number): void => {
-    setStage({ ...stage, bills: stage.bills.filter((_, i) => i !== idx) });
-  };
-
-  const onSubmit = (raw: string): void => {
-    const path = stripQuotes(raw.trim());
-
-    // Empty Enter with files queued = proceed to review.
-    if (path.length === 0) {
-      if (stage.bills.length === 0) {
-        setStage({ ...stage, error: "Add at least one file (drop or paste a path)." });
-        return;
-      }
-      if (stage.bills.some((b) => b.extracting)) {
-        setStage({ ...stage, error: "Wait for files to finish extracting first." });
-        return;
-      }
-      if (stage.bills.every((b) => !!b.error || !b.fields)) {
-        setStage({ ...stage, error: "All queued files failed to extract." });
-        return;
-      }
-      void enterReview(stage.bills, client, setStage);
-      return;
-    }
-
-    if (!existsSync(path)) {
-      setStage({ ...stage, value: path, error: `File not found: ${path}` });
-      return;
-    }
-    if (stage.bills.some((b) => b.file === path)) {
-      setStage({ ...stage, value: "", error: "Already added." });
-      return;
-    }
-
-    const newBill: Bill = { file: path, extracting: true };
-    const nextBills = [...stage.bills, newBill];
-    setStage({ kind: "addFiles", value: "", bills: nextBills });
-
-    // Extract in the background; merge into stage when done.
-    void (async () => {
+  // ----- one-time data load (beneficiaries + bank) -----
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
       try {
-        const fields = await extractClaim(path);
-        setStage({
-          ...stage,
-          value: "",
-          bills: replaceBill(nextBills, path, { file: path, fields, extracting: false }),
-        });
+        const [b, k] = await Promise.all([getSubmitBeneficiaries(client), getBankDetails(client)]);
+        if (cancelled) return;
+        setBenefs(b);
+        setBanks(k);
       } catch (err) {
-        setStage({
-          ...stage,
-          value: "",
-          bills: replaceBill(nextBills, path, {
-            file: path,
-            error: (err as Error).message,
-            extracting: false,
-          }),
-        });
+        if (!cancelled) setError((err as Error).message);
       }
     })();
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [client]);
+
+  // ----- compute current selection -----
+  const selectedFile = bills[selectedFileIdx];
+  const billsOnly = useMemo(
+    () => bills.filter((b): b is Bill & { fields: ClaimFields } => b.kind === "bill" && !!b.fields),
+    [bills],
+  );
+  const total = useMemo(() => billsOnly.reduce((s, b) => s + b.fields.billAmount, 0), [billsOnly]);
+
+  // ----- auto-pick the most likely beneficiary when bills arrive -----
+  useEffect(() => {
+    const hint = billsOnly[0]?.fields.beneficiaryHint;
+    if (hint && benefs.length > 0) {
+      const i = autoMatchBeneficiary(benefs, hint);
+      if (i >= 0) setBenefIdx(i);
+    }
+  }, [billsOnly, benefs]);
+
+  // ----- resolve bill type + pincode whenever the primary bill changes -----
+  useEffect(() => {
+    let cancelled = false;
+    const primary = billsOnly[0]?.fields;
+    if (!primary) {
+      setResolved({ loading: false });
+      return;
+    }
+    const benef = benefs[benefIdx];
+    if (!benef) return;
+    setResolved((r) => ({ ...r, loading: true }));
+    (async () => {
+      try {
+        const [types, localities] = await Promise.all([
+          getBillTypes(client, benef.policyId),
+          primary.pincode ? lookupPincode(client, primary.pincode) : Promise.resolve([]),
+        ]);
+        if (cancelled) return;
+        const billType = matchBillType(types, primary.billType) ?? undefined;
+        const pincode = localities[0] ?? undefined;
+        setResolved({ billType, pincode, loading: false });
+      } catch {
+        if (!cancelled) setResolved({ loading: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [client, billsOnly, benefs, benefIdx]);
+
+  // ----- context-sensitive footer hints -----
+  useEffect(() => {
+    if (!isActive) return;
+    if (overlay) {
+      onContextHintsChange?.([{ key: "esc", label: "close" }]);
+      return;
+    }
+    const hints = getContextHints(panel, editing, bills.length, billsOnly.length);
+    onContextHintsChange?.(hints);
+  }, [panel, editing, bills.length, billsOnly.length, overlay, isActive, onContextHintsChange]);
+
+  // ----- key bindings -----
+  useInput(
+    (input, key) => {
+      // Overlay swallows everything except esc.
+      if (overlay) {
+        if (key.escape) setOverlay(null);
+        return;
+      }
+      // Editing a text field — only handle Esc, TextInput owns the rest.
+      if (editing) {
+        if (key.escape) {
+          setEditing(false);
+          setEditBuffer("");
+        }
+        return;
+      }
+      if (key.tab) {
+        cyclePanel();
+        return;
+      }
+      if (input === "p") {
+        void buildOverlay();
+        return;
+      }
+      switch (panel) {
+        case "input":
+          return; // TextInput owns input keys
+        case "files":
+          handleFilesKeys(input, key);
+          return;
+        case "edit":
+          handleEditKeys(input, key);
+          return;
+        case "beneficiary":
+          handleBeneficiaryKeys(input, key);
+          return;
+      }
+    },
+    { isActive },
+  );
+
+  const cyclePanel = useCallback(() => {
+    setPanel((p) => {
+      const order: Panel[] = ["input", "files", "edit", "beneficiary"];
+      const hasFiles = bills.length > 0;
+      const hasEdit = !!(selectedFile && selectedFile.kind === "bill");
+      const hasBenef = benefs.length > 0;
+      const avail = order.filter((x) => {
+        if (x === "input") return true;
+        if (x === "files") return hasFiles;
+        if (x === "edit") return hasEdit;
+        if (x === "beneficiary") return hasBenef;
+        return false;
+      });
+      const i = avail.indexOf(p);
+      return avail[(i + 1) % avail.length] ?? "input";
+    });
+    setEditing(false);
+  }, [bills.length, selectedFile, benefs.length]);
+
+  // ----- handlers -----
+
+  function addPaths(raw: string): void {
+    const paths = parsePathsFromInput(raw);
+    if (paths.length === 0) return;
+    let added = 0;
+    let skipped = 0;
+    const newBills: Bill[] = [];
+    setBills((prev) => {
+      const seen = new Set(prev.map((b) => b.file));
+      for (const p of paths) {
+        if (seen.has(p)) {
+          skipped++;
+          continue;
+        }
+        if (!existsSync(p)) {
+          setError(`File not found: ${p}`);
+          continue;
+        }
+        const b: Bill = { file: p, extracting: true, kind: "doc" };
+        newBills.push(b);
+        seen.add(p);
+        added++;
+      }
+      return [...prev, ...newBills];
+    });
+    setPathInput("");
+    if (added > 0) setError(skipped > 0 ? `Added ${added}, skipped ${skipped} duplicate(s).` : null);
+
+    // Kick off extractions
+    for (const b of newBills) {
+      const file = b.file;
+      void (async () => {
+        try {
+          const fields = await extractClaim(file);
+          setBills((prev) =>
+            prev.map((x) =>
+              x.file === file ? { file, fields, extracting: false, kind: inferKind(fields) } : x,
+            ),
+          );
+        } catch (err) {
+          setBills((prev) =>
+            prev.map((x) =>
+              x.file === file
+                ? { file, extracting: false, kind: "doc", error: (err as Error).message }
+                : x,
+            ),
+          );
+        }
+      })();
+    }
+  }
+
+  function handleFilesKeys(input: string, key: { downArrow?: boolean; upArrow?: boolean; return?: boolean; escape?: boolean; delete?: boolean }): void {
+    if (bills.length === 0) {
+      setPanel("input");
+      return;
+    }
+    if (key.downArrow || input === "j") {
+      setSelectedFileIdx((i) => Math.min(i + 1, bills.length - 1));
+      setFieldIdx(0);
+    } else if (key.upArrow || input === "k") {
+      setSelectedFileIdx((i) => Math.max(i - 1, 0));
+      setFieldIdx(0);
+    } else if (input === "t" || input === "b" || input === "d") {
+      const target = bills[selectedFileIdx];
+      if (!target || target.extracting) return;
+      const newKind: FileKind =
+        input === "b" ? "bill" : input === "d" ? "doc" : target.kind === "bill" ? "doc" : "bill";
+      setBills((prev) =>
+        prev.map((x, i) => (i === selectedFileIdx ? { ...x, kind: newKind, manualKind: true } : x)),
+      );
+    } else if (input === "x" || key.delete) {
+      setBills((prev) => prev.filter((_, i) => i !== selectedFileIdx));
+      setSelectedFileIdx((i) => Math.min(i, bills.length - 2 >= 0 ? bills.length - 2 : 0));
+    } else if (key.return) {
+      // Enter on selected file → focus its edit panel (if bill)
+      const target = bills[selectedFileIdx];
+      if (target && target.kind === "bill") setPanel("edit");
+    } else if (input === "i") {
+      setPanel("input");
+    } else if (key.escape) {
+      setPanel("input");
+    }
+  }
+
+  function handleEditKeys(input: string, key: { downArrow?: boolean; upArrow?: boolean; leftArrow?: boolean; rightArrow?: boolean; return?: boolean; escape?: boolean }): void {
+    const bill = selectedFile;
+    if (!bill || !bill.fields || bill.kind !== "bill") {
+      setPanel("files");
+      return;
+    }
+    const f = FIELD_ORDER[fieldIdx]!;
+    if (key.downArrow || input === "j") {
+      setFieldIdx((i) => Math.min(i + 1, FIELD_ORDER.length - 1));
+    } else if (key.upArrow || input === "k") {
+      setFieldIdx((i) => Math.max(i - 1, 0));
+    } else if (f.kind === "select" && (key.leftArrow || input === "h")) {
+      cycleBillType(bill.file, -1);
+    } else if (f.kind === "select" && (key.rightArrow || input === "l")) {
+      cycleBillType(bill.file, +1);
+    } else if (key.return) {
+      if (f.kind === "select") cycleBillType(bill.file, +1);
+      else {
+        setEditBuffer(stringifyField(bill.fields, f.key));
+        setEditing(true);
+      }
+    } else if (key.escape) {
+      setPanel("files");
+    }
+  }
+
+  function handleBeneficiaryKeys(input: string, key: { leftArrow?: boolean; rightArrow?: boolean; escape?: boolean }): void {
+    if (benefs.length === 0) return;
+    if (key.leftArrow || input === "h" || input === "k") {
+      setBenefIdx((i) => (i - 1 + benefs.length) % benefs.length);
+    } else if (key.rightArrow || input === "l" || input === "j") {
+      setBenefIdx((i) => (i + 1) % benefs.length);
+    } else if (key.escape) {
+      setPanel("edit");
+    }
+  }
+
+  function cycleBillType(file: string, delta: number): void {
+    setBills((prev) =>
+      prev.map((b) => {
+        if (b.file !== file || !b.fields) return b;
+        const idx = BILL_TYPES.indexOf(b.fields.billType);
+        const next = BILL_TYPES[(idx + delta + BILL_TYPES.length) % BILL_TYPES.length]!;
+        return { ...b, fields: { ...b.fields, billType: next } };
+      }),
+    );
+  }
+
+  function saveEdit(): void {
+    const bill = selectedFile;
+    if (!bill || !bill.fields) return;
+    const f = FIELD_ORDER[fieldIdx]!;
+    const updated = applyFieldEdit(bill.fields, f.key, editBuffer);
+    setBills((prev) =>
+      prev.map((x) => (x.file === bill.file ? { ...x, fields: updated } : x)),
+    );
+    setEditing(false);
+    setEditBuffer("");
+  }
+
+  async function buildOverlay(): Promise<void> {
+    if (billsOnly.length === 0) {
+      setError("No bills detected. Mark at least one file as a bill ([t] / [b] in the files panel).");
+      return;
+    }
+    const benef = benefs[benefIdx];
+    if (!benef) {
+      setError("No beneficiary loaded yet.");
+      return;
+    }
+    if (!resolved.billType) {
+      setError("Bill type lookup hasn't resolved yet.");
+      return;
+    }
+    const bank = banks.find((b) => b.isActive && b.isPrimary) ?? banks[0];
+    if (!bank) {
+      setError("No bank account on policy.");
+      return;
+    }
+    const primary = billsOnly[0]!.fields;
+    const allFilePaths = bills.map((b) => b.file);
+
+    const ctx: SubmitContext = {
+      beneficiary: {
+        id: benef.id,
+        maid: benef.maid,
+        name: benef.name,
+        relation: benef.relation,
+        relationId: benef.relationId,
+        age: benef.age,
+        alphaCode: benef.alphaCode,
+        employeeCode: benef.employeeCode,
+        policyId: benef.policyId,
+        policyNumber: benef.policyNumber,
+        insurer: benef.insurer,
+      },
+      bank,
+      empId: user.empId || benef.employeeCode,
+      entityId: user.entityId || benef.entityId,
+      email: user.email || benef.email,
+      mobile: user.mobile,
+      cityId: resolved.pincode?.cityId ?? 0,
+      cityName: resolved.pincode?.cityName ?? "",
+      stateId: resolved.pincode?.stateId ?? 0,
+      stateName: resolved.pincode?.stateName ?? "",
+      pincode: primary.pincode ?? "",
+      locality: resolved.pincode?.locationName ?? "",
+      billTypeId: resolved.billType.id,
+      hospitalName: primary.clinicName,
+      totalDocCount: allFilePaths.length,
+    };
+    const payloads = buildPayloadsForDryRun(
+      billsOnly.map((b) => b.fields),
+      ctx,
+      allFilePaths,
+    );
+    setOverlay({ payloads, total });
+  }
+
+  if (overlay) {
+    return (
+      <DryRunOverlay
+        bills={bills}
+        billsOnly={billsOnly}
+        benef={benefs[benefIdx]!}
+        billType={resolved.billType!}
+        pincode={resolved.pincode ?? null}
+        payloads={overlay.payloads}
+        total={overlay.total}
+      />
+    );
+  }
 
   return (
-    <Box flexDirection="column">
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor={isFocused ? "cyan" : "gray"}
-        paddingX={2}
-        paddingY={1}
-      >
-        <Text bold color="cyan">New claim — add files</Text>
-        <Text dimColor>
-          Drag &amp; drop PDFs / images onto this terminal (most terminals paste the path) — add as many
-          as you want; each becomes a bill on the same claim.
-        </Text>
-        <Box marginTop={1}>
-          <Text color="cyan">› </Text>
-          {isFocused ? (
-            <TextInput
-              value={stage.value}
-              onChange={(v) => setStage({ ...stage, value: stripQuotes(v), error: undefined })}
-              onSubmit={onSubmit}
-              placeholder="drop or paste a path, then [enter]"
-            />
-          ) : (
-            <Text dimColor>(switch to this tab to type)</Text>
-          )}
-        </Box>
-        {stage.error ? (
-          <Box marginTop={1}>
-            <Text color="red">⚠ {stage.error}</Text>
-          </Box>
-        ) : null}
-        <Box marginTop={1}>
-          <Text dimColor>[enter] add file  ·  empty [enter] proceed to review  ·  [esc] back</Text>
-        </Box>
+    <Box flexDirection="column" paddingX={1}>
+      <FilesPanel
+        bills={bills}
+        selectedIdx={selectedFileIdx}
+        pathInput={pathInput}
+        focused={panel === "input" || panel === "files"}
+        inputFocused={panel === "input"}
+        onPathChange={(v) => setPathInput(stripQuotes(v))}
+        onPathSubmit={addPaths}
+        error={error}
+      />
+      <Box marginTop={1}>
+        <EditPanel
+          bill={selectedFile}
+          fieldIdx={fieldIdx}
+          editing={editing}
+          editBuffer={editBuffer}
+          focused={panel === "edit"}
+          onChangeBuffer={setEditBuffer}
+          onSubmitEdit={saveEdit}
+        />
       </Box>
-
-      {stage.bills.length > 0 ? (
-        <Box
-          marginTop={1}
-          flexDirection="column"
-          borderStyle="round"
-          borderColor="gray"
-          paddingX={1}
-        >
-          <Box>
-            <Text bold>Bills queued ({stage.bills.length})</Text>
-            <Text dimColor> — total ₹ {fmt(stage.bills.reduce((s, b) => s + (b.fields?.billAmount ?? 0), 0))}</Text>
-          </Box>
-          {stage.bills.map((b, i) => (
-            <BillRow key={b.file} bill={b} idx={i} onRemove={() => removeBill(i)} />
-          ))}
-          <Box marginTop={1}>
-            <Text dimColor>(Bills are kept across re-edits; press [esc] from review to come back.)</Text>
-          </Box>
-        </Box>
-      ) : null}
+      <Box marginTop={1}>
+        <BeneficiaryPanel
+          benefs={benefs}
+          selectedIdx={benefIdx}
+          focused={panel === "beneficiary"}
+        />
+      </Box>
+      <Box marginTop={1}>
+        <ResolvedBar
+          billCount={billsOnly.length}
+          docCount={bills.filter((b) => b.kind === "doc").length}
+          total={total}
+          benef={benefs[benefIdx]}
+          resolved={resolved}
+        />
+      </Box>
     </Box>
   );
 }
 
-function BillRow({ bill, idx, onRemove }: { bill: Bill; idx: number; onRemove: () => void }): JSX.Element {
+// ============================================================================
+// Panels
+// ============================================================================
+
+function FilesPanel({
+  bills,
+  selectedIdx,
+  pathInput,
+  focused,
+  inputFocused,
+  onPathChange,
+  onPathSubmit,
+  error,
+}: {
+  bills: Bill[];
+  selectedIdx: number;
+  pathInput: string;
+  focused: boolean;
+  inputFocused: boolean;
+  onPathChange: (v: string) => void;
+  onPathSubmit: (v: string) => void;
+  error: string | null;
+}): JSX.Element {
+  const billCount = bills.filter((b) => b.kind === "bill").length;
+  const docCount = bills.length - billCount;
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={focused ? "cyan" : "gray"}
+      paddingX={1}
+    >
+      <Box>
+        <Text bold>Files</Text>
+        <Text dimColor>
+          {"  "}({bills.length} · bills:{billCount} docs:{docCount})
+        </Text>
+      </Box>
+      <Box marginTop={1}>
+        <Text color={inputFocused ? "cyan" : "gray"}>{inputFocused ? "›" : "‹"} </Text>
+        <TextInput
+          value={pathInput}
+          focus={inputFocused}
+          onChange={onPathChange}
+          onSubmit={onPathSubmit}
+          placeholder="drop file(s) or paste path(s) — multiple paths OK, then [enter]"
+        />
+      </Box>
+      {error ? (
+        <Text color={error.startsWith("Added") ? "green" : "red"}>{error}</Text>
+      ) : null}
+      <Box marginTop={1} flexDirection="column">
+        {bills.length === 0 ? (
+          <Text dimColor>(no files yet — drop or paste paths above)</Text>
+        ) : (
+          bills.map((b, i) => (
+            <FileRow
+              key={b.file}
+              bill={b}
+              idx={i}
+              selected={!inputFocused && focused && i === selectedIdx}
+            />
+          ))
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+function FileRow({ bill, idx, selected }: { bill: Bill; idx: number; selected: boolean }): JSX.Element {
   const f = bill.fields;
+  const tag = bill.kind === "bill" ? "bill" : "doc";
+  const tagColor = bill.kind === "bill" ? "cyan" : "yellow";
   return (
     <Box>
-      <Text dimColor>{`${idx + 1}.`.padEnd(3)}</Text>
-      <Text>{basename(bill.file).padEnd(36)}</Text>
+      <Text inverse={selected}>{selected ? "▶ " : "  "}</Text>
+      <Text inverse={selected} dimColor>{`${idx + 1}.`.padEnd(3)}</Text>
+      <Text inverse={selected}>{truncate(basename(bill.file), 34).padEnd(34)}</Text>
+      <Text inverse={selected} color={tagColor} bold>
+        [{tag}{bill.manualKind ? "*" : ""}]
+      </Text>
+      <Text inverse={selected}> </Text>
       {bill.extracting ? (
-        <Text color="cyan"> extracting…</Text>
+        <Text inverse={selected} color="cyan">extracting…</Text>
       ) : bill.error ? (
-        <Text color="red"> error: {bill.error}</Text>
-      ) : f ? (
+        <Text inverse={selected} color="red">{bill.error}</Text>
+      ) : f && bill.kind === "bill" ? (
         <Box>
-          <Text>{f.billType.padEnd(18)}</Text>
-          <Text>{(f.billNumber || "—").padEnd(11)}</Text>
-          <Text>{(f.billDate || "—").padEnd(11)}</Text>
-          <Text color="cyan">{`₹ ${fmt(f.billAmount)}`.padStart(10)}</Text>
-          <Text dimColor> · </Text>
-          <Text>{f.beneficiaryHint ?? "—"}</Text>
+          <Text inverse={selected}>{f.billType.padEnd(18)}</Text>
+          <Text inverse={selected}>{(f.billNumber || "—").padEnd(11)}</Text>
+          <Text inverse={selected} color={selected ? undefined : "cyan"}>
+            {`₹ ${fmt(f.billAmount)}`.padStart(10)}
+          </Text>
+          <Text inverse={selected} dimColor> · </Text>
+          <Text inverse={selected}>{f.beneficiaryHint ?? "—"}</Text>
         </Box>
+      ) : f ? (
+        <Text inverse={selected} dimColor>(supporting document)</Text>
       ) : null}
     </Box>
   );
 }
 
-function replaceBill(bills: Bill[], file: string, next: Bill): Bill[] {
-  return bills.map((b) => (b.file === file ? next : b));
+function EditPanel({
+  bill,
+  fieldIdx,
+  editing,
+  editBuffer,
+  focused,
+  onChangeBuffer,
+  onSubmitEdit,
+}: {
+  bill: Bill | undefined;
+  fieldIdx: number;
+  editing: boolean;
+  editBuffer: string;
+  focused: boolean;
+  onChangeBuffer: (v: string) => void;
+  onSubmitEdit: () => void;
+}): JSX.Element {
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor={focused ? "cyan" : "gray"} paddingX={1}>
+      <Box>
+        <Text bold>Edit</Text>
+        {bill ? (
+          <Text dimColor>{"  "}· {basename(bill.file)} · [{bill.kind}]</Text>
+        ) : null}
+      </Box>
+      {!bill ? (
+        <Text dimColor>Select a file in the Files panel to edit.</Text>
+      ) : bill.kind !== "bill" || !bill.fields ? (
+        <Text dimColor>
+          {bill.error
+            ? `Extraction failed: ${bill.error}`
+            : bill.extracting
+              ? "Extracting…"
+              : "Supporting document — no editable fields. Press [b] in Files to mark as a bill."}
+        </Text>
+      ) : (
+        <Box marginTop={1} flexDirection="column">
+          {FIELD_ORDER.map((f, i) => {
+            const selected = focused && i === fieldIdx;
+            const isEditingThis = selected && editing;
+            const value = stringifyField(bill.fields!, f.key);
+            return (
+              <Box key={f.key}>
+                <Text inverse={selected && !editing}>{selected ? "▶ " : "  "}</Text>
+                <Text inverse={selected && !editing} dimColor>
+                  {f.label.padEnd(20)}
+                </Text>
+                {isEditingThis ? (
+                  <Box>
+                    <Text> </Text>
+                    <TextInput
+                      value={editBuffer}
+                      focus={true}
+                      onChange={onChangeBuffer}
+                      onSubmit={onSubmitEdit}
+                    />
+                  </Box>
+                ) : f.kind === "select" ? (
+                  <Box>
+                    <Text> </Text>
+                    <Text inverse={selected} color="cyan">{value}</Text>
+                    {selected ? <Text dimColor>  ←/→ cycle</Text> : null}
+                  </Box>
+                ) : (
+                  <Text inverse={selected}>{" "}{truncate(value || "(empty)", 60)}</Text>
+                )}
+              </Box>
+            );
+          })}
+        </Box>
+      )}
+    </Box>
+  );
 }
 
-function stripQuotes(s: string): string {
-  return s.replace(/^["']|["']$/g, "");
+function BeneficiaryPanel({
+  benefs,
+  selectedIdx,
+  focused,
+}: {
+  benefs: SubmitBeneficiary[];
+  selectedIdx: number;
+  focused: boolean;
+}): JSX.Element {
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor={focused ? "cyan" : "gray"} paddingX={1}>
+      <Text bold>Beneficiary</Text>
+      <Box marginTop={1}>
+        <CycleSelector
+          items={benefs}
+          selectedIndex={selectedIdx}
+          isFocused={focused}
+          render={(b) => `${b.name}  (${b.relation}, ${b.age}y)`}
+        />
+      </Box>
+    </Box>
+  );
 }
 
-async function enterReview(
-  bills: Bill[],
-  client: MediAssistClient,
-  setStage: (s: Stage) => void,
-): Promise<void> {
-  try {
-    const [user, benefs, banks] = await Promise.all([
-      getUserContext(client),
-      getSubmitBeneficiaries(client),
-      getBankDetails(client),
-    ]);
-    const billsWithFields = bills.filter((b) => b.fields);
-    const hint = billsWithFields[0]?.fields?.beneficiaryHint;
-    const initial = autoMatchBeneficiary(benefs, hint);
-    setStage({
-      kind: "review",
-      bills,
-      benefs,
-      user,
-      banks,
-      selectedBenef: initial,
-    });
-  } catch (err) {
-    setStage({ kind: "error", message: (err as Error).message });
+function ResolvedBar({
+  billCount,
+  docCount,
+  total,
+  benef,
+  resolved,
+}: {
+  billCount: number;
+  docCount: number;
+  total: number;
+  benef: SubmitBeneficiary | undefined;
+  resolved: Resolved;
+}): JSX.Element {
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1}>
+      <Box>
+        <Text bold dimColor>Resolved </Text>
+        {resolved.loading ? <Text color="yellow">⟳ updating…</Text> : null}
+      </Box>
+      <Box>
+        <Text dimColor>{"  "}claim:  </Text>
+        <Text>{billCount} bill(s), {docCount} doc(s), total ₹ {fmt(total)}</Text>
+      </Box>
+      <Box>
+        <Text dimColor>{"  "}benef:  </Text>
+        <Text>{benef ? `${benef.name} (${benef.relation}, ${benef.age}y) · MAID ${benef.maid}` : "—"}</Text>
+      </Box>
+      <Box>
+        <Text dimColor>{"  "}billTy: </Text>
+        <Text>{resolved.billType ? `${resolved.billType.name} = ${resolved.billType.id}` : (resolved.loading ? "…" : "—")}</Text>
+      </Box>
+      <Box>
+        <Text dimColor>{"  "}pincd:  </Text>
+        <Text>
+          {resolved.pincode
+            ? `${resolved.pincode.pincode} → ${resolved.pincode.locationName}, ${resolved.pincode.cityName}, ${resolved.pincode.stateName}`
+            : resolved.loading
+              ? "…"
+              : "—"}
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+function DryRunOverlay({
+  bills,
+  billsOnly,
+  benef,
+  billType,
+  pincode,
+  payloads,
+  total,
+}: {
+  bills: Bill[];
+  billsOnly: (Bill & { fields: ClaimFields })[];
+  benef: SubmitBeneficiary;
+  billType: BillTypeEntry;
+  pincode: PincodeLocality | null;
+  payloads: Payloads;
+  total: number;
+}): JSX.Element {
+  const docCount = bills.filter((b) => b.kind === "doc").length;
+  const numPosts = 2 + payloads.fileUploads.length + payloads.addClaimBills.length;
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Box flexDirection="column" borderStyle="double" borderColor="yellow" paddingX={2} paddingY={1}>
+        <Text bold color="yellow">
+          DRY RUN — nothing was submitted  ·  {billsOnly.length} bill(s), {docCount} doc(s)  ·  total ₹ {fmt(total)}
+        </Text>
+        <Box marginTop={1} flexDirection="column">
+          <KV k="Beneficiary" v={`${benef.name} (${benef.relation}, ${benef.age}y) — MAID ${benef.maid}`} />
+          <KV k="Bill type"   v={`${billType.name} = ${billType.id}`} />
+          <KV
+            k="Pincode"
+            v={pincode ? `${pincode.pincode} → ${pincode.locationName}, ${pincode.cityName}, ${pincode.stateName}` : "—"}
+          />
+        </Box>
+      </Box>
+      <Box marginTop={1} flexDirection="column" borderStyle="round" paddingX={1}>
+        <Text bold dimColor>What would be sent ({numPosts} POSTs)</Text>
+        <PayloadSummary
+          label="1. SaveDraft"
+          body={payloads.saveDraft}
+          keys={["claimRegnNo", "policyId", "maid", "benefName", "TreatmentStartDate", "TreatmentEndDate", "TotalDocCount", "TotalBillAmount"]}
+        />
+        {payloads.fileUploads.map((u, i) => (
+          <Box key={`upload-${i}`} flexDirection="column" marginTop={1}>
+            <Text color="cyan">{2 + i}. POST {u.endpoint} (multipart)</Text>
+            <Text dimColor>  Filedata = {basename(u.filePath)}</Text>
+          </Box>
+        ))}
+        {payloads.addClaimBills.map((body, i) => (
+          <PayloadSummary
+            key={`bill-${i}`}
+            label={`${2 + payloads.fileUploads.length + i}. AddClaimBill (${i + 1}/${payloads.addClaimBills.length})`}
+            body={body}
+            keys={["billNum", "billAmnt", "billDate", "billId", "billDesc"]}
+          />
+        ))}
+        <PayloadSummary
+          label={`${numPosts}. SubmitClaim`}
+          body={payloads.submitClaim}
+          keys={["empid", "Entity", "mobileno", "chequeleafId", "TotalBillAmount"]}
+        />
+      </Box>
+      <Box marginTop={1}>
+        <Text dimColor>[esc] close · for full payload run </Text>
+        <Text color="cyan" bold>bun run cli submit &lt;file…&gt;</Text>
+      </Box>
+    </Box>
+  );
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function getContextHints(panel: Panel, editing: boolean, fileCount: number, billCount: number): { key: string; label: string }[] {
+  if (editing) return [{ key: "enter", label: "save" }, { key: "esc", label: "cancel" }];
+  const proceed = billCount > 0 ? [{ key: "p", label: "preview" }] : [];
+  switch (panel) {
+    case "input":
+      return [
+        { key: "enter", label: "add file(s)" },
+        { key: "tab", label: "queue" },
+        ...proceed,
+      ];
+    case "files":
+      return [
+        { key: "↑/↓", label: "move" },
+        { key: "enter", label: "edit" },
+        { key: "t/b/d", label: "kind" },
+        { key: "x", label: "remove" },
+        { key: "i", label: "input" },
+        ...proceed,
+      ];
+    case "edit":
+      return [
+        { key: "↑/↓", label: "field" },
+        { key: "enter", label: "edit value" },
+        { key: "←/→", label: "cycle (select)" },
+        ...proceed,
+      ];
+    case "beneficiary":
+      return [
+        { key: "←/→", label: "cycle" },
+        ...proceed,
+      ];
   }
+}
+
+function inferKind(fields: ClaimFields | undefined): FileKind {
+  if (!fields) return "doc";
+  const hasNum = fields.billNumber.trim().length > 0;
+  const hasAmount = fields.billAmount > 0;
+  const hasContext = !!fields.billDate || !!fields.clinicName;
+  return hasNum && hasAmount && hasContext ? "bill" : "doc";
 }
 
 function autoMatchBeneficiary(benefs: SubmitBeneficiary[], hint: string | undefined): number {
-  if (!hint) {
-    const selfIdx = benefs.findIndex((b) => b.relation.toLowerCase() === "self");
-    return selfIdx >= 0 ? selfIdx : 0;
-  }
+  if (!hint) return benefs.findIndex((b) => b.relation.toLowerCase() === "self");
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
   const h = norm(hint);
   let bestIdx = -1;
@@ -311,236 +864,100 @@ function autoMatchBeneficiary(benefs: SubmitBeneficiary[], hint: string | undefi
     }
   }
   if (bestIdx >= 0) return bestIdx;
-  const selfIdx = benefs.findIndex((b) => b.relation.toLowerCase() === "self");
-  return selfIdx >= 0 ? selfIdx : 0;
+  return benefs.findIndex((b) => b.relation.toLowerCase() === "self");
 }
 
-// ---------- Stage: review ----------
+/**
+ * Parse one or more paths from a single text-input value. Handles all the
+ * common ways terminals deliver dropped files: a single bare path, a single
+ * quoted path with spaces, multiple paths separated by newlines (multi-drop),
+ * or multiple `"path1" "path2"` quoted segments.
+ */
+function parsePathsFromInput(raw: string): string[] {
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
 
-function Review({
-  stage,
-}: {
-  stage: Extract<Stage, { kind: "review" }>;
-}): JSX.Element {
-  const billsWithFields = stage.bills.filter((b): b is Bill & { fields: ClaimFields } => !!b.fields);
-  const total = billsWithFields.reduce((s, b) => s + b.fields.billAmount, 0);
-  const distinctHints = [...new Set(billsWithFields.map((b) => b.fields.beneficiaryHint).filter(Boolean))];
-
-  const columns: Column<SubmitBeneficiary>[] = [
-    { header: "Name", width: 28, render: (b) => b.name },
-    { header: "Relation", width: 12, render: (b) => b.relation },
-    { header: "Age", width: 5, align: "right", render: (b) => `${b.age}y` },
-  ];
-
-  return (
-    <Box flexDirection="column">
-      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
-        <Box>
-          <Text bold color="cyan">Review bills</Text>
-          <Text dimColor> ({billsWithFields.length}, total ₹ {fmt(total)})</Text>
-        </Box>
-        {billsWithFields.map((b, i) => (
-          <Box key={b.file}>
-            <Text dimColor>{`${i + 1}.`.padEnd(3)}</Text>
-            <Text>{basename(b.file).padEnd(32)}</Text>
-            <Text>{b.fields.billType.padEnd(18)}</Text>
-            <Text color="cyan">{`₹ ${fmt(b.fields.billAmount)}`.padStart(10)}</Text>
-            <Text dimColor> · </Text>
-            <Text>{b.fields.beneficiaryHint ?? "—"}</Text>
-          </Box>
-        ))}
-        {distinctHints.length > 1 ? (
-          <Box marginTop={1}>
-            <Text color="yellow">
-              ⚠ Patient hints differ ({distinctHints.join(", ")}). A claim is per-beneficiary —
-              pick one or split into separate claims (esc back, remove the odd ones out).
-            </Text>
-          </Box>
-        ) : null}
-      </Box>
-
-      <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
-        <Text bold>Beneficiary</Text>
-        <Text dimColor>Auto-matched from patient hint — change with [j/k] or arrows.</Text>
-        <Box marginTop={1}>
-          <FocusableList
-            rows={stage.benefs}
-            columns={columns}
-            selectedIndex={stage.selectedBenef}
-            viewportHeight={Math.min(stage.benefs.length, 8)}
-          />
-        </Box>
-      </Box>
-
-      <Box marginTop={1}>
-        <Text dimColor>[enter] resolve &amp; show dry-run  ·  [esc] back to file list</Text>
-      </Box>
-    </Box>
-  );
-}
-
-async function resolveAndShow(
-  stage: Extract<Stage, { kind: "review" }>,
-  client: MediAssistClient,
-  setStage: (s: Stage) => void,
-): Promise<void> {
-  const benef = stage.benefs[stage.selectedBenef];
-  if (!benef) {
-    setStage({ kind: "error", message: "No beneficiary selected" });
-    return;
-  }
-  const billsWithFields = stage.bills.filter((b): b is Bill & { fields: ClaimFields } => !!b.fields);
-  if (billsWithFields.length === 0) {
-    setStage({ kind: "error", message: "No bills to submit" });
-    return;
+  if (/[\r\n]/.test(trimmed)) {
+    return trimmed
+      .split(/[\r\n]+/)
+      .map((s) => stripQuotes(s.trim()))
+      .filter(Boolean);
   }
 
-  setStage({ kind: "resolving", message: "Looking up bill type, pincode, bank…" });
-  try {
-    // All bills share the same beneficiary's policy. For pincode we use the
-    // first bill's pincode (claim-level address); individual bills can carry
-    // their own pincode but the portal stores one hospital per claim.
-    const primary = billsWithFields[0]!.fields;
-    const [types, localities] = await Promise.all([
-      getBillTypes(client, benef.policyId),
-      primary.pincode ? lookupPincode(client, primary.pincode) : Promise.resolve([]),
-    ]);
-    const billType = matchBillType(types, primary.billType);
-    if (!billType) {
-      setStage({
-        kind: "error",
-        message:
-          `Could not map bill type "${primary.billType}". Server offered: ` +
-          types.map((t) => t.name).join(", "),
-      });
-      return;
+  // If the entire input (after outer quote strip) is an existing file, it's a
+  // single path that probably contains spaces — keep it whole.
+  const stripped = stripQuotes(trimmed);
+  if (existsSync(stripped)) return [stripped];
+
+  // Otherwise tokenize, respecting double-quote groups.
+  const tokens: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (const ch of trimmed) {
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      continue;
     }
-    const pincode = localities[0] ?? null;
-    const bank = stage.banks.find((b) => b.isActive && b.isPrimary) ?? stage.banks[0];
-    if (!bank) {
-      setStage({ kind: "error", message: "No bank account on policy." });
-      return;
+    if (!inQuotes && ch === " ") {
+      if (cur) {
+        tokens.push(cur);
+        cur = "";
+      }
+      continue;
     }
+    cur += ch;
+  }
+  if (cur) tokens.push(cur);
+  return tokens.filter(Boolean);
+}
 
-    const ctx: SubmitContext = {
-      beneficiary: {
-        id: benef.id,
-        maid: benef.maid,
-        name: benef.name,
-        relation: benef.relation,
-        relationId: benef.relationId,
-        age: benef.age,
-        alphaCode: benef.alphaCode,
-        employeeCode: benef.employeeCode,
-        policyId: benef.policyId,
-        policyNumber: benef.policyNumber,
-        insurer: benef.insurer,
-      },
-      bank,
-      empId: stage.user.empId || benef.employeeCode,
-      entityId: stage.user.entityId || benef.entityId,
-      email: stage.user.email || benef.email,
-      mobile: stage.user.mobile,
-      cityId: pincode?.cityId ?? 0,
-      cityName: pincode?.cityName ?? "",
-      stateId: pincode?.stateId ?? 0,
-      stateName: pincode?.stateName ?? "",
-      pincode: primary.pincode ?? "",
-      locality: pincode?.locationName ?? "",
-      billTypeId: billType.id,
-      hospitalName: primary.clinicName,
-      totalDocCount: billsWithFields.length,
-    };
+function stripQuotes(s: string): string {
+  return s.replace(/^["']|["']$/g, "");
+}
 
-    const payloads = buildPayloadsForDryRun(
-      billsWithFields.map((b) => b.fields),
-      ctx,
-      billsWithFields.map((b) => b.file),
-    );
-    const total = billsWithFields.reduce((s, b) => s + b.fields.billAmount, 0);
-    setStage({ kind: "dryRun", bills: stage.bills, payloads, benef, pincode, billType, total });
-  } catch (err) {
-    setStage({ kind: "error", message: (err as Error).message });
+function stringifyField(fields: ClaimFields, key: EditableField): string {
+  switch (key) {
+    case "billType":
+      return fields.billType;
+    case "billNumber":
+      return fields.billNumber;
+    case "billDate":
+      return fields.billDate;
+    case "billAmount":
+      return String(fields.billAmount);
+    case "clinicName":
+      return fields.clinicName;
+    case "pincode":
+      return fields.pincode ?? "";
+    case "beneficiaryHint":
+      return fields.beneficiaryHint ?? "";
+    case "natureOfIllness":
+      return fields.natureOfIllness;
   }
 }
 
-// ---------- Stage: dry-run ----------
-
-function DryRun({
-  stage,
-}: {
-  stage: Extract<Stage, { kind: "dryRun" }>;
-}): JSX.Element {
-  const { bills, payloads, benef, pincode, billType, total } = stage;
-  const billsWithFields = bills.filter((b): b is Bill & { fields: ClaimFields } => !!b.fields);
-
-  return (
-    <Box flexDirection="column">
-      <Box flexDirection="column" borderStyle="double" borderColor="yellow" paddingX={2} paddingY={1}>
-        <Text bold color="yellow">
-          DRY RUN — nothing was submitted  ·  {billsWithFields.length} bill(s)  ·  total ₹ {fmt(total)}
-        </Text>
-        <Box marginTop={1} flexDirection="column">
-          <KV k="Beneficiary" v={`${benef.name} (${benef.relation}, ${benef.age}y) — MAID ${benef.maid}`} />
-          <KV k="Bill type"   v={`${billType.name} = ${billType.id}`} />
-          <KV
-            k="Pincode"
-            v={pincode ? `${pincode.pincode} → ${pincode.locationName}, ${pincode.cityName}, ${pincode.stateName}` : "—"}
-          />
-          <KV k="Clinic"      v={billsWithFields[0]?.fields.clinicName ?? "—"} />
-        </Box>
-        <Box marginTop={1} flexDirection="column">
-          <Text bold>Bills</Text>
-          {billsWithFields.map((b, i) => (
-            <Box key={b.file}>
-              <Text dimColor>{`${i + 1}.`.padEnd(3)}</Text>
-              <Text>{basename(b.file).padEnd(32)}</Text>
-              <Text dimColor>{b.fields.billNumber.padEnd(12)}</Text>
-              <Text dimColor>{b.fields.billDate.padEnd(11)}</Text>
-              <Text color="cyan">{`₹ ${fmt(b.fields.billAmount)}`.padStart(10)}</Text>
-            </Box>
-          ))}
-        </Box>
-      </Box>
-
-      <Box marginTop={1} flexDirection="column" borderStyle="round" paddingX={1}>
-        <Text bold dimColor>
-          What would be sent ({2 + payloads.fileUploads.length + payloads.addClaimBills.length} POSTs)
-        </Text>
-        <PayloadSummary
-          label="1. SaveDraft"
-          body={payloads.saveDraft}
-          keys={["claimRegnNo", "policyId", "maid", "benefName", "TreatmentStartDate", "TreatmentEndDate", "TotalBillAmount"]}
-        />
-        {payloads.fileUploads.map((u, i) => (
-          <Box key={`upload-${i}`} flexDirection="column" marginTop={1}>
-            <Text color="cyan">
-              {2 + i}. POST {u.endpoint} (multipart)
-            </Text>
-            <Text dimColor>  Filedata = {basename(u.filePath)}</Text>
-          </Box>
-        ))}
-        {payloads.addClaimBills.map((body, i) => (
-          <PayloadSummary
-            key={`bill-${i}`}
-            label={`${2 + payloads.fileUploads.length + i}. AddClaimBill (bill ${i + 1}/${payloads.addClaimBills.length})`}
-            body={body}
-            keys={["billNum", "billAmnt", "billDate", "billId", "billDesc"]}
-          />
-        ))}
-        <PayloadSummary
-          label={`${2 + payloads.fileUploads.length + payloads.addClaimBills.length}. SubmitClaim`}
-          body={payloads.submitClaim}
-          keys={["empid", "Entity", "mobileno", "chequeleafId", "TotalBillAmount"]}
-        />
-      </Box>
-
-      <Box marginTop={1}>
-        <Text dimColor>[esc] / [n] new claim  ·  for the full payload run </Text>
-        <Text color="cyan" bold>bun run cli submit &lt;file…&gt;</Text>
-      </Box>
-    </Box>
-  );
+function applyFieldEdit(fields: ClaimFields, key: EditableField, raw: string): ClaimFields {
+  const trimmed = raw.trim();
+  switch (key) {
+    case "billType":
+      return BILL_TYPES.includes(trimmed as BillType) ? { ...fields, billType: trimmed as BillType } : fields;
+    case "billNumber":
+      return { ...fields, billNumber: trimmed };
+    case "billDate":
+      return { ...fields, billDate: trimmed };
+    case "billAmount": {
+      const n = Number(trimmed.replace(/[,₹\s]/g, ""));
+      return Number.isNaN(n) ? fields : { ...fields, billAmount: Math.round(n) };
+    }
+    case "clinicName":
+      return { ...fields, clinicName: trimmed };
+    case "pincode":
+      return { ...fields, pincode: trimmed || undefined };
+    case "beneficiaryHint":
+      return { ...fields, beneficiaryHint: trimmed || undefined };
+    case "natureOfIllness":
+      return { ...fields, natureOfIllness: trimmed };
+  }
 }
 
 function PayloadSummary({
@@ -566,36 +983,6 @@ function PayloadSummary({
   );
 }
 
-function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max - 1) + "…" : s || "<empty>";
-}
-
-// ---------- Loading / error ----------
-
-function Loading({ text }: { text: string }): JSX.Element {
-  const [frame, setFrame] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setFrame((f) => (f + 1) % 4), 120);
-    return () => clearInterval(t);
-  }, []);
-  const dots = ".".repeat(frame);
-  return (
-    <Box borderStyle="round" paddingX={2} paddingY={1}>
-      <Text color="cyan">{text}{dots}</Text>
-    </Box>
-  );
-}
-
-function ErrorView({ message }: { message: string }): JSX.Element {
-  return (
-    <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={2} paddingY={1}>
-      <Text bold color="red">Error</Text>
-      <Text>{message}</Text>
-      <Text dimColor>[esc] start over</Text>
-    </Box>
-  );
-}
-
 function KV({ k, v, color }: { k: string; v: string; color?: string }): JSX.Element {
   return (
     <Box>
@@ -603,6 +990,10 @@ function KV({ k, v, color }: { k: string; v: string; color?: string }): JSX.Elem
       <Text color={color}>{v}</Text>
     </Box>
   );
+}
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + "…" : s || "<empty>";
 }
 
 function fmt(n: number): string {

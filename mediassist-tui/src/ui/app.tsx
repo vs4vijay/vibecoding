@@ -1,38 +1,71 @@
 import { Box, Text, useApp, useInput } from "ink";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { MediAssistClient } from "../api/client.ts";
-import { Tabs, type Tab } from "./components/tabs.tsx";
-import { Footer, type KeyHint } from "./components/footer.tsx";
+import { listClaims } from "../api/claims.ts";
+import { getOpdBalance, getPolicy, type OpdBalance } from "../api/policy.ts";
+import { getUserContext, type UserContext } from "../api/user-context.ts";
+import type { Claim, Policy } from "../types.ts";
+import { Header, type ViewKey } from "./components/header.tsx";
+import { KeybindingBar, type KeyHint } from "./components/keybinding-bar.tsx";
+import { CommandPalette, type Command } from "./components/command-palette.tsx";
 import { HelpOverlay } from "./components/help-overlay.tsx";
 import { Dashboard } from "./dashboard.tsx";
-import { ClaimsList } from "./claims-list.tsx";
+import { ClaimsView } from "./claims-view.tsx";
 import { NewClaim } from "./new-claim.tsx";
 
-type ScreenKey = "dashboard" | "claims" | "newClaim";
+type GlobalData = {
+  user: UserContext;
+  policy: Policy;
+  balance: OpdBalance;
+  claims: Claim[];
+};
 
-const TABS: Tab[] = [
-  { key: "dashboard", label: "Dashboard" },
-  { key: "claims", label: "Claims" },
-  { key: "newClaim", label: "New Claim" },
-];
-
-type AppProps = { client: MediAssistClient };
-
-export function App({ client }: AppProps): JSX.Element {
+export function App({ client }: { client: MediAssistClient }): JSX.Element {
   const { exit } = useApp();
-  const [screen, setScreen] = useState<ScreenKey>("dashboard");
+  const [view, setView] = useState<ViewKey>("dashboard");
+  const [data, setData] = useState<GlobalData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [help, setHelp] = useState(false);
+  const [palette, setPalette] = useState(false);
+  const [viewHints, setViewHints] = useState<KeyHint[]>([]);
 
+  // ----- global data load (header relies on it) -----
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setData(null);
+      setLoadError(null);
+      try {
+        const [user, policy, balance, claims] = await Promise.all([
+          getUserContext(client),
+          getPolicy(client),
+          getOpdBalance(client),
+          listClaims(client),
+        ]);
+        if (!cancelled) setData({ user, policy, balance, claims });
+      } catch (err) {
+        if (!cancelled) setLoadError((err as Error).message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [client, refreshKey]);
+
+  // ----- global key bindings -----
   useInput((input, key) => {
-    // Help overlay swallows other input
+    if (palette) return; // CommandPalette owns input
     if (help) {
       if (input === "?" || key.escape) setHelp(false);
       return;
     }
-
     if (input === "?") {
       setHelp(true);
+      return;
+    }
+    if (input === ":") {
+      setPalette(true);
       return;
     }
     if (input === "q") {
@@ -43,87 +76,151 @@ export function App({ client }: AppProps): JSX.Element {
       setRefreshKey((n) => n + 1);
       return;
     }
-    // Tab switches by number or letter
-    if (input === "1") setScreen("dashboard");
-    else if (input === "2") setScreen("claims");
-    else if (input === "3") setScreen("newClaim");
+    if (input === "1") setView("dashboard");
+    else if (input === "2") setView("claims");
+    else if (input === "3") setView("newClaim");
     else if (key.tab) {
-      const idx = TABS.findIndex((t) => t.key === screen);
-      const next = TABS[(idx + 1) % TABS.length]!.key as ScreenKey;
-      setScreen(next);
+      setView((v) =>
+        v === "dashboard" ? "claims" : v === "claims" ? "newClaim" : "dashboard",
+      );
     }
   });
 
+  const commands: Command[] = [
+    { name: "dashboard", aliases: ["dash", "1"], description: "Go to dashboard", action: () => setView("dashboard") },
+    { name: "claims", aliases: ["c", "2"], description: "Go to claims", action: () => setView("claims") },
+    { name: "new", aliases: ["new-claim", "submit", "3"], description: "Start a new claim", action: () => setView("newClaim") },
+    { name: "refresh", aliases: ["r"], description: "Refresh data", action: () => setRefreshKey((n) => n + 1) },
+    { name: "help", aliases: ["h", "?"], description: "Show help overlay", action: () => setHelp(true) },
+    { name: "quit", aliases: ["q", "exit"], description: "Quit the app", action: () => exit() },
+  ];
+
+  const onContextHintsChange = useCallback((hints: KeyHint[]) => {
+    setViewHints(hints);
+  }, []);
+
+  const isInteractive = !help && !palette;
+
   return (
     <Box flexDirection="column">
-      <Tabs tabs={TABS} activeKey={screen} />
-      <Box marginTop={1}>
-        {screen === "dashboard" && <Dashboard client={client} refreshKey={refreshKey} />}
-        {screen === "claims" && (
-          <ClaimsList client={client} refreshKey={refreshKey} isFocused={!help} />
+      {data ? (
+        <Header user={data.user} policy={data.policy} balance={data.balance} activeView={view} />
+      ) : (
+        <SimpleHeader status={loadError ? `error: ${loadError}` : "loading…"} />
+      )}
+      <Box flexGrow={1} flexDirection="column">
+        {!data && !loadError ? (
+          <Box paddingX={1}>
+            <Text color="cyan">Loading…</Text>
+          </Box>
+        ) : loadError ? (
+          <Box paddingX={1} flexDirection="column">
+            <Text color="red">Failed to load: {loadError}</Text>
+            <Text dimColor>Press [r] to retry · [q] to quit</Text>
+          </Box>
+        ) : (
+          <>
+            {view === "dashboard" && (
+              <Dashboard policy={data!.policy} balance={data!.balance} claims={data!.claims} />
+            )}
+            {view === "claims" && (
+              <ClaimsView client={client} refreshKey={refreshKey} isActive={isInteractive} />
+            )}
+            {view === "newClaim" && (
+              <NewClaim
+                client={client}
+                user={data!.user}
+                isActive={isInteractive}
+                onContextHintsChange={onContextHintsChange}
+              />
+            )}
+          </>
         )}
-        {screen === "newClaim" && <NewClaim client={client} isFocused={!help} />}
       </Box>
-      <Footer hints={footerHintsFor(screen)} />
-      {help ? (
+      <KeybindingBar contextHints={contextHintsFor(view, viewHints)} />
+      {help ? <HelpOverlayContainer onClose={() => setHelp(false)} /> : null}
+      {palette ? (
         <Box marginTop={1}>
-          <HelpOverlay
-            groups={[
-              {
-                title: "Global",
-                keys: [
-                  { key: "1 / 2 / 3", desc: "Switch tabs" },
-                  { key: "tab", desc: "Cycle tabs" },
-                  { key: "?", desc: "Toggle help" },
-                  { key: "r", desc: "Refresh" },
-                  { key: "q", desc: "Quit" },
-                ],
-              },
-              {
-                title: "Claims list",
-                keys: [
-                  { key: "j / ↓", desc: "Next row" },
-                  { key: "k / ↑", desc: "Previous row" },
-                  { key: "g", desc: "Top" },
-                  { key: "G", desc: "Bottom" },
-                  { key: "PgUp/PgDn", desc: "Jump 10 rows" },
-                  { key: "enter / l", desc: "View detail" },
-                  { key: "esc / h", desc: "Hide detail" },
-                ],
-              },
-              {
-                title: "New claim",
-                keys: [
-                  { key: "drag&drop", desc: "Drop file on terminal" },
-                  { key: "type", desc: "Or type a file path" },
-                  { key: "enter", desc: "Extract / confirm / dry-run" },
-                  { key: "j/k or ↑/↓", desc: "Pick beneficiary" },
-                  { key: "esc", desc: "Back / start over" },
-                ],
-              },
-            ]}
-          />
+          <CommandPalette commands={commands} onClose={() => setPalette(false)} />
         </Box>
       ) : null}
     </Box>
   );
 }
 
-function footerHintsFor(screen: ScreenKey): KeyHint[] {
-  const base: KeyHint[] = [
-    { key: "1-3", label: "tabs" },
-    { key: "tab", label: "next tab" },
-    { key: "r", label: "refresh" },
-    { key: "?", label: "help" },
-    { key: "q", label: "quit" },
-  ];
-  if (screen === "claims") {
-    return [
-      { key: "j/k", label: "move" },
-      { key: "↵", label: "view" },
-      { key: "g/G", label: "top/bot" },
-      ...base,
-    ];
+function contextHintsFor(view: ViewKey, viewHints: KeyHint[]): KeyHint[] {
+  if (viewHints.length > 0) return viewHints;
+  switch (view) {
+    case "dashboard":
+      return [];
+    case "claims":
+      return [
+        { key: "j/k", label: "move" },
+        { key: "enter", label: "detail" },
+        { key: "tab", label: "pane" },
+        { key: "g/G", label: "top/bot" },
+      ];
+    case "newClaim":
+      return [{ key: "drop file", label: "to start" }];
   }
-  return base;
+}
+
+function SimpleHeader({ status }: { status: string }): JSX.Element {
+  return (
+    <Box borderStyle="round" borderColor="gray" paddingX={1}>
+      <Text bold color="cyan">Medi Assist </Text>
+      <Text dimColor>· {status}</Text>
+    </Box>
+  );
+}
+
+function HelpOverlayContainer({ onClose }: { onClose: () => void }): JSX.Element {
+  useInput((input, key) => {
+    if (input === "?" || key.escape) onClose();
+  });
+  return (
+    <Box marginTop={1}>
+      <HelpOverlay
+        groups={[
+          {
+            title: "Global",
+            keys: [
+              { key: "1 / 2 / 3", desc: "Switch tabs" },
+              { key: "tab", desc: "Cycle tabs" },
+              { key: ":", desc: "Command palette" },
+              { key: "?", desc: "Toggle help" },
+              { key: "r", desc: "Refresh data" },
+              { key: "q", desc: "Quit" },
+            ],
+          },
+          {
+            title: "Claims",
+            keys: [
+              { key: "j / ↓", desc: "Next row" },
+              { key: "k / ↑", desc: "Prev row" },
+              { key: "g / G", desc: "Top / Bottom" },
+              { key: "PgUp/PgDn", desc: "Jump 10" },
+              { key: "tab", desc: "List ↔ detail" },
+              { key: "enter / l", desc: "Open detail" },
+              { key: "esc / h", desc: "Back to list" },
+            ],
+          },
+          {
+            title: "New Claim",
+            keys: [
+              { key: "drag&drop", desc: "Drop file(s)" },
+              { key: "tab", desc: "Cycle panel" },
+              { key: "↑/↓", desc: "Move in list/form" },
+              { key: "←/→", desc: "Cycle select / benef" },
+              { key: "enter", desc: "Add / edit / save" },
+              { key: "t / b / d", desc: "Set kind" },
+              { key: "x", desc: "Remove file" },
+              { key: "p", desc: "Preview dry-run" },
+              { key: "esc", desc: "Cancel / back" },
+            ],
+          },
+        ]}
+      />
+    </Box>
+  );
 }
