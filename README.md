@@ -50,9 +50,12 @@ android skills add --skill base
 
 ## MCP used
 
+
 https://mcp.excalidraw.com
 
-
+```bash
+claude mcp add --scope project --transport http excalidraw https://mcp.excalidraw.com
+```
 
 ---
 
