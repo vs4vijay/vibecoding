@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.local
+bun.lockb
+dist/
+*.log
+.DS_Store
+
+# API discovery dumps (contain personal data; not for git)
+debug-*.txt
+debug_*.txt
+src/debug*.ts
