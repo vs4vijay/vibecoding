@@ -163,11 +163,9 @@ function Shell({ client, onSessionExpired }: ShellProps): JSX.Element {
     if (input === "1") setView("dashboard");
     else if (input === "2") setView("claims");
     else if (input === "3") setView("newClaim");
-    else if (key.tab) {
-      setView((v) =>
-        v === "dashboard" ? "claims" : v === "claims" ? "newClaim" : "dashboard",
-      );
-    }
+    // Tab is intentionally NOT a global view-switcher — views own it for
+    // cycling between their internal panels (claims list/detail, new-claim
+    // input/files/edit/beneficiary). Use 1/2/3 or `:cmd` to switch views.
   });
 
   const commands: Command[] = [
@@ -280,12 +278,12 @@ function HelpOverlayContainer({ onClose }: { onClose: () => void }): JSX.Element
           {
             title: "Global",
             keys: [
-              { key: "1 / 2 / 3", desc: "Switch tabs" },
-              { key: "tab", desc: "Cycle tabs" },
-              { key: ":", desc: "Command palette" },
-              { key: "?", desc: "Toggle help" },
+              { key: "1 / 2 / 3", desc: "Switch tabs (Dashboard / Claims / New)" },
+              { key: ":", desc: "Command palette (`:claims`, `:new`, …)" },
               { key: "r", desc: "Refresh data" },
+              { key: "?", desc: "Toggle help" },
               { key: "q", desc: "Quit" },
+              { key: "tab", desc: "Cycle panels WITHIN the current view" },
             ],
           },
           {
