@@ -69,7 +69,16 @@ export async function extractClaim(
   };
 }
 
-type TextSource = { text: string; source: { text?: string; ocr?: string } };
+export type TextSource = { text: string; source: { text?: string; ocr?: string } };
+
+/**
+ * Returns the text contents of a file: text-layer extraction for PDFs that
+ * have one, OCR for images and scanned PDFs.
+ */
+export async function extractTextFromFile(filePath: string, forceOcr = false): Promise<TextSource> {
+  const ext = extname(filePath).toLowerCase();
+  return loadText(filePath, ext, forceOcr);
+}
 
 async function loadText(filePath: string, ext: string, forceOcr: boolean): Promise<TextSource> {
   if (ext === ".pdf") {
