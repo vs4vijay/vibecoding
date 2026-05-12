@@ -1,11 +1,20 @@
 #!/usr/bin/env bun
-import { password as promptPassword, text as promptText, isCancel, intro, outro } from "@clack/prompts";
+import {
+  password as promptPassword,
+  text as promptText,
+  select as promptSelect,
+  isCancel,
+  intro,
+  outro,
+} from "@clack/prompts";
+import { parseArgs } from "node:util";
 import { listClaims } from "./api/claims.ts";
 import { loadSession, login, logout } from "./api/auth.ts";
-import { getOpdBalance, getPolicy, getSubmitBeneficiaries } from "./api/policy.ts";
+import { getOpdBalance, getPolicy, getSubmitBeneficiaries, type SubmitBeneficiary } from "./api/policy.ts";
 import { getBankDetails } from "./api/bank.ts";
 import { getBillTypes, lookupPincode, matchBillType } from "./api/lookups.ts";
 import { buildPayloadsForDryRun, type SubmitContext } from "./api/submit.ts";
+import { getUserContext } from "./api/user-context.ts";
 import { loadEnv } from "./config.ts";
 import { extractClaim } from "./extract/index.ts";
 import type { MediAssistClient } from "./api/client.ts";
@@ -65,6 +74,9 @@ Commands:
   extract <file...>      Extract claim fields from one or more PDFs/images (globs OK)
   submit <file>          DRY-RUN: extract + resolve lookups + print the payloads
                          that would be POSTed. Does NOT submit anything.
+                         Options:
+                           --for <name|relation>  Override beneficiary selection
+                           --yes                  Skip interactive prompts
   help                   Show this message
 `);
 }
@@ -280,36 +292,39 @@ function basename(p: string): string {
 }
 
 async function cmdSubmit(client: MediAssistClient): Promise<void> {
-  const file = process.argv[3];
-  if (!file) {
-    console.error("Usage: bun run cli submit <file>");
+  const opts = parseSubmitArgs();
+  if (!opts.file) {
+    console.error(
+      "Usage: bun run cli submit <file> [--for <name|relation>] [--yes]\n" +
+        "  --for <name|relation>  Beneficiary override (e.g. --for spouse, --for \"Anju Soni\")\n" +
+        "  --yes                  Skip the interactive confirmation prompt",
+    );
     process.exitCode = 1;
     return;
   }
 
-  console.log(`\n📄 Extracting ${file}...`);
-  const fields = await extractClaim(file);
+  console.log(`\n📄 Extracting ${opts.file}...`);
+  const fields = await extractClaim(opts.file);
   console.log(
     `   ${fields.billType} | ${fields.billNumber} | ${fields.billDate} | ₹ ${formatINR(fields.billAmount)} | ${fields.clinicName}`,
   );
   console.log(`   Patient hint: ${fields.beneficiaryHint ?? "—"}`);
 
   console.log("\n🔍 Resolving lookups...");
-  const [benefs, banks] = await Promise.all([
+  const [user, benefs, banks] = await Promise.all([
+    getUserContext(client),
     getSubmitBeneficiaries(client),
     getBankDetails(client),
   ]);
+  console.log(`   You:         ${user.fullName} (${user.empId}) @ ${user.entityCode}`);
+  console.log(`   Mobile:      ${user.mobile || "—"}`);
 
-  const benef = matchBeneficiary(benefs, fields.beneficiaryHint);
+  const benef = await chooseBeneficiary(benefs, fields.beneficiaryHint, opts);
   if (!benef) {
-    console.error(
-      `\n❌ Could not match patient hint "${fields.beneficiaryHint ?? ""}" to any beneficiary.\n` +
-        `   Beneficiaries: ${benefs.map((b) => `${b.name} (${b.relation})`).join(", ")}`,
-    );
     process.exitCode = 1;
     return;
   }
-  console.log(`   Beneficiary: ${benef.name} (${benef.relation}, ${benef.age}y)`);
+  console.log(`   Beneficiary: ${benef.name} (${benef.relation}, ${benef.age}y) — MAID ${benef.maid}`);
 
   const bank = banks.find((b) => b.isActive && b.isPrimary) ?? banks[0];
   if (!bank) {
@@ -368,10 +383,10 @@ async function cmdSubmit(client: MediAssistClient): Promise<void> {
       insurer: benef.insurer,
     },
     bank,
-    empId: benef.employeeCode,
-    entityId: benef.entityId,
-    email: benef.email,
-    mobile: process.env.MEDIASSIST_MOBILE ?? "",
+    empId: user.empId || benef.employeeCode,
+    entityId: user.entityId || benef.entityId,
+    email: user.email || benef.email,
+    mobile: user.mobile,
     cityId,
     cityName,
     stateId,
@@ -383,7 +398,7 @@ async function cmdSubmit(client: MediAssistClient): Promise<void> {
     totalDocCount: 1,
   };
 
-  const payloads = buildPayloadsForDryRun(fields, ctx, file);
+  const payloads = buildPayloadsForDryRun(fields, ctx, opts.file);
 
   console.log("\n══════════════════════════════════════════════════════════════════");
   console.log("                  DRY RUN — NO REQUESTS SENT");
@@ -403,31 +418,123 @@ async function cmdSubmit(client: MediAssistClient): Promise<void> {
   console.log("══════════════════════════════════════════════════════════════════");
 }
 
-function matchBeneficiary<T extends { name: string; relation: string }>(
-  benefs: T[],
+type SubmitArgs = { file?: string; for?: string; yes: boolean };
+
+function parseSubmitArgs(): SubmitArgs {
+  const { values, positionals } = parseArgs({
+    args: process.argv.slice(3),
+    options: {
+      for: { type: "string" },
+      yes: { type: "boolean", short: "y", default: false },
+    },
+    allowPositionals: true,
+    strict: true,
+  });
+  return { file: positionals[0], for: values.for, yes: !!values.yes };
+}
+
+/**
+ * Selects which beneficiary the claim is for. Order of precedence:
+ *   1. `--for <name|relation>` flag (explicit override)
+ *   2. Patient hint from the invoice, if it uniquely matches one beneficiary
+ *   3. Interactive prompt with the full beneficiary list
+ *
+ * In `--yes` mode (non-interactive), step 3 falls back to "Self" or fails.
+ */
+async function chooseBeneficiary(
+  benefs: SubmitBeneficiary[],
   hint: string | undefined,
-): T | null {
-  if (!hint) {
-    return benefs.find((b) => b.relation === "Self") ?? null;
+  opts: SubmitArgs,
+): Promise<SubmitBeneficiary | null> {
+  if (benefs.length === 0) {
+    console.error("\n❌ No beneficiaries found on the policy.");
+    return null;
   }
+
+  if (opts.for) {
+    const match = pickByOverride(benefs, opts.for);
+    if (!match) {
+      console.error(`\n❌ --for "${opts.for}" did not match any beneficiary.`);
+      printBenefList(benefs);
+      return null;
+    }
+    return match;
+  }
+
+  const hintMatches = hint ? fuzzyMatchByName(benefs, hint) : [];
+  if (hintMatches.length === 1) return hintMatches[0]!;
+
+  if (opts.yes) {
+    // Non-interactive: hint must be unambiguous, else fall back to Self.
+    if (hintMatches.length > 1) {
+      console.error(
+        `\n❌ Patient hint "${hint}" matched ${hintMatches.length} beneficiaries. Use --for to disambiguate.`,
+      );
+      printBenefList(benefs);
+      return null;
+    }
+    const self = benefs.find((b) => b.relation.toLowerCase() === "self");
+    if (self) {
+      console.log(`   (no hint, --yes mode → defaulting to Self: ${self.name})`);
+      return self;
+    }
+    return null;
+  }
+
+  // Interactive prompt
+  console.log("");
+  const initialValue =
+    hintMatches[0]?.id ?? benefs.find((b) => b.relation.toLowerCase() === "self")?.id ?? benefs[0]!.id;
+  const choice = await promptSelect({
+    message: hint
+      ? `Multiple beneficiaries — claim is for whom? (hint: "${hint}")`
+      : "Which beneficiary is this claim for?",
+    options: benefs.map((b) => ({
+      value: b.id,
+      label: `${b.name.padEnd(28)} ${b.relation.padEnd(10)} ${b.age}y`,
+    })),
+    initialValue,
+  });
+  if (isCancel(choice)) {
+    console.log("Cancelled.");
+    return null;
+  }
+  return benefs.find((b) => b.id === choice) ?? null;
+}
+
+function pickByOverride(benefs: SubmitBeneficiary[], override: string): SubmitBeneficiary | null {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+  const target = norm(override);
+  // Exact relation match first (self/spouse/mother/father/son/daughter)
+  const byRel = benefs.find((b) => norm(b.relation) === target);
+  if (byRel) return byRel;
+  // Then exact name
+  const byName = benefs.find((b) => norm(b.name) === target);
+  if (byName) return byName;
+  // Then prefix
+  const byPrefix = benefs.find((b) => norm(b.name).startsWith(target));
+  if (byPrefix) return byPrefix;
+  return null;
+}
+
+function fuzzyMatchByName(benefs: SubmitBeneficiary[], hint: string): SubmitBeneficiary[] {
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
   const h = norm(hint);
-  let best: { benef: T; score: number } | null = null;
-  for (const b of benefs) {
+  const exact = benefs.filter((b) => norm(b.name) === h);
+  if (exact.length > 0) return exact;
+  const firstName = h.split(" ")[0] ?? h;
+  return benefs.filter((b) => {
     const name = norm(b.name);
-    if (name === h) return b;
-    let score = 0;
-    if (name.startsWith(h)) score = 3;
-    else if (name.includes(h)) score = 2;
-    else if (h.includes(name.split(" ")[0]!)) score = 2;
-    else {
-      const firstName = name.split(" ")[0]!;
-      const hintFirst = h.split(" ")[0]!;
-      if (firstName === hintFirst) score = 1;
-    }
-    if (score > 0 && (best === null || score > best.score)) best = { benef: b, score };
+    const nameFirst = name.split(" ")[0] ?? name;
+    return name.startsWith(h) || name.includes(h) || nameFirst === firstName;
+  });
+}
+
+function printBenefList(benefs: SubmitBeneficiary[]): void {
+  console.error("   Beneficiaries on policy:");
+  for (const b of benefs) {
+    console.error(`     - ${b.name.padEnd(28)} (${b.relation}, ${b.age}y)`);
   }
-  return best?.benef ?? null;
 }
 
 function printForm(body: Record<string, string>): void {
