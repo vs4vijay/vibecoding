@@ -7,6 +7,10 @@ export type EnvShape = {
   MEDIASSIST_USER?: string;
   MEDIASSIST_COOKIE?: string;
   MEDIASSIST_COOKIE_EXPIRES_AT?: string;
+  TEXT_EXTRACTOR?: string;
+  OCR_ENGINE?: string;
+  FIELD_EXTRACTORS?: string;
+  TESSERACT_LANGS?: string;
   OLLAMA_HOST?: string;
   OLLAMA_MODEL?: string;
 };

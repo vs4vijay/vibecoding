@@ -1,0 +1,92 @@
+import { extname } from "node:path";
+import type { ClaimFields } from "../types.ts";
+import {
+  getFieldExtractorChain,
+  getOcrEngine,
+  getTextExtractor,
+} from "../engines/registry.ts";
+
+export type ExtractOptions = {
+  /** Force OCR even if the PDF has a text layer. */
+  forceOcr?: boolean;
+  /** Override the field-extractor chain (comma-separated names). */
+  fieldExtractors?: string;
+};
+
+export type ExtractResult = ClaimFields & {
+  /** Path through the pipeline, useful for debugging. */
+  engines: { text?: string; ocr?: string; fields: string[] };
+};
+
+/**
+ * Orchestrates: text extraction → (OCR if needed) → chained field extractors.
+ *
+ * Engines are selected from environment variables — see `engines/registry.ts`:
+ *   TEXT_EXTRACTOR    (default: unpdf)
+ *   OCR_ENGINE        (default: tesseract)
+ *   FIELD_EXTRACTORS  (default: heuristic,ollama)
+ */
+export async function extractClaim(
+  filePath: string,
+  opts: ExtractOptions = {},
+): Promise<ExtractResult> {
+  if (opts.fieldExtractors) process.env.FIELD_EXTRACTORS = opts.fieldExtractors;
+
+  const ext = extname(filePath).toLowerCase();
+  const { text, source } = await loadText(filePath, ext, opts.forceOcr ?? false);
+
+  const chain = await getFieldExtractorChain();
+  let fields: ClaimFields | undefined;
+  const used: string[] = [];
+  for (const engine of chain) {
+    if (fields && !hasLowConfidence(fields)) break;
+    fields = await engine.extract(text, fields);
+    used.push(engine.name);
+  }
+
+  if (!fields) {
+    // Should never happen: registry guarantees at least the heuristic engine.
+    throw new Error("No field extractor available");
+  }
+
+  return {
+    ...fields,
+    engines: {
+      text: source.text,
+      ocr: source.ocr,
+      fields: used,
+    },
+  };
+}
+
+type TextSource = { text: string; source: { text?: string; ocr?: string } };
+
+async function loadText(filePath: string, ext: string, forceOcr: boolean): Promise<TextSource> {
+  if (ext === ".pdf") {
+    const textEngine = getTextExtractor();
+    const result = await textEngine.extract(filePath);
+    if (!forceOcr && result.hasTextLayer) {
+      return { text: result.text, source: { text: textEngine.name } };
+    }
+    if (result.text.length === 0) {
+      throw new Error(
+        "Scanned PDF detected (no embedded text). Convert pages to images first, or use a text extractor that supports OCR (e.g., TEXT_EXTRACTOR=markitdown when available).",
+      );
+    }
+    return { text: result.text, source: { text: textEngine.name } };
+  }
+  if ([".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"].includes(ext)) {
+    const ocr = getOcrEngine();
+    const text = await ocr.recognize(filePath);
+    return { text, source: { ocr: ocr.name } };
+  }
+  throw new Error(`Unsupported file type: ${ext}`);
+}
+
+function hasLowConfidence(f: ClaimFields): boolean {
+  const conf = f.confidence ?? {};
+  for (const k of ["billNumber", "billDate", "billAmount", "clinicName"] as const) {
+    if (!f[k] || (conf as Record<string, number>)[k]! < 0.7) return true;
+  }
+  return false;
+}

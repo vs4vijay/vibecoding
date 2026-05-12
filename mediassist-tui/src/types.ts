@@ -21,6 +21,8 @@ export type ClaimFields = {
   natureOfIllness: string;
   beneficiaryHint?: string;
   rawText: string;
+  /** Per-field confidence in [0, 1]. Missing keys mean "no signal". */
+  confidence?: Partial<Record<keyof ClaimFields, number>>;
 };
 
 export type Beneficiary = {

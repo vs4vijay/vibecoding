@@ -117,13 +117,37 @@ file path
                     ClaimFields
 ```
 
-### Library choices (researched 2026)
+### Pluggable engine architecture
 
-| Step | Library | Why |
-|---|---|---|
-| PDF text extraction | **`unpdf`** | Serverless build of pdf.js; no native deps (avoids `canvas` build pain on Windows); Bun-friendly. |
-| OCR for images / scanned PDFs | **`tesseract.js`** v6+ | Pure WASM (no `tesseract.exe` install); supports eng + Devanagari traineddata. |
-| LLM fallback (optional) | **Ollama** (`qwen2.5:3b` or `nuextract`) | Localhost HTTP API, JSON-mode structured outputs. Off by default; opt-in via `.env`. |
+The extraction pipeline is split into **three swappable engine roles** behind narrow TypeScript interfaces (see `src/engines/types.ts`). New backends (MarkItDown, PaddleOCR, native Tesseract, Anthropic, OpenAI, local Qwen, etc.) plug in without touching the orchestrator.
+
+| Role | Interface | Default impl | Future drop-ins |
+|---|---|---|---|
+| **TextExtractor** — PDF/document → text | `extract(file) → { text, hasTextLayer }` | `unpdf` | `markitdown`, `pdfjs-dist`, `pandoc` |
+| **OcrEngine** — image → text | `recognize(file) → string` | `tesseract.js` | `paddleocr`, native `tesseract`, cloud OCR |
+| **FieldExtractor** — text → ClaimFields | `extract(text, partial?) → ClaimFields` | `heuristic` (regex + templates), `ollama` (chain) | `anthropic`, `openai`, `local-qwen` via llama.cpp, `nuextract` |
+
+Engines are selected via `.env`:
+```bash
+TEXT_EXTRACTOR=unpdf                # default
+OCR_ENGINE=tesseract                # default
+FIELD_EXTRACTORS=heuristic,ollama   # chain — engines run in order until confidence is high enough
+```
+
+Registering a new engine is one line in `src/engines/registry.ts`:
+```ts
+registerFieldExtractor("anthropic", anthropicFieldExtractor);
+```
+
+`registry.ts` exposes `registerTextExtractor`, `registerOcrEngine`, `registerFieldExtractor` for plugin-style extension.
+
+### Library choices (current implementations, researched 2026)
+
+| Default | Why |
+|---|---|
+| **`unpdf`** | Serverless build of pdf.js; no native deps (avoids `canvas` build pain on Windows); Bun-friendly. |
+| **`tesseract.js`** v6+ | Pure WASM (no `tesseract.exe` install); supports eng + Devanagari traineddata. |
+| **Ollama** (`qwen2.5:3b` / `nuextract`) | Localhost HTTP API, JSON-mode structured outputs. Off by default; opt-in by setting `OLLAMA_HOST` in `.env`. |
 
 ### Extraction strategy
 
@@ -240,12 +264,18 @@ mediassist-tui/
 │   │   ├── policy.ts              # GetPolicies.aspx → Policy + OPD balance + beneficiaries
 │   │   ├── claims.ts              # GetClaims.aspx → list; AddClaimBill + SubmitClaim
 │   │   └── lookups.ts             # pincode, bill types, hospital search
+│   ├── engines/                   # pluggable extraction engines
+│   │   ├── types.ts               # TextExtractor / OcrEngine / FieldExtractor interfaces
+│   │   ├── registry.ts            # named registries + getters; env-driven selection
+│   │   ├── text/
+│   │   │   └── unpdf.ts           # default PDF text extractor
+│   │   ├── ocr/
+│   │   │   └── tesseract.ts       # default OCR (tesseract.js, WASM)
+│   │   └── fields/
+│   │       ├── heuristic.ts       # regex/template field extractor
+│   │       └── ollama.ts          # local LLM gap-filler (optional)
 │   ├── extract/
-│   │   ├── pdf.ts                 # unpdf text extraction
-│   │   ├── ocr.ts                 # tesseract.js OCR
-│   │   ├── heuristics.ts          # regex/template extractors → ClaimFields
-│   │   ├── ollama.ts              # optional LLM fallback
-│   │   └── index.ts               # pipeline orchestrator
+│   │   └── index.ts               # pipeline orchestrator (uses registry)
 │   └── ui/
 │       ├── app.tsx                # Ink root + router
 │       ├── login.tsx              # @clack/prompts pre-Ink for credential entry
@@ -268,14 +298,12 @@ mediassist-tui/
 - CLI commands: `bun run cli login | whoami | logout | policy | claims`
 - **Acceptance:** ✅ login works, policy + OPD balance + beneficiaries shown, claims list shown with correct names/amounts/status.
 
-### Phase 2 — Local document extraction (no cloud APIs)
-- `extract/pdf.ts` using `unpdf`
-- `extract/ocr.ts` using `tesseract.js` (English + Devanagari traineddata)
-- `extract/heuristics.ts` — regex/template extractors for invoice no, date, amount, GST, pincode, patient name, vendor → bill-type classifier
-- `extract/ollama.ts` (optional, off by default) — POSTs to `localhost:11434` for LLM-assisted gap-filling
-- `extract/index.ts` — orchestrator: detect → text/OCR → heuristics → (optional Ollama) → `ClaimFields`
-- CLI command: `bun run cli extract <file>` → prints `ClaimFields` JSON
-- **Acceptance:** correctly extracts fields from the 5 sample invoices (Arjun Optical x3, Augmenta Health x2) without network calls.
+### Phase 2 — Local document extraction (pluggable engines) ✅ DONE
+- Pluggable engine architecture (see §5): `TextExtractor`, `OcrEngine`, `FieldExtractor` interfaces with a registry
+- Default impls: `unpdf` (PDF), `tesseract.js` (OCR), `heuristic` (regex + per-vendor templates), `ollama` (optional LLM gap-fill)
+- Orchestrator chains extractors and stops as soon as confidence is high enough
+- CLI: `bun run cli extract <file>` prints fields + low-confidence list + engines path
+- **Acceptance:** ✅ all 5 sample invoices (Arjun Optical ×3, Augmenta Health ×2) extract every field correctly with zero network calls. Pluggability verified — swap engines via `TEXT_EXTRACTOR` / `OCR_ENGINE` / `FIELD_EXTRACTORS` in `.env`.
 
 ### Phase 3 — Claim submission via API
 - `lookups.ts` (pincode, hospitals, bill types)

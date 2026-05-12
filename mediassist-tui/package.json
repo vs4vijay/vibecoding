@@ -7,13 +7,17 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "cli": "bun run src/cli.ts",
+    "ocr": "bun run src/ocr.ts",
     "dev": "bun --watch src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:samples": "bun run src/cli.ts extract \"C:/Users/vijaysoni/OneDrive - Microsoft/aaa___TempSharing/*.pdf\""
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",
     "ink": "^5.0.1",
-    "react": "^18.3.1"
+    "react": "^18.3.1",
+    "tesseract.js": "^7.0.0",
+    "unpdf": "^1.6.2"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
