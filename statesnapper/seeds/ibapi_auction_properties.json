@@ -1,0 +1,25 @@
+{
+  "name": "ibapi_auction_properties",
+  "enabled": true,
+  "http": {
+    "method": "POST",
+    "url": "https://ibapi.in/Sale_Info_Home.aspx/Button_search_Click",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Content-Type": "application/json; charset=utf-8",
+      "X-Requested-With": "XMLHttpRequest",
+      "Accept": "application/json, text/javascript, */*; q=0.01",
+      "Origin": "https://ibapi.in",
+      "Referer": "https://ibapi.in/Sale_Info_Home.aspx"
+    },
+    "body": { "key_val": [] }
+  },
+  "pagination": {
+    "style": "none"
+  },
+  "records_path": "$.d",
+  "external_id_path": "$.ROWID",
+  "hash_fields": null,
+  "schedule_cron": null,
+  "storage_mode": "generic"
+}

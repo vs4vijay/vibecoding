@@ -1,0 +1,35 @@
+{
+  "name": "rera_raj_projects",
+  "enabled": true,
+  "http": {
+    "method": "POST",
+    "url": "https://rera.rajasthan.gov.in/Home/GetProjectsList",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "Origin": "https://rera.rajasthan.gov.in"
+    },
+    "form": {
+      "v": "",
+      "District": "1063",
+      "teshil": "",
+      "projectName": "",
+      "promoterName": "",
+      "certificateNo": "",
+      "applicationStatus": "3"
+    }
+  },
+  "pagination": {
+    "style": "page",
+    "page_param": "page",
+    "size_param": "PageSize",
+    "size": 200,
+    "start_page": 1,
+    "stop_when": "empty_records"
+  },
+  "records_path": "$.Data",
+  "external_id_path": "$.RegNo",
+  "hash_fields": null,
+  "schedule_cron": null,
+  "storage_mode": "generic"
+}

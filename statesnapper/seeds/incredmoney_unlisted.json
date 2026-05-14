@@ -1,0 +1,22 @@
+{
+  "name": "incredmoney_unlisted",
+  "enabled": true,
+  "http": {
+    "method": "GET",
+    "url": "https://api.incredmoney.com/unlisted/equities/isins",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0",
+      "Accept": "application/json",
+      "Origin": "https://incredmoney.com",
+      "Referer": "https://incredmoney.com/"
+    }
+  },
+  "pagination": {
+    "style": "none"
+  },
+  "records_path": "$.data",
+  "external_id_path": "$.ISIN",
+  "hash_fields": null,
+  "schedule_cron": null,
+  "storage_mode": "generic"
+}

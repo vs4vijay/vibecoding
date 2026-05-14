@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun --version)",
+      "Bash(bun install *)"
+    ]
+  },
+  "disabledMcpjsonServers": [
+    "excalidraw"
+  ]
+}

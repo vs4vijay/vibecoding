@@ -1,0 +1,32 @@
+{
+  "name": "sharescart_unlisted",
+  "enabled": true,
+  "http": {
+    "method": "POST",
+    "url": "https://www.sharescart.com/web-services/unlisted-stocks-intermediary.php",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Accept": "application/json, text/javascript, */*; q=0.01",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "Origin": "https://www.sharescart.com",
+      "Referer": "https://www.sharescart.com/unlisted-shares/unlisted-shares-quotes.php",
+      "X-Requested-With": "XMLHttpRequest"
+    },
+    "form": {
+      "action": "unlisted_shares_quotes_new",
+      "company_name": "",
+      "mcap": "all",
+      "price": "all",
+      "industry": "all",
+      "instaBuy": "No"
+    }
+  },
+  "pagination": {
+    "style": "none"
+  },
+  "records_path": "$.data",
+  "external_id_path": "$.UL_STOCKS_FINCODE",
+  "hash_fields": null,
+  "schedule_cron": null,
+  "storage_mode": "generic"
+}

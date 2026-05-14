@@ -1,0 +1,26 @@
+{
+  "Data": [
+    {
+      "RegNo": "RAJ/P/2024/0001",
+      "ProjectName": "Aravali Heights",
+      "District": "1063",
+      "Status": "Approved",
+      "PromoterName": "Aravali Builders"
+    },
+    {
+      "RegNo": "RAJ/P/2024/0002",
+      "ProjectName": "Pink City Towers",
+      "District": "1063",
+      "Status": "Approved",
+      "PromoterName": "Jaipur Estates"
+    },
+    {
+      "RegNo": "RAJ/P/2024/0003",
+      "ProjectName": "Hawa Mahal Residency",
+      "District": "1063",
+      "Status": "Approved",
+      "PromoterName": "Heritage Holdings"
+    }
+  ],
+  "Total": 3
+}
