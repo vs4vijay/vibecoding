@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { getDb } from "../db";
+import { PGlite } from "@electric-sql/pglite";
+import { getDb, getDriver, getRawClient } from "../db";
 import { runs, type Source } from "../db/schema";
 import { canonicalHash } from "./hash";
 import { extractScalar } from "./extract";
@@ -16,6 +17,8 @@ export type RunResult = {
   recordsSkipped: number;
   errorMessage?: string;
 };
+
+const BATCH_SIZE = 250;
 
 export async function runPipeline(
   source: Source,
@@ -35,6 +38,7 @@ export async function runPipeline(
   const runId = runRow.id;
 
   const storageTable = source.storageTable || "entities";
+  validateIdent(storageTable);
 
   let recordsSeen = 0;
   let recordsCreated = 0;
@@ -45,27 +49,40 @@ export async function runPipeline(
     const http = source.http as HttpConfig;
     const pagination = source.pagination as PaginationConfig;
 
+    // Dedupe by external_id across the entire run, last-wins. This is necessary
+    // because Postgres' ON CONFLICT DO UPDATE statement cannot affect the same
+    // row twice in one INSERT — a multi-row upsert with two duplicates throws
+    // "ON CONFLICT DO UPDATE command cannot affect row a second time". Some
+    // upstream APIs (e.g. sharescart) emit duplicates; we keep the last one.
+    const dedup = new Map<string, BatchRow>();
+
+    const flush = async () => {
+      if (dedup.size === 0) return;
+      const rows = [...dedup.values()];
+      dedup.clear();
+      const result = await upsertBatch({
+        storageTable,
+        source: source.name,
+        runId,
+        rows,
+      });
+      recordsCreated += result.created;
+      recordsUpdated += result.updated;
+      recordsSkipped += result.skipped;
+    };
+
     for await (const { records } of paginate(http, source.recordsPath, pagination)) {
       for (const rec of records) {
         recordsSeen++;
         const externalId = extractScalar(rec, source.externalIdPath);
         if (externalId == null) continue;
         const hash = canonicalHash(rec, source.hashFields ?? null);
-
-        const result = await upsertEntity({
-          storageTable,
-          source: source.name,
-          externalId,
-          payload: rec,
-          contentHash: hash,
-          runId,
-        });
-
-        if (result === "created") recordsCreated++;
-        else if (result === "updated") recordsUpdated++;
-        else recordsSkipped++;
+        // Last-wins dedupe inside the buffer
+        dedup.set(externalId, { externalId, payload: rec, contentHash: hash });
+        if (dedup.size >= BATCH_SIZE) await flush();
       }
     }
+    await flush();
 
     await db
       .update(runs)
@@ -113,49 +130,88 @@ export async function runPipeline(
   }
 }
 
-// Skip-unchanged upsert + RETURNING flags so we can distinguish created vs updated vs skipped.
-// SET LOCAL app.run_id makes the run id available inside the trigger via current_setting.
-async function upsertEntity(args: {
+type BatchRow = { externalId: string; payload: unknown; contentHash: string };
+
+// One transaction per batch (vs one per row): cuts PGLite IPC overhead by
+// BATCH_SIZE×. The same trigger fires per-row inside the batch so versioning
+// + change_log behavior is unchanged.
+//
+// RETURNING (xmax=0) emits one row per actually-written record (INSERT or
+// UPDATE); rows filtered by the WHERE produce nothing, so:
+//   skipped = batch.length - returned.length
+//   created = returned where xmax=0
+//   updated = returned where xmax!=0
+async function upsertBatch(args: {
   storageTable: string;
   source: string;
-  externalId: string;
-  payload: unknown;
-  contentHash: string;
   runId: number;
-}): Promise<"created" | "updated" | "skipped"> {
-  const db = getDb();
-  validateIdent(args.storageTable);
+  rows: BatchRow[];
+}): Promise<{ created: number; updated: number; skipped: number }> {
+  if (args.rows.length === 0) return { created: 0, updated: 0, skipped: 0 };
 
-  // Single transaction: set the run_id GUC, perform upsert, return inserted flag.
-  // PGLite + drizzle: db.transaction works on both drivers.
-  const result = await db.transaction(async (tx) => {
-    await tx.execute(sql.raw(`SET LOCAL app.run_id = '${args.runId}'`));
+  const params: unknown[] = [];
+  const valuesParts: string[] = [];
+  let i = 1;
+  for (const r of args.rows) {
+    valuesParts.push(`($${i}, $${i + 1}, $${i + 2}::jsonb, $${i + 3})`);
+    params.push(args.source, r.externalId, JSON.stringify(r.payload), r.contentHash);
+    i += 4;
+  }
 
-    const payloadJson = JSON.stringify(args.payload);
-    const upsertSql = sql`
-      INSERT INTO ${sql.identifier(args.storageTable)} (source, external_id, payload, content_hash)
-      VALUES (${args.source}, ${args.externalId}, ${sql.raw(`'${payloadJson.replace(/'/g, "''")}'::jsonb`)}, ${args.contentHash})
-      ON CONFLICT (source, external_id) DO UPDATE
-        SET payload = EXCLUDED.payload,
-            content_hash = EXCLUDED.content_hash
-        WHERE ${sql.identifier(args.storageTable)}.content_hash IS DISTINCT FROM EXCLUDED.content_hash
-      RETURNING (xmax = 0) AS inserted, id
-    `;
-    const res = await tx.execute(upsertSql);
-    const rows = extractRows(res);
-    if (rows.length === 0) return "skipped" as const;
-    const inserted = rows[0].inserted === true || rows[0].inserted === "t" || rows[0].inserted === 1;
-    return inserted ? ("created" as const) : ("updated" as const);
-  });
+  const upsertSql = `
+    INSERT INTO "${args.storageTable}" (source, external_id, payload, content_hash)
+    VALUES ${valuesParts.join(", ")}
+    ON CONFLICT (source, external_id) DO UPDATE
+      SET payload = EXCLUDED.payload,
+          content_hash = EXCLUDED.content_hash
+      WHERE "${args.storageTable}".content_hash IS DISTINCT FROM EXCLUDED.content_hash
+    RETURNING (xmax = 0) AS inserted, external_id
+  `;
 
-  return result;
+  const driver = getDriver();
+  const client = getRawClient();
+  const written = await execInTxnWithParams(driver, client, args.runId, upsertSql, params);
+
+  const created = written.filter((r) => isTrue(r.inserted)).length;
+  const updated = written.length - created;
+  const skipped = args.rows.length - written.length;
+  return { created, updated, skipped };
 }
 
-function extractRows(res: unknown): any[] {
-  if (Array.isArray(res)) return res;
-  const r = res as any;
-  if (r && Array.isArray(r.rows)) return r.rows;
-  return [];
+async function execInTxnWithParams(
+  driver: "pglite" | "postgres",
+  client: any,
+  runId: number,
+  upsertSql: string,
+  params: unknown[]
+): Promise<any[]> {
+  if (driver === "pglite") {
+    const pg = client as PGlite;
+    return await pg.transaction(async (tx) => {
+      await tx.exec(`SET LOCAL app.run_id = '${runId}'`);
+      const res = await tx.query(upsertSql, params);
+      return (res.rows as any[]) ?? [];
+    });
+  }
+  const c = await client.connect();
+  try {
+    await c.query("BEGIN");
+    await c.query(`SET LOCAL app.run_id = '${runId}'`);
+    const res = await c.query(upsertSql, params);
+    await c.query("COMMIT");
+    return res.rows ?? [];
+  } catch (err) {
+    try {
+      await c.query("ROLLBACK");
+    } catch {}
+    throw err;
+  } finally {
+    c.release();
+  }
+}
+
+function isTrue(v: unknown): boolean {
+  return v === true || v === "t" || v === "true" || v === 1 || v === "1";
 }
 
 function validateIdent(name: string) {

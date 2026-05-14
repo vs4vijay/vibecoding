@@ -1,0 +1,32 @@
+{
+  "name": "bankeauctions_live",
+  "enabled": true,
+  "http": {
+    "method": "POST",
+    "url": "https://www.bankeauctions.com/home/liveAuctionDatatable//?tmpAct=0",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Referer": "https://www.bankeauctions.com/",
+      "X-Requested-With": "XMLHttpRequest",
+      "Origin": "https://www.bankeauctions.com",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+    },
+    "form": {
+      "sEcho": "1"
+    }
+  },
+  "pagination": {
+    "style": "offset",
+    "offset_param": "iDisplayStart",
+    "size_param": "iDisplayLength",
+    "size": 10,
+    "start_offset": 0,
+    "stop_when": "empty_records",
+    "max_pages": 300
+  },
+  "records_path": "$.aaData",
+  "external_id_path": "$[1]",
+  "hash_fields": null,
+  "schedule_cron": null,
+  "storage_mode": "generic"
+}

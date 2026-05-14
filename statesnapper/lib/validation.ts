@@ -20,6 +20,15 @@ const PaginationSchema = z.discriminatedUnion("style", [
     stop_when: z.literal("empty_records").optional(),
     max_pages: z.number().int().positive().optional(),
   }),
+  z.object({
+    style: z.literal("offset"),
+    offset_param: z.string(),
+    size_param: z.string().optional(),
+    size: z.number().int().positive(),
+    start_offset: z.number().int().nonnegative().optional(),
+    stop_when: z.literal("empty_records").optional(),
+    max_pages: z.number().int().positive().optional(),
+  }),
 ]);
 
 export const SourceCreateSchema = z.object({

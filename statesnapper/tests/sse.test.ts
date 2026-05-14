@@ -8,13 +8,16 @@ import { subscribeEntityChanges, type EntityChangedEvent } from "../lib/sse/list
 let server: { url: string; close: () => Promise<void> };
 
 async function startMock() {
+  let calls = 0;
   const s = Bun.serve({
     port: 0,
     async fetch() {
-      return new Response(
-        JSON.stringify({ items: [{ id: "x", v: Math.random() }] }),
-        { headers: { "Content-Type": "application/json" } }
-      );
+      calls++;
+      // First call: one record; subsequent calls: empty → pagination stops.
+      const body = calls === 1 ? { items: [{ id: "x", v: 1 }] } : { items: [] };
+      return new Response(JSON.stringify(body), {
+        headers: { "Content-Type": "application/json" },
+      });
     },
   });
   return {

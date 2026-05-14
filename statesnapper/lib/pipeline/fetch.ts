@@ -20,6 +20,17 @@ export type PaginationConfig =
       start_page?: number;
       stop_when?: "empty_records";
       max_pages?: number;
+    }
+  | {
+      // Offset-based pagination (DataTables-style). offset_param increments by
+      // `size` each request, starting from start_offset (default 0).
+      style: "offset";
+      offset_param: string;
+      size_param?: string;
+      size: number;
+      start_offset?: number;
+      stop_when?: "empty_records";
+      max_pages?: number;
     };
 
 export type FetchHook = (page: number, raw: unknown, records: unknown[]) => void | Promise<void>;
@@ -80,6 +91,9 @@ export async function fetchOnePage(
     if (pagination.size_param && pagination.size) {
       extraForm[pagination.size_param] = pagination.size;
     }
+  } else if (pagination?.style === "offset") {
+    extraForm = { [pagination.offset_param]: pagination.start_offset ?? 0 };
+    if (pagination.size_param) extraForm[pagination.size_param] = pagination.size;
   }
   const raw = await ofetch(http.url, buildFetchInit(http, extraForm));
   const records = extractRecords(raw, recordsPath);
@@ -97,19 +111,35 @@ export async function* paginate(
     return;
   }
 
-  // style === "page"
-  const start = pagination.start_page ?? 1;
-  const maxPages = pagination.max_pages ?? 1000;
-  for (let p = start; p < start + maxPages; p++) {
-    const extra: Record<string, string | number> = { [pagination.page_param]: p };
-    if (pagination.size_param && pagination.size) {
-      extra[pagination.size_param] = pagination.size;
+  if (pagination.style === "page") {
+    const start = pagination.start_page ?? 1;
+    const maxPages = pagination.max_pages ?? 1000;
+    for (let p = start; p < start + maxPages; p++) {
+      const extra: Record<string, string | number> = { [pagination.page_param]: p };
+      if (pagination.size_param && pagination.size) {
+        extra[pagination.size_param] = pagination.size;
+      }
+      const raw = await ofetch(http.url, buildFetchInit(http, extra));
+      const records = extractRecords(raw, recordsPath);
+      yield { page: p, raw, records };
+      if (pagination.stop_when === "empty_records" && records.length === 0) break;
+      if (pagination.size && records.length < pagination.size) break;
     }
+    return;
+  }
+
+  // style === "offset"
+  const offsetStart = pagination.start_offset ?? 0;
+  const size = pagination.size;
+  const maxPages = pagination.max_pages ?? 1000;
+  for (let i = 0; i < maxPages; i++) {
+    const offset = offsetStart + i * size;
+    const extra: Record<string, string | number> = { [pagination.offset_param]: offset };
+    if (pagination.size_param) extra[pagination.size_param] = size;
     const raw = await ofetch(http.url, buildFetchInit(http, extra));
     const records = extractRecords(raw, recordsPath);
-    yield { page: p, raw, records };
-    if (pagination.stop_when === "empty_records" && records.length === 0) break;
-    // If we got fewer records than the page size, this is the last page.
-    if (pagination.size && records.length < pagination.size) break;
+    yield { page: i + 1, raw, records };
+    if (records.length === 0) break;
+    if (records.length < size) break;
   }
 }
