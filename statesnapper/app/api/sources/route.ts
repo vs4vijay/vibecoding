@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
         storageMode,
         typedColumns: v.typed_columns ?? [],
         storageTable,
+        displayColumns: v.display_columns ?? [],
       })
       .returning();
     inserted = row;

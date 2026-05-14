@@ -31,6 +31,12 @@ const PaginationSchema = z.discriminatedUnion("style", [
   }),
 ]);
 
+const DisplayColumnSchema = z.object({
+  label: z.string().min(1),
+  jsonpath: z.string().min(1),
+  primary: z.boolean().optional(),
+});
+
 export const SourceCreateSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9_]{0,62}$/, "lowercase letters/digits/underscore; must start with a letter"),
   enabled: z.boolean().optional(),
@@ -43,6 +49,9 @@ export const SourceCreateSchema = z.object({
   storage_mode: z.enum(["generic", "dedicated"]).optional(),
   typed_columns: z.array(z.any()).optional(),
   storage_table: z.string().optional(),
+  display_columns: z.array(DisplayColumnSchema).optional(),
 });
+
+export type DisplayColumn = z.infer<typeof DisplayColumnSchema>;
 
 export type SourceCreateInput = z.infer<typeof SourceCreateSchema>;

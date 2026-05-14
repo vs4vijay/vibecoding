@@ -36,6 +36,7 @@ export const sources = pgTable(
     storageMode: text("storage_mode").notNull().default("generic"),
     typedColumns: jsonb("typed_columns").notNull().default(sql`'[]'::jsonb`),
     storageTable: text("storage_table").notNull().default("entities"),
+    displayColumns: jsonb("display_columns").notNull().default(sql`'[]'::jsonb`),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

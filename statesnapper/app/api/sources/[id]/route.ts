@@ -27,6 +27,15 @@ const PatchSchema = z.object({
   records_path: z.string().optional(),
   external_id_path: z.string().optional(),
   storage_mode: z.enum(["generic", "dedicated"]).optional(),
+  display_columns: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        jsonpath: z.string().min(1),
+        primary: z.boolean().optional(),
+      })
+    )
+    .optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -58,6 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (parsed.data.pagination !== undefined) next.pagination = parsed.data.pagination;
   if (parsed.data.records_path !== undefined) next.recordsPath = parsed.data.records_path;
   if (parsed.data.external_id_path !== undefined) next.externalIdPath = parsed.data.external_id_path;
+  if (parsed.data.display_columns !== undefined) next.displayColumns = parsed.data.display_columns;
 
   const [updated] = await db
     .update(sources)

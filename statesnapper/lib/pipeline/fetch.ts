@@ -52,7 +52,7 @@ function buildFetchInit(http: HttpConfig, extraForm?: Record<string, string | nu
       }
     },
   };
-  const methodAcceptsBody = method !== "GET" && method !== "HEAD";
+  const methodAcceptsBody = method !== "GET" && (method as string) !== "HEAD";
 
   // GET/HEAD: pagination params + http.params go into query string. http.form is ignored.
   // Other methods: http.form is sent as form-urlencoded body, pagination params merge in.
