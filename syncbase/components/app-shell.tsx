@@ -52,7 +52,7 @@ export function AppShell({
       <aside className="sidebar">
         <Link href="/" className="sidebar-brand" style={{ color: "inherit", textDecoration: "none" }}>
           <div className="logo">S</div>
-          <div className="name">statesnapper</div>
+          <div className="name">syncbase</div>
         </Link>
         {NAV.map((group) => (
           <div key={group.section}>

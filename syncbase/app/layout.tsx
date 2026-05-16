@@ -3,7 +3,7 @@ import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 
 export const metadata: Metadata = {
-  title: "statesnapper",
+  title: "syncbase",
   description: "Stateful API ingest with DB-layer versioning",
 };
 

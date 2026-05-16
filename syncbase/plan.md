@@ -1,4 +1,4 @@
-# plan.md — statesnapper Implementation Plan
+# plan.md — syncbase Implementation Plan
 
 *Vertical-sliced phases. Each phase is mergeable, demoable, and validates a defined slice of the [PRD's acceptance criteria](./PRD.md#8-acceptance-criteria).*
 
@@ -61,7 +61,7 @@
 **Goal.** Project boots. A `bun dev` server serves a Next.js page that reads from PGLite via Drizzle. Proves the toolchain.
 
 **In scope.**
-- `bun init` at `S:/GitHub/vibecoding/statesnapper/`.
+- `bun init` at `S:/GitHub/vibecoding/syncbase/`.
 - Add deps: `next`, `react`, `react-dom`, `drizzle-orm`, `drizzle-kit`, `@electric-sql/pglite`, `pg`, `zod`, `citty`.
 - `lib/db/index.ts` with the driver-swap stub (PGLite-only path lit up).
 - `lib/db/schema.ts` with a single `health` table.
@@ -79,8 +79,8 @@
 bun install
 bun bin/cli.ts init
 bun dev
-# visit http://localhost:3000 → health row visible
-# curl http://localhost:3000/api/health → {"ok":true,"db":"pglite",...}
+# visit http://localhost:5555 → health row visible
+# curl http://localhost:5555/api/health → {"ok":true,"db":"pglite",...}
 ```
 
 **Validates.** Build & deploy pipeline only — no PRD AC yet.
@@ -438,7 +438,7 @@ P6: + docker-compose, tests/{pglite-vs-pg,error-handling}, README, .github/workf
 
 ## Next concrete action
 
-1. `mkdir S:/GitHub/vibecoding/statesnapper` ✅ done
+1. `mkdir S:/GitHub/vibecoding/syncbase` ✅ done
 2. Write `PRD.md` and `plan.md` into it ✅ done
 3. Start Phase 0: `bun init`, install Next.js + Drizzle + PGLite, get `bun dev` to serve `/api/health`.
 4. Stop and confirm Phase 0 is green before moving to Phase 1.

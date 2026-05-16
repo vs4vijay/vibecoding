@@ -1,4 +1,4 @@
-# statesnapper
+# syncbase
 
 Stateful API ingest with DB-layer versioning. Pulls data from arbitrary REST APIs on a schedule, detects new/changed/unchanged records inside the database, and surfaces a live + durable change feed.
 
@@ -10,7 +10,7 @@ See [`PRD.md`](./PRD.md) and [`plan.md`](./plan.md) for the design.
 bun install
 cp .env.example .env
 bun bin/cli.ts init     # apply migrations to ./local.pglite
-bun dev                 # next dev on :3000
+bun dev                 # next dev on :5555
 ```
 
 Visit:
@@ -37,7 +37,7 @@ bun bin/cli.ts worker                            # long-lived LISTEN run_due loo
 ```bash
 docker compose up -d postgres
 echo 'DB_DRIVER=postgres' >> .env
-echo 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/statesnapper' >> .env
+echo 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/syncbase' >> .env
 bun bin/cli.ts init
 bun dev
 ```

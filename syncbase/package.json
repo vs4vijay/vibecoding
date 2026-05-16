@@ -1,12 +1,12 @@
 {
-  "name": "statesnapper",
+  "name": "syncbase",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 5555",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 5555",
     "test": "bun test",
     "cli": "bun bin/cli.ts",
     "drizzle:generate": "drizzle-kit generate"

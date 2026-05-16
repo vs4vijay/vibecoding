@@ -4,21 +4,21 @@ services:
     # Fallback if the citusdata image isn't available in your registry, swap to:
     #   image: postgres:16-alpine
     # and apt-get install postgresql-16-cron manually (see README).
-    container_name: statesnapper_pg
+    container_name: syncbase_pg
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: statesnapper
+      POSTGRES_DB: syncbase
     ports:
       - "5432:5432"
     volumes:
-      - statesnapper_pgdata:/var/lib/postgresql/data
+      - syncbase_pgdata:/var/lib/postgresql/data
     command:
       - "postgres"
       - "-c"
       - "shared_preload_libraries=pg_cron"
       - "-c"
-      - "cron.database_name=statesnapper"
+      - "cron.database_name=syncbase"
 
 volumes:
-  statesnapper_pgdata:
+  syncbase_pgdata:

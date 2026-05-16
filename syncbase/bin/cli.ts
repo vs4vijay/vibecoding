@@ -95,7 +95,7 @@ const workerCmd = defineCommand({
 });
 
 const main = defineCommand({
-  meta: { name: "statesnapper", description: "statesnapper CLI" },
+  meta: { name: "syncbase", description: "syncbase CLI" },
   subCommands: {
     init: initCmd,
     run: runCmd,

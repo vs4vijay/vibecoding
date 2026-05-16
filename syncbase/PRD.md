@@ -1,4 +1,4 @@
-# PRD: statesnapper
+# PRD: syncbase
 
 *Stateful API Ingest with DB-Layer Versioning*
 
@@ -7,7 +7,7 @@
 | **Status** | Draft v1 |
 | **Author** | viz |
 | **Date** | 2026-05-13 |
-| **Codename** | **statesnapper** — *snaps the state of an API and keeps every version* |
+| **Codename** | **syncbase** — *snaps the state of an API and keeps every version* |
 
 ---
 
@@ -21,7 +21,7 @@ We need a lightweight system that periodically pulls data from a growing set of 
 
 Doing this in application code at scale is fragile (diff bugs, ORM races, partial writes) and means every new API requires bespoke ingest logic. We want the versioning logic to live in the **database layer** so it's transactional, atomic, and identical for every source. Adding a new API source should require **config, not code**.
 
-statesnapper lets each source decide whether its data lands in a **shared generic table** (zero DDL, JSONB-only) or in its **own dedicated typed table** (per-source schema, named columns) — with identical versioning behavior either way.
+syncbase lets each source decide whether its data lands in a **shared generic table** (zero DDL, JSONB-only) or in its **own dedicated typed table** (per-source schema, named columns) — with identical versioning behavior either way.
 
 A small admin surface (CLI + web app) lets a human inspect what's been ingested, browse history, watch a live change feed, and manage schedules.
 
@@ -51,7 +51,7 @@ A small admin surface (CLI + web app) lets a human inspect what's been ingested,
 
 | Persona | Use Case |
 |---|---|
-| **Operator** (the dev running statesnapper) | Add a new API source via the web UI in <5 min; pick storage mode; verify it parses via "Test"; save. |
+| **Operator** (the dev running syncbase) | Add a new API source via the web UI in <5 min; pick storage mode; verify it parses via "Test"; save. |
 | **Analyst / Investigator** | Browse current entities; inspect a specific entity's version history; diff two versions side-by-side; subscribe to a live feed of changes. |
 | **Automation consumer** | Subscribe (via SSE or polling `change_log`) to events for downstream processing — alerts, Slack messages, webhooks. |
 | **CLI user** | Run `bun bin/cli.ts run --source X` in a script, ad-hoc cron, or CI job. |
@@ -66,7 +66,7 @@ A small admin surface (CLI + web app) lets a human inspect what's been ingested,
 
 ### 5.2 Storage Modes (the hybrid)
 - **FR-5** When `storage_mode = 'generic'`, the source writes to the shared `entities` table keyed by `(source, external_id)`.
-- **FR-6** When `storage_mode = 'dedicated'`, statesnapper auto-creates a per-source table `entities_<source_slug>` with the standard versioning columns plus the source's `typed_columns`. A paired `entities_<source_slug>_versions` table is created the same way.
+- **FR-6** When `storage_mode = 'dedicated'`, syncbase auto-creates a per-source table `entities_<source_slug>` with the standard versioning columns plus the source's `typed_columns`. A paired `entities_<source_slug>_versions` table is created the same way.
 - **FR-7** `typed_columns` are realized as `GENERATED ALWAYS AS (payload->>'<jsonpath>') STORED`, optionally indexed. They work in both storage modes.
 - **FR-8** The versioning trigger function is **table-agnostic** (uses `TG_TABLE_NAME`); the same function is attached to the shared `entities` table and to every dedicated table.
 - **FR-9** Switching a source's `storage_mode` after creation is **not supported in v1** (it would require data migration). It's a create-time decision.
@@ -396,7 +396,7 @@ Both downstream paths receive identical `pg_notify('run_due', source_name)` even
 ### 7.9 Project Layout
 
 ```
-S:/GitHub/vibecoding/statesnapper/
+S:/GitHub/vibecoding/syncbase/
   package.json                # bun; deps: next, react, drizzle-orm, @electric-sql/pglite,
                               #   pg, croner, citty, zod, jsonpath-plus, ofetch,
                               #   deep-object-diff, @monaco-editor/react

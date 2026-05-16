@@ -29,18 +29,18 @@ export class PgCronScheduler implements Scheduler {
   async list(): Promise<{ name: string; cron: string }[]> {
     const db = getDb();
     const res: any = await db.execute(
-      sql`SELECT jobname, schedule FROM cron.job WHERE jobname LIKE 'statesnapper:%'`
+      sql`SELECT jobname, schedule FROM cron.job WHERE jobname LIKE 'syncbase:%'`
     );
     const rows = res.rows ?? res;
     return rows.map((r: any) => ({
-      name: r.jobname.replace(/^statesnapper:/, ""),
+      name: r.jobname.replace(/^syncbase:/, ""),
       cron: r.schedule,
     }));
   }
 }
 
 function jobNameFor(name: string): string {
-  return `statesnapper:${name}`;
+  return `syncbase:${name}`;
 }
 
 function quoteLiteral(s: string): string {

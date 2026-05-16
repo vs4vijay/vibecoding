@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "statesnapper",
+      "name": "syncbase",
       "dependencies": {
         "@electric-sql/pglite": "^0.2.13",
         "@monaco-editor/react": "^4.6.0",

@@ -290,7 +290,7 @@ export default function NewSourcePage() {
         <div>
           <h1>New source</h1>
           <p className="muted" style={{ margin: 0 }}>
-            Configure how statesnapper pulls, identifies, stores, and displays records from an HTTP API.
+            Configure how syncbase pulls, identifies, stores, and displays records from an HTTP API.
           </p>
         </div>
         <div className="row">
@@ -385,7 +385,7 @@ function BasicsTab({ s, update }: { s: FormState; update: (p: Partial<FormState>
   return (
     <div className="col">
       <Help title="What is a source?">
-        A source is one HTTP endpoint statesnapper will poll on a schedule (or on demand).
+        A source is one HTTP endpoint syncbase will poll on a schedule (or on demand).
         Give it a stable machine-friendly <code>name</code> — it identifies the source everywhere
         (URLs, change_log rows, scheduler jobs, dedicated tables). Names cannot be changed later.
       </Help>
@@ -423,7 +423,7 @@ function HttpTab({ s, update }: { s: FormState; update: (p: Partial<FormState>) 
   return (
     <div className="col">
       <Help title="HTTP request">
-        Define the upstream request statesnapper will send each run.
+        Define the upstream request syncbase will send each run.
         <ul>
           <li><strong>Headers</strong>: static request headers (e.g. <code>Authorization: Bearer …</code>).</li>
           <li><strong>Query params</strong>: appended to the URL as <code>?k=v</code>.</li>
@@ -472,7 +472,7 @@ function PaginationTab({ s, update }: { s: FormState; update: (p: Partial<FormSt
   return (
     <div className="col">
       <Help title="Pagination strategy">
-        Choose how statesnapper walks the upstream pages until exhausted.
+        Choose how syncbase walks the upstream pages until exhausted.
         <ul>
           <li><strong>none</strong> — single request, no paging.</li>
           <li><strong>page</strong> — increments a <em>page number</em> param (e.g. <code>?page=1</code>, <code>?page=2</code>).</li>
@@ -541,7 +541,7 @@ function ExtractionTab({ s, update }: { s: FormState; update: (p: Partial<FormSt
   return (
     <div className="col">
       <Help title="Records extraction (JSONPath)">
-        Tell statesnapper how to dig into the response JSON.
+        Tell syncbase how to dig into the response JSON.
         <ul>
           <li><strong>records_path</strong> — JSONPath that resolves to the array of records.
               Examples: <code>$</code> (response is the array), <code>$.data</code>, <code>$.results.items</code>.</li>
@@ -689,7 +689,7 @@ function DisplayTab({
   return (
     <div className="col">
       <Help title="Display fields — human-friendly labels">
-        statesnapper normally identifies records by <code>external_id</code>, which is good for joins but
+        syncbase normally identifies records by <code>external_id</code>, which is good for joins but
         opaque to humans. Configure <strong>display fields</strong> to surface friendlier values like a
         project name or title in the Entities table, change feed, and detail pages.
         <ul>
@@ -710,7 +710,7 @@ function DisplayTab({
         </div>
         {s.display_columns.length === 0 && (
           <p className="muted">
-            No display fields yet. Run <strong>Test fetch</strong> and click <em>Suggest from test</em> — statesnapper
+            No display fields yet. Run <strong>Test fetch</strong> and click <em>Suggest from test</em> — syncbase
             will pick up to 3 likely-readable string/number fields.
           </p>
         )}

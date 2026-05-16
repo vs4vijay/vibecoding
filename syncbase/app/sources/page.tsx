@@ -14,7 +14,7 @@ export default async function SourcesPage() {
         <div>
           <h1>Sources</h1>
           <p className="muted" style={{ margin: 0 }}>
-            HTTP endpoints statesnapper polls. Each source describes the request, extraction, storage,
+            HTTP endpoints syncbase polls. Each source describes the request, extraction, storage,
             and display configuration.
           </p>
         </div>

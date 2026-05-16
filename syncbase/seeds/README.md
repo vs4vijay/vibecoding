@@ -1,6 +1,6 @@
 # Seed sources
 
-Live source configs validated through statesnapper's `test-dryrun` + full-run pipeline.
+Live source configs validated through syncbase's `test-dryrun` + full-run pipeline.
 
 ## Working JSON-API sources
 
@@ -59,7 +59,7 @@ DataTables-style endpoints return `aaData` as an array of arrays, not array of o
 
 ### Offset pagination (`bankeauctions.com`)
 
-The DataTables endpoint caps `iDisplayLength` at 10 server-side regardless of what you request. statesnapper handles this via `pagination.style: "offset"` (added when this seed was wired up) — `iDisplayStart` increments by `size` each page until an empty response. ~175 pages for the current 1,746-record inventory.
+The DataTables endpoint caps `iDisplayLength` at 10 server-side regardless of what you request. syncbase handles this via `pagination.style: "offset"` (added when this seed was wired up) — `iDisplayStart` increments by `size` each page until an empty response. ~175 pages for the current 1,746-record inventory.
 
 ### Cloudflare-fronted sites (`aubank.in`)
 
