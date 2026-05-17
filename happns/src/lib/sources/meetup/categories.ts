@@ -37,10 +37,20 @@ export function getCategory(id: string): Category | undefined {
   return CATEGORY_BY_ID.get(id);
 }
 
-export function parseCategoryIds(raw: string | string[] | undefined): string[] {
-  if (!raw) return [];
+/**
+ * Reads the `categories` query param. Returns `null` if the key isn't
+ * present at all (caller should apply default); returns `[]` if the key is
+ * present but empty / the explicit-clear sentinel (`none`), meaning the user
+ * deliberately chose no categories.
+ */
+export function parseCategoryIds(
+  raw: string | string[] | undefined,
+): string[] | null {
+  if (raw === undefined) return null;
   const flat = Array.isArray(raw) ? raw.join(",") : raw;
-  const ids = flat
+  const cleaned = flat.trim();
+  if (cleaned === "" || cleaned === "none") return [];
+  const ids = cleaned
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -53,3 +63,5 @@ export function parseCategoryIds(raw: string | string[] | undefined): string[] {
   }
   return out;
 }
+
+export const DEFAULT_CATEGORY_IDS: readonly string[] = ["technology"];

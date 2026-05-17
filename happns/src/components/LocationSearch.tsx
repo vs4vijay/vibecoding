@@ -68,7 +68,7 @@ export function LocationSearch({
       </div>
       <button
         type="submit"
-        className={`${btnCls} rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-[var(--accent-foreground)] font-medium transition disabled:opacity-50`}
+        className={`${btnCls} rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-[var(--accent-foreground)] font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         Search
       </button>

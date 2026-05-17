@@ -30,4 +30,9 @@ export const meetupAdapter: SourceAdapter = {
   },
 };
 
-export { CATEGORIES, getCategory, parseCategoryIds } from "./categories";
+export {
+  CATEGORIES,
+  DEFAULT_CATEGORY_IDS,
+  getCategory,
+  parseCategoryIds,
+} from "./categories";

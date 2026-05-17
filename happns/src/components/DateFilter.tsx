@@ -22,8 +22,10 @@ export function DateFilter({
     if (!location.trim()) return;
     const params = new URLSearchParams();
     params.set("location", location);
-    if (categories.length > 0) params.set("categories", categories.join(","));
-    if (id !== "any") params.set("when", id);
+    // Mirror CategoryFilter: always set both keys so "Any time" / "no
+    // categories" stick rather than getting re-defaulted on next render.
+    params.set("categories", categories.length > 0 ? categories.join(",") : "none");
+    params.set("when", id);
     startTransition(() => {
       router.push(`/events?${params.toString()}`);
     });
@@ -50,7 +52,7 @@ export function DateFilter({
               aria-checked={active}
               onClick={() => select(w.id)}
               disabled={pending || !location.trim()}
-              className={`px-3 h-8 rounded-full text-sm border transition disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`px-3 h-8 rounded-full text-sm border transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                 active
                   ? "bg-[var(--accent)] text-[var(--accent-foreground)] border-[var(--accent)]"
                   : "bg-[var(--surface)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]"

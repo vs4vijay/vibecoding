@@ -22,8 +22,10 @@ export function CategoryFilter({
   function navigate(next: string[]) {
     const params = new URLSearchParams();
     params.set("location", location);
-    if (next.length > 0) params.set("categories", next.join(","));
-    if (when && when !== "any") params.set("when", when);
+    // Always set the key so the server can tell "user explicitly chose nothing"
+    // (sentinel `none`) apart from "key absent → apply default".
+    params.set("categories", next.length > 0 ? next.join(",") : "none");
+    if (when) params.set("when", when);
     startTransition(() => {
       router.push(`/events?${params.toString()}`);
     });
@@ -56,7 +58,7 @@ export function CategoryFilter({
           <button
             type="button"
             onClick={clear}
-            className="text-xs text-[var(--accent-strong)] hover:underline disabled:opacity-50"
+            className="text-xs text-[var(--accent-strong)] hover:underline disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             disabled={pending}
           >
             Clear
@@ -78,7 +80,7 @@ export function CategoryFilter({
               onClick={() => toggle(cat.id)}
               aria-pressed={active}
               disabled={pending || !location.trim()}
-              className={`px-3 h-8 rounded-full text-sm border transition disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`px-3 h-8 rounded-full text-sm border transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                 active
                   ? "bg-[var(--accent)] text-[var(--accent-foreground)] border-[var(--accent)]"
                   : "bg-[var(--surface)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]"

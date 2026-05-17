@@ -17,13 +17,21 @@ export const TIME_WINDOWS: TimeWindow[] = [
 
 const TIME_WINDOW_IDS = new Set<TimeWindowId>(TIME_WINDOWS.map((w) => w.id));
 
+/**
+ * Parse the `when` query param. Returns `null` when the param is absent so
+ * the caller can apply a default; returns the parsed id otherwise (falling
+ * back to `"any"` for unknown values).
+ */
 export function parseTimeWindow(
   raw: string | string[] | undefined,
-): TimeWindowId {
-  if (!raw) return "any";
+): TimeWindowId | null {
+  if (raw === undefined) return null;
   const v = Array.isArray(raw) ? raw[0] : raw;
+  if (v === undefined || v === "") return null;
   return TIME_WINDOW_IDS.has(v as TimeWindowId) ? (v as TimeWindowId) : "any";
 }
+
+export const DEFAULT_TIME_WINDOW: TimeWindowId = "week";
 
 interface DateRange {
   start: Date;

@@ -1,11 +1,22 @@
+import { cookies } from "next/headers";
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { DateFilter } from "@/components/DateFilter";
 import { EventList } from "@/components/EventList";
 import { LocationSearch } from "@/components/LocationSearch";
-import { parseCategoryIds } from "@/lib/sources/meetup";
+import { RememberLocation } from "@/components/RememberLocation";
+import {
+  DISABLED_SOURCES_COOKIE,
+  filterEnabledAdapters,
+  parseDisabledSources,
+} from "@/lib/sourcePrefs";
+import { DEFAULT_CATEGORY_IDS, parseCategoryIds } from "@/lib/sources/meetup";
 import { SOURCES, searchAcrossSources } from "@/lib/sources/registry";
 import type { SourceId } from "@/lib/sources/types";
-import { filterByTimeWindow, parseTimeWindow } from "@/lib/timeWindow";
+import {
+  DEFAULT_TIME_WINDOW,
+  filterByTimeWindow,
+  parseTimeWindow,
+} from "@/lib/timeWindow";
 
 interface PageProps {
   searchParams: Promise<{
@@ -18,14 +29,21 @@ interface PageProps {
 export default async function EventsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const location = (params.location ?? "").trim();
-  const categoryIds = parseCategoryIds(params.categories);
-  const timeWindow = parseTimeWindow(params.when);
+  const categoryIds =
+    parseCategoryIds(params.categories) ?? [...DEFAULT_CATEGORY_IDS];
+  const timeWindow = parseTimeWindow(params.when) ?? DEFAULT_TIME_WINDOW;
+
+  const cookieStore = await cookies();
+  const disabled = parseDisabledSources(
+    cookieStore.get(DISABLED_SOURCES_COOKIE)?.value,
+  );
+  const enabledAdapters = filterEnabledAdapters(SOURCES, disabled);
 
   let events: Awaited<ReturnType<typeof searchAcrossSources>>["events"] = [];
   let perSource: Partial<Record<SourceId, number>> = {};
   let failed: SourceId[] = [];
-  if (location) {
-    const result = await searchAcrossSources(SOURCES, {
+  if (location && enabledAdapters.length > 0) {
+    const result = await searchAcrossSources(enabledAdapters, {
       location,
       keywords: categoryIds,
     });
@@ -36,6 +54,7 @@ export default async function EventsPage({ searchParams }: PageProps) {
 
   return (
     <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-10">
+      {location ? <RememberLocation location={location} /> : null}
       <div className="mb-8">
         <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight mb-1">
           {location ? (

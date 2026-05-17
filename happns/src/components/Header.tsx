@@ -19,6 +19,7 @@ export function Header() {
         <nav className="flex items-center gap-1 text-sm">
           <HeaderNavLink href="/events">Browse</HeaderNavLink>
           <HeaderNavLink href="/saved">Saved</HeaderNavLink>
+          <HeaderNavLink href="/settings">Settings</HeaderNavLink>
         </nav>
       </div>
     </header>

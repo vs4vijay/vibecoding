@@ -18,25 +18,28 @@ export function EventCard({ event }: EventCardProps) {
 
   return (
     <div className="card-lift group relative rounded-2xl overflow-hidden bg-[var(--surface)] border border-[var(--border)] flex flex-col">
-      <Link
-        href={eventHref}
-        {...linkProps}
-        className="block relative aspect-[16/10] overflow-hidden"
-      >
-        {event.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={event.imageUrl}
-            alt=""
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[var(--accent-soft)] via-[var(--surface-elevated)] to-[var(--surface)]" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+      <div className="relative aspect-[16/10] overflow-hidden">
+        <Link
+          href={eventHref}
+          {...linkProps}
+          className="absolute inset-0 block"
+          aria-label={event.title}
+        >
+          {event.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={event.imageUrl}
+              alt=""
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[var(--accent-soft)] via-[var(--surface-elevated)] to-[var(--surface)]" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+        </Link>
 
         {date ? (
-          <div className="absolute top-3 left-3 bg-[var(--surface)] rounded-xl px-2.5 py-1.5 shadow-sm border border-[var(--border)] text-center min-w-[44px]">
+          <div className="pointer-events-none absolute top-3 left-3 bg-[var(--surface)] rounded-xl px-2.5 py-1.5 shadow-sm border border-[var(--border)] text-center min-w-[44px]">
             <p className="text-[10px] uppercase tracking-wide font-semibold text-[var(--accent)] leading-none">
               {date.month}
             </p>
@@ -46,7 +49,7 @@ export function EventCard({ event }: EventCardProps) {
           </div>
         ) : null}
 
-        <div className="absolute top-3 right-3 flex items-center gap-1">
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-1">
           <ExternalLink href={event.eventUrl} />
           <SaveButton
             event={{
@@ -59,7 +62,7 @@ export function EventCard({ event }: EventCardProps) {
           />
         </div>
 
-        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
+        <div className="pointer-events-none absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
           {date ? (
             <p className="text-xs font-medium text-white drop-shadow">
               {date.time}
@@ -69,7 +72,7 @@ export function EventCard({ event }: EventCardProps) {
           )}
           <SourceBadge source={event.source} />
         </div>
-      </Link>
+      </div>
 
       <div className="p-4 flex flex-col gap-2 flex-1">
         <Link href={eventHref} {...linkProps} className="block">

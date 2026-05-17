@@ -1,3 +1,5 @@
+import { gdgAdapter } from "./gdg";
+import { hasgeekAdapter } from "./hasgeek";
 import { lumaAdapter } from "./luma";
 import { meetupAdapter } from "./meetup";
 import type {
@@ -11,7 +13,12 @@ import type {
  * Every source the app knows about. Order here is the default display order.
  * Adding a new source = add one import + push the adapter into this array.
  */
-export const SOURCES: SourceAdapter[] = [meetupAdapter, lumaAdapter];
+export const SOURCES: SourceAdapter[] = [
+  meetupAdapter,
+  lumaAdapter,
+  gdgAdapter,
+  hasgeekAdapter,
+];
 
 const BY_ID = new Map<SourceId, SourceAdapter>(
   SOURCES.map((s) => [s.id, s]),

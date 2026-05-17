@@ -17,7 +17,7 @@ export default function Home() {
         <div className="max-w-3xl mx-auto px-6 pt-20 pb-24 sm:pt-28 sm:pb-32 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] text-xs font-medium mb-6">
             <span className="size-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
-            Read-only Meetup browser
+            Events from across the web
           </div>
           <h1 className="text-5xl sm:text-6xl font-semibold tracking-tight mb-5">
             Find what&apos;s happening{" "}
@@ -27,8 +27,7 @@ export default function Home() {
             .
           </h1>
           <p className="text-lg text-[var(--muted)] mb-10 max-w-xl mx-auto">
-            Browse Meetup events and groups without an account. No clutter, no
-            login walls.
+            One search, every source. No account, no clutter, no login walls.
           </p>
           <div className="max-w-xl mx-auto">
             <LocationSearch size="lg" autoFocus />
