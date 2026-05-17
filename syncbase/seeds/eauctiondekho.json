@@ -1,0 +1,62 @@
+{
+  "name": "eauctiondekho",
+  "enabled": true,
+  "category": "bank-auction",
+  "location": {
+    "mode": "query",
+    "field": "filters[city][$eqi]",
+    "supports_all": true
+  },
+  "http": {
+    "method": "GET",
+    "url": "https://api.eauctiondekho.com/api/notices",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Accept": "application/json",
+      "Origin": "https://www.eauctiondekho.com",
+      "Referer": "https://www.eauctiondekho.com/"
+    },
+    "params": {
+      "sort": "id:desc"
+    }
+  },
+  "pagination": {
+    "style": "page",
+    "page_param": "pagination[page]",
+    "size_param": "pagination[pageSize]",
+    "size": 100,
+    "start_page": 1,
+    "stop_when": "empty_records",
+    "max_pages": 5
+  },
+  "records_path": "$.data",
+  "external_id_path": "$.id",
+  "hash_fields": null,
+  "schedule_cron": null,
+  "storage_mode": "generic",
+  "dedup": {
+    "key_fields": [
+      { "path": "$.attributes.pincode", "normalize": "pincode" },
+      { "path": "$.attributes.reservePrice", "normalize": "round_10000" },
+      { "path": "$.attributes.bankPropertyId", "normalize": "identity" }
+    ],
+    "similarity_threshold": 0.75,
+    "compare_fields": ["$.attributes.title", "$.attributes.propertyAddress"]
+  },
+  "cross_dedup": {
+    "pincode": "$.attributes.pincode",
+    "price": "$.attributes.reservePrice",
+    "bank": "$.attributes.bankName",
+    "title": "$.attributes.title",
+    "address": "$.attributes.propertyAddress",
+    "date": "$.attributes.auctionDate"
+  },
+  "display_columns": [
+    { "label": "Title", "jsonpath": "$.attributes.title", "primary": true },
+    { "label": "Bank", "jsonpath": "$.attributes.bankName" },
+    { "label": "City", "jsonpath": "$.attributes.city" },
+    { "label": "State", "jsonpath": "$.attributes.state" },
+    { "label": "Reserve ₹", "jsonpath": "$.attributes.reservePrice" },
+    { "label": "Auction date", "jsonpath": "$.attributes.auctionDate" }
+  ]
+}

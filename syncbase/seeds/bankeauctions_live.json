@@ -1,6 +1,11 @@
 {
   "name": "bankeauctions_live",
   "enabled": true,
+  "category": "bank-auction",
+  "location": {
+    "mode": "none",
+    "supports_all": true
+  },
   "http": {
     "method": "POST",
     "url": "https://www.bankeauctions.com/home/liveAuctionDatatable//?tmpAct=0",

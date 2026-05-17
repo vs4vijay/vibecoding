@@ -37,9 +37,45 @@ const DisplayColumnSchema = z.object({
   primary: z.boolean().optional(),
 });
 
+const LocationConfigSchema = z.object({
+  mode: z.enum(["none", "query", "form", "body", "path"]).default("none"),
+  // For mode in {query, form, body}: the parameter / json-key name on the upstream request.
+  field: z.string().min(1).optional(),
+  // Optional value maps so the operator picks human slugs ("ajmer") and the upstream
+  // receives the canonical value the API expects ("16").
+  city_values: z.record(z.union([z.string(), z.number()])).optional(),
+  state_values: z.record(z.union([z.string(), z.number()])).optional(),
+  // For mode=="path": Mustache-ish template — {{ location.city }}, {{ location.state }}.
+  // Rendered into http.url (with %-encoding) before the request fires.
+  templated: z.string().optional(),
+  // If true and the operator omits a location at runtime, the pipeline fetches the
+  // source's full inventory. If false, the run errors out with LOCATION_REQUIRED.
+  supports_all: z.boolean().default(true),
+});
+
+export type LocationConfig = z.infer<typeof LocationConfigSchema>;
+
+export const RunLocationSchema = z.object({
+  city: z.string().min(1).optional(),
+  state: z.string().min(1).optional(),
+}).optional();
+export type RunLocation = z.infer<typeof RunLocationSchema>;
+
+const DedupConfigSchema = z.object({
+  key_fields: z.array(
+    z.object({
+      path: z.string().min(1),
+      normalize: z.enum(["address", "round_1000", "round_10000", "date_week", "pincode", "bank", "lower", "identity"]).optional(),
+    })
+  ).min(1),
+  similarity_threshold: z.number().min(0).max(1).optional(),
+  compare_fields: z.array(z.string().min(1)).optional(),
+});
+
 export const SourceCreateSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9_]{0,62}$/, "lowercase letters/digits/underscore; must start with a letter"),
   enabled: z.boolean().optional(),
+  category: z.string().min(1).max(64).optional(),
   http: HttpConfigSchema,
   pagination: PaginationSchema,
   records_path: z.string().min(1),
@@ -50,6 +86,16 @@ export const SourceCreateSchema = z.object({
   typed_columns: z.array(z.any()).optional(),
   storage_table: z.string().optional(),
   display_columns: z.array(DisplayColumnSchema).optional(),
+  location: LocationConfigSchema.optional(),
+  dedup: DedupConfigSchema.optional(),
+  cross_dedup: z.object({
+    pincode: z.string().min(1).optional(),
+    price: z.string().min(1).optional(),
+    bank: z.string().min(1).optional(),
+    title: z.string().min(1).optional(),
+    address: z.string().min(1).optional(),
+    date: z.string().min(1).optional(),
+  }).optional(),
 });
 
 export type DisplayColumn = z.infer<typeof DisplayColumnSchema>;

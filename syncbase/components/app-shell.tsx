@@ -24,6 +24,7 @@ const NAV: NavGroup[] = [
   {
     section: "Data",
     items: [
+      { href: "/search", label: "Search", icon: "⌕" },
       { href: "/entities", label: "Entities", icon: "❒" },
       { href: "/changes", label: "Changes", icon: "↯" },
     ],

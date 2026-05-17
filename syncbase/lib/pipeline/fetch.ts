@@ -62,8 +62,13 @@ function buildFetchInit(http: HttpConfig, extraForm?: Record<string, string | nu
     return init;
   }
 
-  if (http.params) (init as any).query = http.params;
-  if (http.form || extraForm) {
+  // Three POST/PUT/etc shapes:
+  //   1. http.form is set → form-urlencoded body; pagination keys merge into the form.
+  //   2. http.body is set (and http.form is not) → JSON body shipped as-is.
+  //        Pagination keys are URL query parameters in that case (e.g. Typesense /multi_search?page=N).
+  //   3. Neither → empty body; pagination keys (if any) become URL query.
+  const baseQuery: Record<string, string | number> = { ...(http.params ?? {}) };
+  if (http.form) {
     const merged = { ...(http.form ?? {}), ...(extraForm ?? {}) };
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(merged)) params.append(k, String(v));
@@ -73,8 +78,14 @@ function buildFetchInit(http: HttpConfig, extraForm?: Record<string, string | nu
       headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8";
     }
     init.headers = headers;
+    if (Object.keys(baseQuery).length) (init as any).query = baseQuery;
   } else if (http.body !== undefined) {
     (init as any).body = http.body;
+    const merged = { ...baseQuery, ...(extraForm ?? {}) };
+    if (Object.keys(merged).length) (init as any).query = merged;
+  } else {
+    const merged = { ...baseQuery, ...(extraForm ?? {}) };
+    if (Object.keys(merged).length) (init as any).query = merged;
   }
   return init;
 }

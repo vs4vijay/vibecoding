@@ -1,0 +1,66 @@
+{
+  "name": "auctionbazaar",
+  "enabled": true,
+  "category": "bank-auction",
+  "location": { "mode": "none", "supports_all": true },
+  "http": {
+    "method": "POST",
+    "url": "https://863av92kw7rsz0ogp.a1.typesense.net/multi_search",
+    "headers": {
+      "Content-Type": "application/json",
+      "Origin": "https://www.auctionbazaar.com",
+      "Referer": "https://www.auctionbazaar.com/"
+    },
+    "params": {
+      "x-typesense-api-key": "SLOToVUdGM1KOdnlcZ999MKITFq2axDW"
+    },
+    "body": {
+      "searches": [
+        {
+          "collection": "properties",
+          "q": "*",
+          "filter_by": "status:active",
+          "sort_by": "auction_start_date_unix_timestamp:asc"
+        }
+      ]
+    }
+  },
+  "pagination": {
+    "style": "page",
+    "page_param": "page",
+    "size_param": "per_page",
+    "size": 100,
+    "start_page": 1,
+    "stop_when": "empty_records",
+    "max_pages": 10
+  },
+  "records_path": "$.results[0].hits[*].document",
+  "external_id_path": "$.uuid",
+  "hash_fields": null,
+  "schedule_cron": null,
+  "storage_mode": "generic",
+  "dedup": {
+    "key_fields": [
+      { "path": "$.dump.location.pincode", "normalize": "pincode" },
+      { "path": "$.reserve_price", "normalize": "round_10000" }
+    ],
+    "similarity_threshold": 0.75,
+    "compare_fields": ["$.address", "$.description"]
+  },
+  "cross_dedup": {
+    "pincode": "$.dump.location.pincode",
+    "price": "$.reserve_price",
+    "bank": "$.dump.bank.bank_name",
+    "title": "$.address",
+    "address": "$.description",
+    "date": "$.auction_start_date_time"
+  },
+  "display_columns": [
+    { "label": "Address", "jsonpath": "$.address", "primary": true },
+    { "label": "Bank", "jsonpath": "$.dump.bank.bank_name" },
+    { "label": "City", "jsonpath": "$.dump.location.city_name" },
+    { "label": "State", "jsonpath": "$.dump.location.state_name" },
+    { "label": "Reserve ₹", "jsonpath": "$.reserve_price" },
+    { "label": "Auction date", "jsonpath": "$.auction_start_date_time" }
+  ]
+}

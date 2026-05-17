@@ -5,6 +5,8 @@ import { runs, type Source } from "../db/schema";
 import { canonicalHash } from "./hash";
 import { extractScalar } from "./extract";
 import { paginate, type HttpConfig, type PaginationConfig } from "./fetch";
+import { applyLocation } from "./location";
+import type { LocationConfig, RunLocation } from "../validation";
 
 export type RunTrigger = "adhoc" | "schedule" | "test";
 
@@ -22,7 +24,8 @@ const BATCH_SIZE = 250;
 
 export async function runPipeline(
   source: Source,
-  trigger: RunTrigger
+  trigger: RunTrigger,
+  runLocation?: RunLocation
 ): Promise<RunResult> {
   const db = getDb();
 
@@ -46,7 +49,9 @@ export async function runPipeline(
   let recordsSkipped = 0;
 
   try {
-    const http = source.http as HttpConfig;
+    const rawHttp = source.http as HttpConfig;
+    const location = (source as Source & { location?: LocationConfig | null }).location ?? null;
+    const http = applyLocation(rawHttp, location, runLocation, source.name);
     const pagination = source.pagination as PaginationConfig;
 
     // Dedupe by external_id across the entire run, last-wins. This is necessary

@@ -37,10 +37,27 @@ export function generateDedicatedTableDDL(
     `  content_hash TEXT NOT NULL,\n` +
     `  version_num INTEGER NOT NULL DEFAULT 1,\n` +
     `  first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n` +
-    `  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()` +
+    `  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n` +
+    `  search_tsv tsvector GENERATED ALWAYS AS (\n` +
+    `    setweight(to_tsvector('simple', coalesce(payload->>'title',   '')), 'A') ||\n` +
+    `    setweight(to_tsvector('simple', coalesce(payload->>'name',    '')), 'A') ||\n` +
+    `    setweight(to_tsvector('simple', coalesce(payload->>'address', '')), 'B') ||\n` +
+    `    setweight(to_tsvector('simple', coalesce(payload->>'city',    '')), 'B') ||\n` +
+    `    setweight(to_tsvector('simple', coalesce(payload->>'state',   '')), 'C') ||\n` +
+    `    setweight(to_tsvector('simple', coalesce(payload->>'bank',    '')), 'C') ||\n` +
+    `    setweight(to_tsvector('simple', coalesce(payload::text,       '')), 'D')\n` +
+    `  ) STORED` +
     (columnDefs.length ? `,\n  ${columnDefs.join(",\n  ")}` : "") +
     `,\n  UNIQUE (source, external_id)\n` +
     `);`;
+
+  const tsvIdxSql = `CREATE INDEX ${quoteIdent(table + "_tsv_idx")} ON ${quoteIdent(table)} USING GIN (search_tsv);`;
+  const titleTrgmIdxSql =
+    `CREATE INDEX ${quoteIdent(table + "_title_trgm_idx")} ON ${quoteIdent(table)} ` +
+    `USING GIN ((coalesce(payload->>'title','') || ' ' || coalesce(payload->>'name','')) gin_trgm_ops);`;
+  const addrTrgmIdxSql =
+    `CREATE INDEX ${quoteIdent(table + "_addr_trgm_idx")} ON ${quoteIdent(table)} ` +
+    `USING GIN ((coalesce(payload->>'address','') || ' ' || coalesce(payload->>'city','')) gin_trgm_ops);`;
 
   const versionsSql =
     `CREATE TABLE ${quoteIdent(versions)} (\n` +
@@ -77,6 +94,9 @@ export function generateDedicatedTableDDL(
     { kind: "table", sql: tableSql },
     { kind: "table", sql: versionsSql },
     { kind: "index", sql: versionsIdxSql },
+    { kind: "index", sql: tsvIdxSql },
+    { kind: "index", sql: titleTrgmIdxSql },
+    { kind: "index", sql: addrTrgmIdxSql },
     { kind: "trigger", sql: beforeTrgSql },
     { kind: "trigger", sql: afterTrgSql },
     ...indexes,

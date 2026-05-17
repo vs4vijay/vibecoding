@@ -1,0 +1,29 @@
+{
+  "name": "eauction_gov_in_upcoming",
+  "enabled": true,
+  "category": "govt-eauction",
+  "location": {
+    "mode": "none",
+    "supports_all": true
+  },
+  "http": {
+    "method": "GET",
+    "url": "https://eauction.gov.in/eauction_webservice/homePage/getLandingPageContents",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Accept": "application/json",
+      "Referer": "https://eauction.gov.in/eauction/"
+    }
+  },
+  "pagination": { "style": "none" },
+  "records_path": "$.upcomingAuctions",
+  "external_id_path": "$.refNo",
+  "hash_fields": ["date", "title", "refNo"],
+  "schedule_cron": null,
+  "storage_mode": "generic",
+  "display_columns": [
+    { "label": "Ref No", "jsonpath": "$.refNo", "primary": true },
+    { "label": "Date", "jsonpath": "$.date" },
+    { "label": "Title", "jsonpath": "$.title" }
+  ]
+}

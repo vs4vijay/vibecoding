@@ -36,6 +36,8 @@ const PatchSchema = z.object({
       })
     )
     .optional(),
+  category: z.string().min(1).max(64).nullable().optional(),
+  location: z.any().nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -68,6 +70,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (parsed.data.records_path !== undefined) next.recordsPath = parsed.data.records_path;
   if (parsed.data.external_id_path !== undefined) next.externalIdPath = parsed.data.external_id_path;
   if (parsed.data.display_columns !== undefined) next.displayColumns = parsed.data.display_columns;
+  if (parsed.data.category !== undefined) next.category = parsed.data.category;
+  if (parsed.data.location !== undefined) next.location = parsed.data.location;
 
   const [updated] = await db
     .update(sources)

@@ -37,6 +37,10 @@ export const sources = pgTable(
     typedColumns: jsonb("typed_columns").notNull().default(sql`'[]'::jsonb`),
     storageTable: text("storage_table").notNull().default("entities"),
     displayColumns: jsonb("display_columns").notNull().default(sql`'[]'::jsonb`),
+    category: text("category"),
+    location: jsonb("location"),
+    dedup: jsonb("dedup"),
+    crossDedup: jsonb("cross_dedup"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -114,6 +118,17 @@ export const changeLog = pgTable(
     sourceIdx: index("change_log_source_idx").on(t.source),
   })
 );
+
+export const entityDuplicates = pgTable("entity_duplicates", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  source: text("source").notNull(),
+  canonicalId: bigint("canonical_id", { mode: "number" }).notNull(),
+  duplicateId: bigint("duplicate_id", { mode: "number" }).notNull(),
+  similarity: integer("similarity").notNull(),
+  dedupKeyHash: text("dedup_key_hash").notNull(),
+  detectedAt: timestamp("detected_at", { withTimezone: true }).defaultNow().notNull(),
+  status: text("status").notNull().default("auto"),
+});
 
 export const ddlLog = pgTable("ddl_log", {
   id: bigserial("id", { mode: "number" }).primaryKey(),

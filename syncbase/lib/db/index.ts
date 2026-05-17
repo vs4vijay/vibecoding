@@ -2,6 +2,8 @@ import { drizzle as drizzlePg, NodePgDatabase } from "drizzle-orm/node-postgres"
 import { drizzle as drizzlePglite, PgliteDatabase } from "drizzle-orm/pglite";
 import pkg from "pg";
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
+import { fuzzystrmatch } from "@electric-sql/pglite/contrib/fuzzystrmatch";
 import * as schema from "./schema";
 
 const { Pool } = pkg;
@@ -32,7 +34,9 @@ export function getDb(): DB {
     _db = Object.assign(d, { _driver: "postgres" as const });
     _listen = makePgListen(_pool);
   } else {
-    _pglite = new PGlite(process.env.PGLITE_PATH ?? "./local.pglite");
+    _pglite = new PGlite(process.env.PGLITE_PATH ?? "./local.pglite", {
+      extensions: { pg_trgm, fuzzystrmatch },
+    });
     const d = drizzlePglite(_pglite, { schema });
     _db = Object.assign(d, { _driver: "pglite" as const });
     _listen = makePgliteListen(_pglite);

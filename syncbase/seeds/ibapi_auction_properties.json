@@ -1,6 +1,11 @@
 {
   "name": "ibapi_auction_properties",
   "enabled": true,
+  "category": "bank-auction",
+  "location": {
+    "mode": "none",
+    "supports_all": true
+  },
   "http": {
     "method": "POST",
     "url": "https://ibapi.in/Sale_Info_Home.aspx/Button_search_Click",

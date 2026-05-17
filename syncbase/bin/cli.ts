@@ -5,6 +5,8 @@ import { getDb, closeDb } from "../lib/db";
 import { sources } from "../lib/db/schema";
 import { eq } from "drizzle-orm";
 import { runPipeline } from "../lib/pipeline/run";
+import { detectDuplicatesForSource, detectDuplicatesForAllSources } from "../lib/pipeline/dedup";
+import { detectCrossSourceDuplicates } from "../lib/pipeline/cross-dedup";
 
 const initCmd = defineCommand({
   meta: { name: "init", description: "Apply migrations" },
@@ -75,6 +77,11 @@ const sourcesAddCmd = defineCommand({
         storageMode: body.storage_mode ?? "generic",
         typedColumns: body.typed_columns ?? [],
         storageTable: body.storage_table ?? "entities",
+        displayColumns: body.display_columns ?? [],
+        category: body.category ?? null,
+        location: body.location ?? null,
+        dedup: body.dedup ?? null,
+        crossDedup: body.cross_dedup ?? null,
       })
       .returning();
     console.log("created source", row);
@@ -94,6 +101,26 @@ const workerCmd = defineCommand({
   },
 });
 
+const dedupCmd = defineCommand({
+  meta: { name: "dedup", description: "Run duplicate detection (intra- or cross-source)" },
+  args: {
+    source: { type: "string", description: "Only run for this source (intra-source only)" },
+    "cross-source": { type: "boolean", description: "Run cross-source clustering instead of intra-source dedup", default: false },
+  },
+  async run({ args }) {
+    if (args["cross-source"]) {
+      const summary = await detectCrossSourceDuplicates();
+      console.log(JSON.stringify(summary, null, 2));
+    } else {
+      const summaries = args.source
+        ? [await detectDuplicatesForSource(args.source)]
+        : await detectDuplicatesForAllSources();
+      console.log(JSON.stringify(summaries, null, 2));
+    }
+    await closeDb();
+  },
+});
+
 const main = defineCommand({
   meta: { name: "syncbase", description: "syncbase CLI" },
   subCommands: {
@@ -101,6 +128,7 @@ const main = defineCommand({
     run: runCmd,
     sources: sourcesCmd,
     worker: workerCmd,
+    dedup: dedupCmd,
   },
 });
 
