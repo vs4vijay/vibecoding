@@ -1,5 +1,5 @@
 import { EventCard } from "./EventCard";
-import type { Event } from "@/lib/meetup/types";
+import type { Event } from "@/lib/sources/types";
 
 interface EventListProps {
   events: Event[];

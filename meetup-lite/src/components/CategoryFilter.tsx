@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { CATEGORIES } from "@/lib/meetup/categories";
+import { CATEGORIES } from "@/lib/sources/meetup";
 
 interface CategoryFilterProps {
   location: string;

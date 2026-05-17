@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "meetup-lite",
+      "name": "happns",
       "dependencies": {
         "next": "16.2.4",
         "node-html-parser": "^6.1.13",

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { EventList } from "@/components/EventList";
 import { GroupHeader } from "@/components/GroupHeader";
-import { getGroup } from "@/lib/meetup/group";
+import { meetupAdapter } from "@/lib/sources/meetup";
+import type { GroupPageData } from "@/lib/sources/types";
 
 interface PageProps {
   params: Promise<{ groupSlug: string }>;
@@ -10,10 +11,10 @@ interface PageProps {
 export default async function GroupPage({ params }: PageProps) {
   const { groupSlug } = await params;
 
-  let data: Awaited<ReturnType<typeof getGroup>> = null;
+  let data: GroupPageData | null = null;
   let errored = false;
   try {
-    data = await getGroup(groupSlug);
+    data = (await meetupAdapter.getGroup?.(groupSlug)) ?? null;
   } catch {
     errored = true;
   }

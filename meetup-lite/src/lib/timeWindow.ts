@@ -1,11 +1,6 @@
-import type { Event } from "./types";
+import type { Event } from "./sources/types";
 
-export type TimeWindowId =
-  | "any"
-  | "today"
-  | "week"
-  | "weekend"
-  | "month";
+export type TimeWindowId = "any" | "today" | "week" | "weekend" | "month";
 
 export interface TimeWindow {
   id: TimeWindowId;
@@ -32,7 +27,6 @@ export function parseTimeWindow(
 
 interface DateRange {
   start: Date;
-  /** End is exclusive. Null means "no upper bound" (i.e. "any"). */
   end: Date | null;
 }
 
@@ -60,9 +54,7 @@ export function getDateRange(window: TimeWindowId, now = new Date()): DateRange 
     case "month":
       return { start: today, end: addDays(today, 30) };
     case "weekend": {
-      // Upcoming weekend = next Saturday 00:00 → following Monday 00:00.
-      // If today is Sat/Sun, the weekend starts at today.
-      const day = today.getDay(); // 0 = Sun, 6 = Sat
+      const day = today.getDay();
       let start: Date;
       let end: Date;
       if (day === 6) {

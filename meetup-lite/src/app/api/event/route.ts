@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getEvent } from "@/lib/meetup/event";
+import { meetupAdapter } from "@/lib/sources/meetup";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const event = await getEvent(groupSlug, eventId);
+    const event = (await meetupAdapter.getEvent?.(groupSlug, eventId)) ?? null;
     if (!event) {
       return NextResponse.json({ event: null }, { status: 404 });
     }

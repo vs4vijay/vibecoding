@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SaveButton } from "./SaveButton";
-import type { Event } from "@/lib/meetup/types";
+import { SourceBadge } from "./SourceBadge";
+import type { Event } from "@/lib/sources/types";
 
 interface EventCardProps {
   event: Event;
@@ -9,11 +10,19 @@ interface EventCardProps {
 export function EventCard({ event }: EventCardProps) {
   const date = parseDate(event.dateTime);
   const venue = formatVenue(event);
-  const eventHref = `/e/${event.group.urlname}/${event.id}`;
+  const eventHref = event.detailHref ?? event.eventUrl;
+  const isExternal = !event.detailHref;
+  const linkProps = isExternal
+    ? { target: "_blank" as const, rel: "noopener noreferrer" as const }
+    : {};
 
   return (
     <div className="card-lift group relative rounded-2xl overflow-hidden bg-[var(--surface)] border border-[var(--border)] flex flex-col">
-      <Link href={eventHref} className="block relative aspect-[16/10] overflow-hidden">
+      <Link
+        href={eventHref}
+        {...linkProps}
+        className="block relative aspect-[16/10] overflow-hidden"
+      >
         {event.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -38,11 +47,7 @@ export function EventCard({ event }: EventCardProps) {
         ) : null}
 
         <div className="absolute top-3 right-3 flex items-center gap-1">
-          <span
-            aria-hidden
-            className="absolute inset-0 -z-10 rounded-full bg-[var(--surface)]/0"
-          />
-          <ExternalLink href={eventHref} />
+          <ExternalLink href={event.eventUrl} />
           <SaveButton
             event={{
               id: event.id,
@@ -54,26 +59,37 @@ export function EventCard({ event }: EventCardProps) {
           />
         </div>
 
-        {date ? (
-          <p className="absolute bottom-3 left-3 text-xs font-medium text-white drop-shadow">
-            {date.time}
-          </p>
-        ) : null}
+        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
+          {date ? (
+            <p className="text-xs font-medium text-white drop-shadow">
+              {date.time}
+            </p>
+          ) : (
+            <span />
+          )}
+          <SourceBadge source={event.source} />
+        </div>
       </Link>
 
       <div className="p-4 flex flex-col gap-2 flex-1">
-        <Link href={eventHref} className="block">
+        <Link href={eventHref} {...linkProps} className="block">
           <h3 className="font-semibold text-[15px] leading-snug clamp-2 group-hover:text-[var(--accent-strong)] transition-colors">
             {event.title}
           </h3>
         </Link>
 
-        <Link
-          href={`/g/${event.group.urlname}`}
-          className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] clamp-1 transition-colors w-fit max-w-full"
-        >
-          {event.group.name}
-        </Link>
+        {event.source === "meetup" && event.group.urlname ? (
+          <Link
+            href={`/g/${event.group.urlname}`}
+            className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] clamp-1 transition-colors w-fit max-w-full"
+          >
+            {event.group.name}
+          </Link>
+        ) : (
+          <p className="text-sm text-[var(--muted)] clamp-1">
+            {event.group.name}
+          </p>
+        )}
 
         <div className="mt-auto pt-2 border-t border-[var(--border)] text-xs text-[var(--muted)] space-y-1">
           <p className="flex items-center gap-1.5 clamp-1">
@@ -83,9 +99,7 @@ export function EventCard({ event }: EventCardProps) {
           {typeof event.going === "number" ? (
             <p className="flex items-center gap-1.5">
               <UsersIcon />
-              <span>
-                {event.going} {event.going === 1 ? "going" : "going"}
-              </span>
+              <span>{event.going} going</span>
             </p>
           ) : null}
         </div>
@@ -96,11 +110,11 @@ export function EventCard({ event }: EventCardProps) {
 
 function ExternalLink({ href }: { href: string }) {
   return (
-    <Link
+    <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Open event in new tab"
+      aria-label="Open on source"
       className="inline-flex items-center justify-center size-8 rounded-full bg-[var(--surface)]/90 backdrop-blur text-[var(--foreground)] hover:bg-[var(--surface)] border border-[var(--border)] transition"
     >
       <svg
@@ -118,7 +132,7 @@ function ExternalLink({ href }: { href: string }) {
         <path d="M10 14L21 3" />
         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
       </svg>
-    </Link>
+    </a>
   );
 }
 

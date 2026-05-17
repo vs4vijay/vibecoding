@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { TIME_WINDOWS, type TimeWindowId } from "@/lib/meetup/timeWindow";
+import { TIME_WINDOWS, type TimeWindowId } from "@/lib/timeWindow";
 
 interface DateFilterProps {
   location: string;

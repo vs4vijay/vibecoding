@@ -7,8 +7,8 @@ export interface Category {
 
 /**
  * Curated subset of meetup.com's top-level categories. The `keyword` is the
- * search term we forward to meetup.com — we don't have access to a typed
- * category-id filter, so we lean on their text search instead.
+ * search term we forward to meetup.com — they don't expose a typed category
+ * filter so we lean on their text search instead.
  */
 export const CATEGORIES: Category[] = [
   { id: "technology", label: "Technology", keyword: "technology" },
@@ -37,7 +37,6 @@ export function getCategory(id: string): Category | undefined {
   return CATEGORY_BY_ID.get(id);
 }
 
-/** Parse a comma-separated category id list from a URL search param. */
 export function parseCategoryIds(raw: string | string[] | undefined): string[] {
   if (!raw) return [];
   const flat = Array.isArray(raw) ? raw.join(",") : raw;
@@ -45,7 +44,6 @@ export function parseCategoryIds(raw: string | string[] | undefined): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  // Preserve user order, drop unknown ids.
   const seen = new Set<string>();
   const out: string[] = [];
   for (const id of ids) {

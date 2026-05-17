@@ -1,4 +1,4 @@
-import type { Group } from "@/lib/meetup/types";
+import type { Group } from "@/lib/sources/types";
 
 interface GroupHeaderProps {
   group: Group;

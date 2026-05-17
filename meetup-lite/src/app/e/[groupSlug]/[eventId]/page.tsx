@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EventDetail } from "@/components/EventDetail";
-import { getEvent } from "@/lib/meetup/event";
+import { meetupAdapter } from "@/lib/sources/meetup";
+import type { Event } from "@/lib/sources/types";
 
 interface PageProps {
   params: Promise<{ groupSlug: string; eventId: string }>;
@@ -9,10 +10,10 @@ interface PageProps {
 export default async function EventPage({ params }: PageProps) {
   const { groupSlug, eventId } = await params;
 
-  let event: Awaited<ReturnType<typeof getEvent>> = null;
+  let event: Event | null = null;
   let errored = false;
   try {
-    event = await getEvent(groupSlug, eventId);
+    event = (await meetupAdapter.getEvent?.(groupSlug, eventId)) ?? null;
   } catch {
     errored = true;
   }

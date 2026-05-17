@@ -69,9 +69,6 @@ export function getNumber(obj: unknown, key: string): number | undefined {
   return typeof v === "number" ? v : undefined;
 }
 
-/**
- * Apollo references look like { __ref: "Event:12345" }. Resolve to the cache entry.
- */
 export function deref(
   apolloState: ApolloState,
   value: unknown,

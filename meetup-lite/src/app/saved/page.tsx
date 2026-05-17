@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSavedEvents, type SavedEvent } from "@/lib/saved";
-import type { Event } from "@/lib/meetup/types";
+import type { Event } from "@/lib/sources/types";
 
 export default function SavedPage() {
   const { saved, removeSaved } = useSavedEvents();

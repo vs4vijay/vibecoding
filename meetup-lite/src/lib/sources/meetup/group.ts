@@ -7,12 +7,7 @@ import {
   getNumber,
   getString,
 } from "./parse";
-import type { Event, Group } from "./types";
-
-export interface GroupPageData {
-  group: Group;
-  upcomingEvents: Event[];
-}
+import type { Event, Group, GroupPageData } from "@/lib/sources/types";
 
 export async function getGroup(urlname: string): Promise<GroupPageData | null> {
   const url = `https://www.meetup.com/${encodeURIComponent(urlname)}/`;
@@ -103,7 +98,6 @@ function collectUpcomingEvents(
   apolloState: ApolloState,
   groupSlug: string,
 ): Event[] {
-  // Find the connection wrapper keyed with ACTIVE filter; iterate its edges.
   const refs: string[] = [];
   for (const [key, value] of Object.entries(rawGroup)) {
     if (!key.startsWith("events(") || !key.includes('"ACTIVE"')) continue;
@@ -125,7 +119,6 @@ function collectUpcomingEvents(
     seen.add(ref);
     const raw = apolloState[ref];
     if (!raw) continue;
-    // Skip skeleton series placeholders that lack a real title.
     if (typeof raw.title !== "string" || !raw.title.trim()) continue;
     try {
       const eventUrl = getString(raw, "eventUrl") ?? "";

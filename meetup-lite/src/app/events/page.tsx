@@ -2,9 +2,10 @@ import { CategoryFilter } from "@/components/CategoryFilter";
 import { DateFilter } from "@/components/DateFilter";
 import { EventList } from "@/components/EventList";
 import { LocationSearch } from "@/components/LocationSearch";
-import { parseCategoryIds } from "@/lib/meetup/categories";
-import { searchEventsByCategories } from "@/lib/meetup/search";
-import { filterByTimeWindow, parseTimeWindow } from "@/lib/meetup/timeWindow";
+import { parseCategoryIds } from "@/lib/sources/meetup";
+import { SOURCES, searchAcrossSources } from "@/lib/sources/registry";
+import type { SourceId } from "@/lib/sources/types";
+import { filterByTimeWindow, parseTimeWindow } from "@/lib/timeWindow";
 
 interface PageProps {
   searchParams: Promise<{
@@ -20,15 +21,17 @@ export default async function EventsPage({ searchParams }: PageProps) {
   const categoryIds = parseCategoryIds(params.categories);
   const timeWindow = parseTimeWindow(params.when);
 
-  let events: Awaited<ReturnType<typeof searchEventsByCategories>> = [];
-  let errored = false;
+  let events: Awaited<ReturnType<typeof searchAcrossSources>>["events"] = [];
+  let perSource: Partial<Record<SourceId, number>> = {};
+  let failed: SourceId[] = [];
   if (location) {
-    try {
-      const all = await searchEventsByCategories(location, categoryIds);
-      events = filterByTimeWindow(all, timeWindow);
-    } catch {
-      errored = true;
-    }
+    const result = await searchAcrossSources(SOURCES, {
+      location,
+      keywords: categoryIds,
+    });
+    events = filterByTimeWindow(result.events, timeWindow);
+    perSource = result.perSource;
+    failed = result.failed;
   }
 
   return (
@@ -47,9 +50,15 @@ export default async function EventsPage({ searchParams }: PageProps) {
           )}
         </h1>
         <p className="text-[var(--muted)] mb-6">
-          {location
-            ? `${events.length} ${events.length === 1 ? "result" : "results"} from meetup.com`
-            : "Pick a city to start browsing."}
+          {location ? (
+            <ResultSummary
+              total={events.length}
+              perSource={perSource}
+              failed={failed}
+            />
+          ) : (
+            "Pick a city to start browsing."
+          )}
         </p>
         <div className="max-w-2xl">
           <LocationSearch
@@ -78,34 +87,50 @@ export default async function EventsPage({ searchParams }: PageProps) {
             </div>
           </aside>
           <div>
-            {errored ? (
-              <EmptyState>
-                Couldn&apos;t load events from meetup.com. Please try again.
-              </EmptyState>
-            ) : (
-              <EventList
-                events={events}
-                emptyMessage={buildEmptyMessage(
-                  location,
-                  categoryIds.length > 0,
-                  timeWindow !== "any",
-                )}
-              />
-            )}
+            <EventList
+              events={events}
+              emptyMessage={buildEmptyMessage(
+                location,
+                categoryIds.length > 0,
+                timeWindow !== "any",
+              )}
+            />
           </div>
         </div>
       ) : (
-        <EmptyState>Enter a city above to find Meetup events.</EmptyState>
+        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] py-16 px-6 text-center text-[var(--muted)]">
+          Enter a city above to find events across Meetup, Luma and more.
+        </div>
       )}
     </main>
   );
 }
 
-function EmptyState({ children }: { children: React.ReactNode }) {
+interface ResultSummaryProps {
+  total: number;
+  perSource: Partial<Record<SourceId, number>>;
+  failed: SourceId[];
+}
+
+function ResultSummary({ total, perSource, failed }: ResultSummaryProps) {
+  const parts: string[] = [];
+  for (const [id, count] of Object.entries(perSource)) {
+    if (!count) continue;
+    const adapter = SOURCES.find((s) => s.id === id);
+    if (!adapter) continue;
+    parts.push(`${count} ${adapter.label}`);
+  }
   return (
-    <div className="rounded-2xl border border-dashed border-[var(--border-strong)] py-16 px-6 text-center text-[var(--muted)]">
-      {children}
-    </div>
+    <>
+      {total} {total === 1 ? "result" : "results"}
+      {parts.length > 0 ? <> &middot; {parts.join(" · ")}</> : null}
+      {failed.length > 0 ? (
+        <span className="text-amber-600 dark:text-amber-400">
+          {" "}
+          (couldn&apos;t reach: {failed.join(", ")})
+        </span>
+      ) : null}
+    </>
   );
 }
 

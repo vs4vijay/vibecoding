@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "meetup-lite",
-  description: "A lightweight read-only browser for public meetup.com events and groups.",
+  title: "happns — find what's happening near you",
+  description:
+    "A lightweight read-only browser for public events across Meetup, Luma, and more.",
 };
 
 export default function RootLayout({

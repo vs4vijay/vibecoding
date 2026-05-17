@@ -9,11 +9,11 @@ export function Header() {
         <Link
           href="/"
           className="flex items-center gap-2 group"
-          aria-label="meetup-lite home"
+          aria-label="happns home"
         >
           <Logo size={22} />
           <span className="font-semibold tracking-tight text-[15px] group-hover:text-[var(--accent)] transition-colors">
-            meetup-lite
+            happns
           </span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">

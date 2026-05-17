@@ -2,8 +2,9 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-const STORAGE_KEY = "meetup-lite:saved";
-const CHANGE_EVENT = "meetup-lite:saved-change";
+const STORAGE_KEY = "happns:saved";
+const LEGACY_STORAGE_KEY = "meetup-lite:saved";
+const CHANGE_EVENT = "happns:saved-change";
 
 export interface SavedEvent {
   id: string;
@@ -13,9 +14,26 @@ export interface SavedEvent {
   savedAt: string;
 }
 
+/**
+ * One-shot: if the legacy "meetup-lite:saved" key exists and the new key
+ * doesn't, copy entries over. Runs lazily on first read. We never write the
+ * legacy key again after this, so it's safe to leave behind in case the user
+ * downgrades — but we delete it to keep their localStorage tidy.
+ */
+function migrateLegacy(): void {
+  if (typeof window === "undefined") return;
+  const ls = window.localStorage;
+  if (ls.getItem(STORAGE_KEY) !== null) return;
+  const legacy = ls.getItem(LEGACY_STORAGE_KEY);
+  if (legacy === null) return;
+  ls.setItem(STORAGE_KEY, legacy);
+  ls.removeItem(LEGACY_STORAGE_KEY);
+}
+
 function readFromStorage(): SavedEvent[] {
   if (typeof window === "undefined") return [];
   try {
+    migrateLegacy();
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
@@ -54,6 +72,7 @@ let cachedList: SavedEvent[] = [];
 
 function getSnapshot(): SavedEvent[] {
   if (typeof window === "undefined") return EMPTY;
+  migrateLegacy();
   const raw = window.localStorage.getItem(STORAGE_KEY);
   if (raw === cachedRaw) return cachedList;
   cachedRaw = raw;

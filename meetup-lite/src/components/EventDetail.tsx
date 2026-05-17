@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SaveButton } from "./SaveButton";
-import type { Event } from "@/lib/meetup/types";
+import type { Event } from "@/lib/sources/types";
 
 interface EventDetailProps {
   event: Event;

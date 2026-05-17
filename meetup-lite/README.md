@@ -1,17 +1,32 @@
-# meetup-lite
+# happns
 
-A lightweight read-only web client for public [meetup.com](https://meetup.com) events and groups, built with Next.js 16, React 19, Tailwind 4, and Bun.
+A lightweight read-only browser for public community events. Built with Next.js 16, React 19, Tailwind 4, and Bun.
 
-Meetup's official GraphQL API requires OAuth + a paid Pro account. Instead, this app extracts the `__NEXT_DATA__` JSON payload that meetup.com's own Next.js SSR embeds in every public page. It is **read-only** — no RSVP, no auth, just browsing.
+Today **happns** aggregates events from **Meetup** and **Luma**. GDG, HasGeek and more are on the roadmap. The strategy is the same for every source: extract the JSON payload that each platform's own SSR already embeds in its public pages (typically `__NEXT_DATA__`) and normalize it into a single `Event` shape. No accounts, no login walls, no API keys.
+
+> Previously known as `meetup-lite` while the app was Meetup-only.
+
+## Sources today
+
+| Source | Status | Method |
+|---|---|---|
+| Meetup | ✅ live | `__NEXT_DATA__` → Apollo cache |
+| Luma | ✅ live | `__NEXT_DATA__` → `pageProps.initialData.data.events` |
+| GDG (`gdg.community.dev`) | 🚧 planned | `__NEXT_DATA__` → `prerenderData.upcomingEvents` |
+| HasGeek | 🚧 planned | DOM scraping of the homepage + project pages |
+| Sahaj.ai | ⏸ deferred | Page is almost entirely past events |
 
 ## Features
 
-- **Search events by city** — type a city, get a grid of upcoming events
-- **Event detail pages** — title, time, venue, host group, going count, description, photo
-- **Group detail pages** — name, member count, topics, description, upcoming events
+- **Search across sources** — type a city, get one merged feed of upcoming events
+- **Source badges** — every card shows where it came from (Meetup red, Luma purple)
+- **Time filter** — Today / This week / This weekend / This month
+- **Category filter (Meetup)** — multi-select category chips powered by Meetup's keyword search; OR-merged across categories
+- **Event detail pages** (Meetup) — title, time, venue, host group, going count, description, photo
+- **Group detail pages** (Meetup) — name, member count, topics, description, upcoming events
 - **Save events locally** — bookmark events to `localStorage`; view them on `/saved`
-- **Graceful failures** — per-route `loading.tsx` skeletons and `error.tsx` fallbacks; the parser returns `null` rather than throwing when Meetup's schema shifts
-- **Server-side caching** — every meetup.com fetch is cached for 10 minutes via Next.js `revalidate`
+- **Graceful failures** — per-route `loading.tsx` skeletons and `error.tsx` fallbacks; if one source dies the rest still render
+- **Server-side caching** — every upstream fetch is cached for 10 minutes via Next.js `revalidate`
 
 ## Run locally
 
@@ -33,47 +48,40 @@ Open <http://localhost:3300>.
 ## Routes
 
 | Route | What it shows |
-|-------|---------------|
+|---|---|
 | `/` | Home with city search |
-| `/events?location=<city>` | Event grid for a location |
-| `/e/<groupSlug>/<eventId>` | Single event detail |
-| `/g/<groupSlug>` | Group detail + upcoming events |
+| `/events?location=<city>&categories=…&when=…` | Multi-source event grid |
+| `/e/<groupSlug>/<eventId>` | Meetup event detail |
+| `/g/<groupSlug>` | Meetup group detail |
 | `/saved` | Your locally bookmarked events |
-| `/api/event?groupSlug=…&eventId=…` | JSON proxy used by `/saved` for fresh data |
+| `/api/event?groupSlug=…&eventId=…` | JSON proxy used by `/saved` for fresh Meetup data |
 
-## ToS / scraping caveat
-
-This project scrapes public meetup.com pages, which is a gray area under Meetup's Terms of Service. It is intended for **personal/educational use only**. If you're considering deploying this publicly or commercially, you should use the official Meetup API (which requires OAuth + a paid Meetup Pro account) instead.
-
-## Known fragility points
-
-The whole app rests on a thin scraping foundation. The places most likely to break:
-
-- **`src/lib/meetup/parse.ts`** — relies on meetup.com embedding `__NEXT_DATA__` on every page with `pageProps.__APOLLO_STATE__`. If Meetup ships a different SSR strategy (e.g., RSC streaming) this returns `null` and every page renders an empty state.
-- **Apollo cache keys with inline args** — the `going` count lives at `rsvps({"filter":{"rsvpStatus":["YES"]}}).totalCount`, and group upcoming events live at a similarly stringified key. If Meetup changes those argument shapes, the values disappear.
-- **Location resolution** — Meetup's `/find/?location=…` endpoint can geo-bias results based on the request's IP. Free-text city names work, but quality varies; canonical Meetup location slugs (e.g. `us--ca--san-francisco`) give the best results.
-- **Rate limiting** — Meetup may block aggressive scraping. The default User-Agent is a real Chrome string and all fetches go through a 10-minute revalidate cache to keep volume low.
+Luma events open externally to luma.com — internal detail pages for Luma are not built yet.
 
 ## Architecture
 
 ```
 src/
 ├── app/                  # App Router pages
-│   ├── e/[groupSlug]/[eventId]/   # Event detail
-│   ├── g/[groupSlug]/    # Group detail
-│   ├── events/           # Search results
-│   ├── saved/            # Local bookmarks (client component)
-│   └── api/event/        # JSON proxy used by /saved
-├── components/           # Presentational + small client components
 └── lib/
-    ├── meetup/
-    │   ├── client.ts     # fetch wrapper (UA header, revalidate cache)
-    │   ├── parse.ts      # __NEXT_DATA__ / Apollo extractor
-    │   ├── types.ts      # Event / Group / Venue / Host
-    │   ├── event.ts      # getEvent(groupSlug, eventId)
-    │   ├── group.ts      # getGroup(urlname)
-    │   └── search.ts     # searchEvents(location)
+    ├── sources/
+    │   ├── types.ts      # Shared Event, Group, Venue, Host, SourceAdapter, SourceId
+    │   ├── registry.ts   # SOURCES + searchAcrossSources(adapters, query)
+    │   ├── meetup/       # client.ts, parse.ts, event.ts, group.ts, search.ts, categories.ts, index.ts (meetupAdapter)
+    │   └── luma/         # client.ts, parse.ts, normalize.ts, search.ts, index.ts (lumaAdapter)
+    ├── timeWindow.ts     # Time-window filter helper (source-agnostic)
     └── saved.ts          # localStorage-backed useSavedEvents hook
 ```
 
-Server Components do all scraping. The only API route (`/api/event`) exists solely so the client-only `/saved` page can re-fetch fresh data for stored event IDs.
+Each source implements a single `SourceAdapter` interface with `searchEvents`, and optionally `getEvent` / `getGroup`. The `/events` page fans out to every registered adapter via `Promise.allSettled`, dedupes by `${source}:${id}`, and sorts by date. One source failing never sinks the rest.
+
+## ToS / scraping caveat
+
+This project scrapes public pages on Meetup, Luma, and other providers. It's a gray area under most of their Terms of Service. Intended for **personal/educational use only**. If you're considering deploying this publicly or commercially, you should switch to each provider's official API.
+
+## Known fragility points
+
+- **Schema drift** — each source's parser depends on the shape of the embedded JSON they ship. When they restructure their cache, the relevant adapter returns empty and the source quietly disappears from the feed (other sources keep working).
+- **Apollo cache keys with inline args (Meetup)** — `going` count lives at `rsvps({"filter":{"rsvpStatus":["YES"]}}).totalCount`; if Meetup changes that arg shape the value disappears.
+- **City slug mapping (Luma)** — Luma's `/<city>` pages aren't uniformly named: `bangalore→bengaluru`, `san francisco→sf`, `new york→nyc`. See `src/lib/sources/luma/search.ts:CITY_ALIASES`.
+- **Rate limiting** — every adapter sets a realistic User-Agent and routes through Next's 10-minute revalidate cache to keep request volume low.

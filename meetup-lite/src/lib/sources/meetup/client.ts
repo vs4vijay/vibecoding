@@ -27,11 +27,7 @@ export async function fetchMeetupHtml(url: string): Promise<string | null> {
 
     if (!res.ok) {
       if (res.status === 404) return null;
-      throw new FetchError(
-        `Meetup responded ${res.status}`,
-        url,
-        res.status,
-      );
+      throw new FetchError(`Meetup responded ${res.status}`, url, res.status);
     }
 
     return await res.text();

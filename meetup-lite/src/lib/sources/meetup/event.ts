@@ -7,7 +7,7 @@ import {
   getNumber,
   getString,
 } from "./parse";
-import type { Event, Host, Venue } from "./types";
+import type { Event, Host, Venue } from "@/lib/sources/types";
 
 export async function getEvent(
   groupSlug: string,
@@ -41,10 +41,9 @@ function findEventRecord(
     apolloState,
     "Event",
   );
-  // Prefer exact id match; otherwise return the first Event in the cache
-  // (event pages usually have a single Event record).
   const match = candidates.find(
-    (e) => getString(e, "id") === eventId || getString(e, "eventId") === eventId,
+    (e) =>
+      getString(e, "id") === eventId || getString(e, "eventId") === eventId,
   );
   return match ?? candidates[0] ?? null;
 }
@@ -61,11 +60,13 @@ export function normalizeEvent(
   const id =
     getString(raw, "id") ??
     getString(raw, "eventId") ??
-    extractEventIdFromUrl(url);
+    extractEventIdFromUrl(url) ??
+    "";
   const eventType = getString(raw, "eventType");
 
   return {
-    id: id ?? "",
+    source: "meetup",
+    id,
     title: getString(raw, "title") ?? "Untitled event",
     dateTime:
       getString(raw, "dateTime") ??
@@ -73,6 +74,7 @@ export function normalizeEvent(
       new Date(0).toISOString(),
     endTime: getString(raw, "endTime"),
     eventUrl: getString(raw, "eventUrl") ?? url,
+    detailHref: `/e/${encodeURIComponent(group.urlname)}/${encodeURIComponent(id)}`,
     description:
       getString(raw, "description") ?? getString(raw, "howToFindUs"),
     going: resolveGoingCount(raw),
@@ -96,8 +98,6 @@ function resolveGoingCount(raw: Record<string, unknown>): number | undefined {
     getNumber(raw, "rsvpYesCount");
   if (typeof direct === "number") return direct;
 
-  // Apollo cache stores connections keyed by their args, e.g.
-  // `rsvps({"filter":{"rsvpStatus":["YES"]}})` → { totalCount: N }
   for (const [key, value] of Object.entries(raw)) {
     if (!key.startsWith("rsvps(") || !key.includes('"YES"')) continue;
     const total = getNumber(value as Record<string, unknown>, "totalCount");

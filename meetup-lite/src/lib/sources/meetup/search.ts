@@ -2,7 +2,7 @@ import { getCategory } from "./categories";
 import { fetchMeetupHtml } from "./client";
 import { normalizeEvent } from "./event";
 import { extractNextData, findByTypename } from "./parse";
-import type { Event } from "./types";
+import type { Event } from "@/lib/sources/types";
 
 export interface SearchOptions {
   location: string;
@@ -32,8 +32,6 @@ export async function searchEvents(opts: SearchOptions): Promise<Event[]> {
 
   const events: Event[] = [];
   for (const raw of raws) {
-    // Meetup ships skeleton Event records (id, dateTime, group, __typename only)
-    // for future series occurrences. Skip anything without a real title.
     if (typeof raw.title !== "string" || !raw.title.trim()) continue;
 
     const groupSlug = resolveGroupSlug(raw, data.apolloState) ?? "unknown";
@@ -54,11 +52,6 @@ export async function searchEvents(opts: SearchOptions): Promise<Event[]> {
   return events.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
 }
 
-/**
- * Run a separate keyword-filtered search for each selected category in parallel,
- * then merge + dedupe by event id. Empty category list falls back to a single
- * unfiltered search.
- */
 export async function searchEventsByCategories(
   location: string,
   categoryIds: string[],
@@ -81,7 +74,6 @@ export async function searchEventsByCategories(
   const results = await Promise.all(
     keywords.map((keyword) =>
       searchEvents({ location: trimmed, keywords: keyword }).catch(
-        // Surface a single failure as an empty result rather than failing the merge.
         () => [] as Event[],
       ),
     ),
@@ -91,7 +83,7 @@ export async function searchEventsByCategories(
   const merged: Event[] = [];
   for (const list of results) {
     for (const e of list) {
-      const key = `${e.group.urlname}:${e.id}`;
+      const key = `${e.source}:${e.group.urlname}:${e.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
       merged.push(e);
