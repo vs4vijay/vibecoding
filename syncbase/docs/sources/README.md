@@ -9,14 +9,14 @@ One markdown file per data source. Each documents the recon results: tech stack,
 - `ibapi.in` → `seeds/ibapi_auction_properties.json` — see existing notes in `seeds/README.md`.
 - `bankeauctions.com` → `seeds/bankeauctions_live.json` — see existing notes in `seeds/README.md`.
 
-### 🟡 New, JSON-API confirmed — ready for seeding
+### 🟢 Onboarded
 
-| Source | Phase | Doc | Spike still needed? |
+| Source | Phase | Doc | Records |
 |---|---|---|---|
-| `eauction.gov.in` | S1 | [eauction-gov-in.md](./eauction-gov-in.md) | No |
-| `baanknet.com` | S2 | [baanknet.md](./baanknet.md) | Yes — capture browser POST body |
-| `eauctiondekho.com` | S3 | [eauctiondekho.md](./eauctiondekho.md) | Yes — verify Strapi `/api/auctions` |
-| `auctionbazaar.com` | S4 | [auctionbazaar.md](./auctionbazaar.md) | Yes — find API or use `__NEXT_DATA__` |
+| `eauction.gov.in` | S1 | [eauction-gov-in.md](./eauction-gov-in.md) | 10 (upcoming feed) |
+| `baanknet.com` | S2 | [baanknet.md](./baanknet.md) | 8,139 (all-live tab) |
+| `eauctiondekho.com` | S3 | [eauctiondekho.md](./eauctiondekho.md) | 5,396 (sample of 126k) |
+| `auctionbazaar.com` | S4 | [auctionbazaar.md](./auctionbazaar.md) | 10,000 (sample of 10k+ active) |
 
 ### 🟠 Server-rendered — needs a recon spike before seeding
 

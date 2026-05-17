@@ -5,6 +5,11 @@ import { eq } from "drizzle-orm";
 import { runPipeline } from "../lib/pipeline/run";
 import { getScheduler } from "../lib/scheduler";
 
+// Reserved virtual "source" names that the cron emits on the run_due channel.
+// These don't ingest data — they trigger maintenance jobs (cross-source dedup, etc.).
+const CROSS_DEDUP_VIRTUAL = "__cross_dedup__";
+const CROSS_DEDUP_CRON = process.env.SYNCBASE_CROSS_DEDUP_CRON ?? "0 */6 * * *"; // every 6 hours
+
 async function bootstrapSchedulesFromSourcesTable() {
   const db = getDb();
   const all = await db.select().from(sources);
@@ -15,6 +20,12 @@ async function bootstrapSchedulesFromSourcesTable() {
       console.log(`[worker] scheduled ${s.name} @ ${s.scheduleCron}`);
     }
   }
+  // Cross-source dedup tick (only if at least one source has cross_dedup configured).
+  const hasCrossDedup = all.some((s) => (s as any).crossDedup);
+  if (hasCrossDedup) {
+    await sched.register(CROSS_DEDUP_VIRTUAL, CROSS_DEDUP_CRON);
+    console.log(`[worker] scheduled cross-source dedup @ ${CROSS_DEDUP_CRON}`);
+  }
 }
 
 async function main() {
@@ -24,6 +35,16 @@ async function main() {
   const unlisten = await listen("run_due", async (payload) => {
     const name = payload.trim();
     console.log(`[worker] run_due received: ${name}`);
+    if (name === CROSS_DEDUP_VIRTUAL) {
+      try {
+        const { detectCrossSourceDuplicates } = await import("../lib/pipeline/cross-dedup");
+        const summary = await detectCrossSourceDuplicates();
+        console.log(`[worker] cross-dedup: ${JSON.stringify(summary)}`);
+      } catch (err) {
+        console.error(`[worker] cross-dedup failed:`, err);
+      }
+      return;
+    }
     const db = getDb();
     const rows = await db.select().from(sources).where(eq(sources.name, name));
     if (rows.length === 0) {

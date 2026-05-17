@@ -84,6 +84,27 @@ export function normalize(value: unknown, mode: DedupNormalize = "identity"): st
   }
 }
 
+function trigrams(s: string): Set<string> {
+  if (!s) return new Set();
+  const out = new Set<string>();
+  const words = s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  for (const w of words) {
+    const padded = "  " + w + " ";
+    for (let i = 0; i + 3 <= padded.length; i++) out.add(padded.slice(i, i + 3));
+  }
+  return out;
+}
+
+function trigramSimilarity(a: string, b: string): number {
+  if (!a || !b) return 0;
+  const A = trigrams(a);
+  const B = trigrams(b);
+  if (A.size === 0 || B.size === 0) return 0;
+  let inter = 0;
+  for (const t of A) if (B.has(t)) inter++;
+  return inter / (A.size + B.size - inter);
+}
+
 function parseDate(s: string): Date | null {
   // Try ISO first, then "18-May-2026 09:30 AM" style.
   const iso = Date.parse(s);
@@ -149,15 +170,27 @@ export async function detectDuplicatesForSource(sourceName: string): Promise<Ded
   const compareFields = cfg.compare_fields ?? ["$.title", "$.address"];
 
   const storageTable = src.storageTable;
-  // Fetch all entities for this source from its storage table.
-  const res: any = await db.execute(sql`
-    SELECT id, payload FROM ${sql.identifier(storageTable)}
-    WHERE source = ${sourceName}
-  `);
-  const rows: { id: number; payload: unknown }[] = (res.rows ?? res).map((r: any) => ({
-    id: Number(r.id),
-    payload: r.payload,
-  }));
+  // Paged scan: a single SELECT against a 10k-row dedicated table blows the PGLite
+  // WASM heap. 1k rows at a time keeps memory bounded.
+  const SCAN_BATCH = 1000;
+  const rows: { id: number; payload: unknown }[] = [];
+  let lastId = 0;
+  while (true) {
+    const res: any = await db.execute(sql`
+      SELECT id, payload FROM ${sql.identifier(storageTable)}
+      WHERE source = ${sourceName} AND id > ${lastId}
+      ORDER BY id ASC
+      LIMIT ${SCAN_BATCH}
+    `);
+    const batch: { id: number; payload: unknown }[] = (res.rows ?? res).map((r: any) => ({
+      id: Number(r.id),
+      payload: r.payload,
+    }));
+    if (batch.length === 0) break;
+    for (const r of batch) rows.push(r);
+    lastId = batch[batch.length - 1].id;
+    if (batch.length < SCAN_BATCH) break;
+  }
 
   // Group by dedup_key_hash.
   const groups = new Map<string, { ids: number[]; payloads: Map<number, unknown> }>();
@@ -186,12 +219,10 @@ export async function detectDuplicatesForSource(sourceName: string): Promise<Ded
         // Build compare strings from JSONPaths.
         const aStr = compareFields.map((p) => extractScalar(a, p)).join(" ");
         const bStr = compareFields.map((p) => extractScalar(b, p)).join(" ");
-        // Use the database's similarity() function via a one-off query so we get
-        // the exact same scoring as the search index. For very small datasets this
-        // is fine; for larger ones a batched SELECT could be added.
-        const simRes: any = await db.execute(sql`SELECT similarity(${aStr}, ${bStr}) AS sim`);
-        const simRow = (simRes.rows ?? simRes)[0];
-        const sim = Number(simRow.sim);
+        // JS-side trigram similarity (Jaccard-on-trigrams). Same algorithm as
+        // lib/pipeline/cross-dedup.ts so D1 and D2 score consistently. Doing this
+        // in JS avoids one DB round-trip per pair, which OOMs PGLite at ≥10k rows.
+        const sim = trigramSimilarity(aStr, bStr);
         if (sim < threshold) continue;
         // Skip if operator already overrode this pair.
         const ovr: any = await db.execute(sql`

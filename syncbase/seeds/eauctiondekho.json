@@ -27,12 +27,12 @@
     "size": 100,
     "start_page": 1,
     "stop_when": "empty_records",
-    "max_pages": 5
+    "max_pages": 50
   },
   "records_path": "$.data",
   "external_id_path": "$.id",
   "hash_fields": null,
-  "schedule_cron": null,
+  "schedule_cron": "*/30 * * * *",
   "storage_mode": "generic",
   "dedup": {
     "key_fields": [
@@ -45,6 +45,8 @@
   },
   "cross_dedup": {
     "pincode": "$.attributes.pincode",
+    "city": "$.attributes.city",
+    "state": "$.attributes.state",
     "price": "$.attributes.reservePrice",
     "bank": "$.attributes.bankName",
     "title": "$.attributes.title",

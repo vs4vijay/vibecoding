@@ -79,4 +79,38 @@ describe("G1 — global search", () => {
     expect(r.hits.length).toBeGreaterThanOrEqual(1);
     expect(r.hits[0].external_id).toBe("g1");
   });
+
+  test("cluster rollup: members from same cluster collapse to one hit by default", async () => {
+    const db = getDb();
+    // Manually create a cluster and place two existing entities in it.
+    await db.execute(sql`INSERT INTO entity_clusters (cluster_key, member_count) VALUES ('synthetic-test', 2)`);
+    const cidRes: any = await db.execute(sql`SELECT cluster_id FROM entity_clusters WHERE cluster_key='synthetic-test'`);
+    const cid = Number(((cidRes.rows ?? cidRes)[0] as any).cluster_id);
+    // Pick b1 (Ajmer) and g1 (Timber). Both must surface for the same query — let's use "Ajmer"
+    // and add a govt-eauction row that also mentions ajmer so they pair in results.
+    await db.execute(sql`
+      INSERT INTO entities (source, external_id, payload, content_hash) VALUES
+        ('src_govt', 'g_ajmer', '{"title":"Govt eAuction near Ajmer","refNo":"2026_RJ_1"}'::jsonb, 'hcj1')
+    `);
+    const bIdRes: any = await db.execute(sql`SELECT id FROM entities WHERE source='src_banks' AND external_id='b1'`);
+    const gIdRes: any = await db.execute(sql`SELECT id FROM entities WHERE source='src_govt' AND external_id='g_ajmer'`);
+    const bId = Number(((bIdRes.rows ?? bIdRes)[0] as any).id);
+    const gId = Number(((gIdRes.rows ?? gIdRes)[0] as any).id);
+    await db.execute(sql`
+      INSERT INTO entity_cluster_members (cluster_id, source, entity_id, role) VALUES
+        (${cid}, 'src_banks', ${bId}, 'canonical'),
+        (${cid}, 'src_govt',  ${gId}, 'member')
+    `);
+
+    // With rollup ON (default), the cluster collapses to one hit.
+    const rolledUp = await searchEntities({ q: "ajmer" });
+    const rolledClusterHits = rolledUp.hits.filter((h) => h.cluster_id === cid);
+    expect(rolledClusterHits.length).toBe(1);
+    expect(rolledClusterHits[0].members?.length).toBe(2);
+
+    // With rollup OFF, both members come back as separate hits.
+    const expanded = await searchEntities({ q: "ajmer", cluster_rollup: false });
+    const expandedClusterHits = expanded.hits.filter((h) => h.cluster_id === cid);
+    expect(expandedClusterHits.length).toBe(2);
+  });
 });

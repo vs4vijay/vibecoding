@@ -19,7 +19,7 @@
   "records_path": "$.upcomingAuctions",
   "external_id_path": "$.refNo",
   "hash_fields": ["date", "title", "refNo"],
-  "schedule_cron": null,
+  "schedule_cron": "*/15 * * * *",
   "storage_mode": "generic",
   "display_columns": [
     { "label": "Ref No", "jsonpath": "$.refNo", "primary": true },

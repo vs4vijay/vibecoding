@@ -14,6 +14,8 @@ export type SearchHit = {
   snippet: string | null;
   payload: Record<string, unknown>;
   score: number;
+  cluster_id?: number;
+  members?: { source: string; id: number; role: string }[];
 };
 
 export type SearchOpts = {
@@ -22,6 +24,8 @@ export type SearchOpts = {
   offset?: number;
   source?: string;
   category?: string;
+  /** When true (default) results are rolled up by cluster_id — one card per cluster. */
+  cluster_rollup?: boolean;
 };
 
 export async function searchEntities(opts: SearchOpts): Promise<{ hits: SearchHit[]; took_ms: number }> {
@@ -103,13 +107,71 @@ export async function searchEntities(opts: SearchOpts): Promise<{ hits: SearchHi
     }
   }
 
-  // Cross-table sort → facet filter → paginate.
+  // Look up which hits belong to a cluster so we can either roll them up
+  // (one hit per cluster) or just decorate the per-source hits with cluster_id.
+  if (allHits.length) await annotateClusters(db, allHits);
+
+  // Cross-table sort → facet filter → optional roll-up → paginate.
   let filtered = allHits;
   if (opts.source) filtered = filtered.filter((h) => h.source === opts.source);
   if (opts.category) filtered = filtered.filter((h) => h.category === opts.category);
   filtered.sort((a, b) => b.score - a.score);
+
+  const rollup = opts.cluster_rollup !== false; // default ON
+  if (rollup) filtered = rollupClusters(filtered);
+
   const page = filtered.slice(offset, offset + limit);
   return { hits: page, took_ms: Date.now() - t0 };
+}
+
+async function annotateClusters(db: any, hits: SearchHit[]): Promise<void> {
+  if (hits.length === 0) return;
+  // entity_cluster_members is small (one row per clustered entity, not per ingested entity),
+  // so a full scan + JS filter is simpler than array-binding tricks and equally fast at
+  // expected scale.
+  let res: any;
+  try {
+    res = await db.execute(sql`SELECT cluster_id, source, entity_id, role FROM entity_cluster_members`);
+  } catch {
+    return;
+  }
+  const allRows: any[] = res.rows ?? res ?? [];
+  if (allRows.length === 0) return;
+
+  // Index by (source, entity_id) → cluster_id.
+  const byKey = new Map<string, number>();
+  // Index by cluster_id → members list.
+  const byCluster = new Map<number, { source: string; id: number; role: string }[]>();
+  for (const r of allRows) {
+    const src = String(r.source);
+    const eid = Number(r.entity_id);
+    const cid = Number(r.cluster_id);
+    byKey.set(`${src}\x00${eid}`, cid);
+    let g = byCluster.get(cid);
+    if (!g) { g = []; byCluster.set(cid, g); }
+    g.push({ source: src, id: eid, role: String(r.role) });
+  }
+
+  for (const h of hits) {
+    const cid = byKey.get(`${h.source}\x00${h.id}`);
+    if (cid == null) continue;
+    h.cluster_id = cid;
+    h.members = byCluster.get(cid);
+  }
+}
+
+function rollupClusters(hits: SearchHit[]): SearchHit[] {
+  // Keep the first occurrence of each cluster_id (which, since hits are score-sorted,
+  // is the highest-scoring representative). Drop any later members.
+  const seen = new Set<number>();
+  const out: SearchHit[] = [];
+  for (const h of hits) {
+    if (h.cluster_id == null) { out.push(h); continue; }
+    if (seen.has(h.cluster_id)) continue;
+    seen.add(h.cluster_id);
+    out.push(h);
+  }
+  return out;
 }
 
 function clamp(n: number, lo: number, hi: number): number {

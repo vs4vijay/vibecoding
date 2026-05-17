@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+const PreRequestCaptureSchema = z.object({
+  from: z.enum(["cookie"]),                 // for now only cookies
+  name: z.string().min(1),                  // cookie name
+  to: z.string().min(1),                    // "headers.X-XSRF-TOKEN" or "cookies.JSESSIONID"
+});
+
+const PreRequestSchema = z.object({
+  method: z.enum(["GET", "POST"]).optional(),
+  url: z.string().url(),
+  headers: z.record(z.string()).optional(),
+  captures: z.array(PreRequestCaptureSchema).min(1),
+});
+
 const HttpConfigSchema = z.object({
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).optional(),
   url: z.string().url(),
@@ -7,6 +20,7 @@ const HttpConfigSchema = z.object({
   params: z.record(z.union([z.string(), z.number()])).optional(),
   form: z.record(z.union([z.string(), z.number()])).optional(),
   body: z.any().optional(),
+  pre_request: PreRequestSchema.optional(),
 });
 
 const PaginationSchema = z.discriminatedUnion("style", [
@@ -90,6 +104,8 @@ export const SourceCreateSchema = z.object({
   dedup: DedupConfigSchema.optional(),
   cross_dedup: z.object({
     pincode: z.string().min(1).optional(),
+    city: z.string().min(1).optional(),
+    state: z.string().min(1).optional(),
     price: z.string().min(1).optional(),
     bank: z.string().min(1).optional(),
     title: z.string().min(1).optional(),

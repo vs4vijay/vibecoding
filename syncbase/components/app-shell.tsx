@@ -26,6 +26,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/search", label: "Search", icon: "⌕" },
       { href: "/entities", label: "Entities", icon: "❒" },
+      { href: "/duplicates", label: "Duplicates", icon: "⎗" },
       { href: "/changes", label: "Changes", icon: "↯" },
     ],
   },

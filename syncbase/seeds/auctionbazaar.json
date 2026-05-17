@@ -32,12 +32,12 @@
     "size": 100,
     "start_page": 1,
     "stop_when": "empty_records",
-    "max_pages": 10
+    "max_pages": 100
   },
   "records_path": "$.results[0].hits[*].document",
   "external_id_path": "$.uuid",
   "hash_fields": null,
-  "schedule_cron": null,
+  "schedule_cron": "*/30 * * * *",
   "storage_mode": "generic",
   "dedup": {
     "key_fields": [
@@ -48,7 +48,8 @@
     "compare_fields": ["$.address", "$.description"]
   },
   "cross_dedup": {
-    "pincode": "$.dump.location.pincode",
+    "city": "$.dump.location.city_name",
+    "state": "$.dump.location.state_name",
     "price": "$.reserve_price",
     "bank": "$.dump.bank.bank_name",
     "title": "$.address",

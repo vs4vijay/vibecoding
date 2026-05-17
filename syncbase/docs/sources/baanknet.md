@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Phase | S2 |
-| Status | 🟡 JSON API located, body shape needs one more spike |
+| Status | 🟢 Onboarded — `seeds/baanknet.json`, 8,139 records ingested on first run |
 | Category | bank-auction (PSU bank consortium) |
 | Scope | All-India, with state + city + locality filters |
 | Last recon | 2026-05-16 |
@@ -124,8 +124,16 @@ Location is **body-keyed**. F1 config:
 }
 ```
 
+## Onboarding outcome (2026-05-17)
+
+- Full search-form body confirmed: every field present at `clearForm()` defaults, plus `tab: 0`, `tabRequired: false`, `userId: null`. `tab: 0` returns the "all live" feed (8,139 records total). `tab: 2/3/4` open much larger archives (277k+) — pursue if needed.
+- Pre-flight `GET /eauction-psb/api/get-session` captures `JSESSIONID` (HttpOnly, path `/eauction-psb`) and `XSRF-TOKEN`. The latter must be echoed back in the `X-XSRF-TOKEN` header for the POST.
+- The pipeline grew a generic `http.pre_request` capability for this (see `lib/pipeline/fetch.ts:applyPreRequest`). The session is bootstrapped once per run; if it expires mid-pagination during a long sync we'd need an auto-retry hook (not implemented yet).
+- `bun bin/cli.ts run --source baanknet` requires `NODE_TLS_REJECT_UNAUTHORIZED=0` on dev boxes whose trust store doesn't include the baanknet CA. Prod Linux with `ca-certificates` updated is fine. **Don't ship the env var as a default** — it disables TLS verification process-wide.
+- Cross-source dedup against `eauctiondekho` clusters **2,177 records** — confirmed: `eauctiondekho` aggregates baanknet as a `serviceProvider`, so most baanknet listings have a sibling in eauctiondekho.
+
 ## Known risks
 
-- The `elkSearchAuction` ENV branch points at `/common/eauction-search/…`. If the portal flips that flag on, the seed above will start failing — keep the seed pinned and add a fallback seed for the ELK path during the spike.
-- The pre-flight session lifetime is unknown; seed assumes one pre-flight per run. If the session expires mid-pagination, the pipeline must retry the pre-flight on 401 / 419.
-- A future "feature flag" config field on the source might also expose the bank/state/category filters for richer UI faceting.
+- The `elkSearchAuction` ENV branch points at `/common/eauction-search/…`. If the portal flips that flag on, the seed above will start failing — keep the seed pinned and add a fallback seed for the ELK path.
+- The pre-flight session lifetime is unknown; seed assumes one pre-flight per run. If the session expires mid-pagination, the pipeline must retry the pre-flight on 401 / 419 — not currently handled.
+- City/state filter would need an extra capability: the pipeline's `location.mode=body` would need to set `cityID` to an integer ID, but the operator types "Bengaluru". A pre_request that fetches `/get-state` + `/get-auto-suggestion-cities/{stateAbbr}` and joins the maps would close this.

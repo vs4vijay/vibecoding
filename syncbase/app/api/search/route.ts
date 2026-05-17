@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
   const offset = parseInt(url.searchParams.get("offset") ?? "0", 10) || 0;
   const source = url.searchParams.get("source") ?? undefined;
   const category = url.searchParams.get("category") ?? undefined;
-  const result = await searchEntities({ q, limit, offset, source, category });
+  const rollupParam = url.searchParams.get("cluster_rollup");
+  const cluster_rollup = rollupParam == null ? undefined : rollupParam === "true" || rollupParam === "1";
+  const result = await searchEntities({ q, limit, offset, source, category, cluster_rollup });
   return NextResponse.json({ q, total: result.hits.length, ...result });
 }

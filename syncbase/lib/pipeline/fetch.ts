@@ -1,6 +1,19 @@
 import { ofetch } from "ofetch";
 import { extractRecords } from "./extract";
 
+export type PreRequestCapture = {
+  from: "cookie";
+  name: string;
+  to: string;   // e.g. "headers.X-XSRF-TOKEN" or "cookies.JSESSIONID"
+};
+
+export type PreRequest = {
+  method?: "GET" | "POST";
+  url: string;
+  headers?: Record<string, string>;
+  captures: PreRequestCapture[];
+};
+
 export type HttpConfig = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   url: string;
@@ -8,6 +21,11 @@ export type HttpConfig = {
   params?: Record<string, string | number>;
   form?: Record<string, string | number>;
   body?: unknown;
+  pre_request?: PreRequest;
+  /** Internal: cookies attached to every request issued by this http config.
+   *  Operators should not set this directly; the pipeline writes it after running
+   *  pre_request and reads it for paginated requests. */
+  cookies?: Record<string, string>;
 };
 
 export type PaginationConfig =
@@ -37,9 +55,15 @@ export type FetchHook = (page: number, raw: unknown, records: unknown[]) => void
 
 function buildFetchInit(http: HttpConfig, extraForm?: Record<string, string | number>) {
   const method = http.method ?? "GET";
+  const headers: Record<string, string> = { ...(http.headers ?? {}) };
+  if (http.cookies && Object.keys(http.cookies).length) {
+    const cookieHeader = Object.entries(http.cookies)
+      .map(([k, v]) => `${k}=${v}`).join("; ");
+    headers["Cookie"] = cookieHeader;
+  }
   const init: Parameters<typeof ofetch>[1] = {
     method,
-    headers: { ...(http.headers ?? {}) },
+    headers,
     retry: 1,
     timeout: 60_000,
     // Force-parse JSON even when server returns text/html — some APIs (e.g. PHP
@@ -88,6 +112,42 @@ function buildFetchInit(http: HttpConfig, extraForm?: Record<string, string | nu
     if (Object.keys(merged).length) (init as any).query = merged;
   }
   return init;
+}
+
+/**
+ * Run the optional pre_request and return an HttpConfig clone with captured
+ * cookies/headers applied. No-op when pre_request is undefined.
+ */
+export async function applyPreRequest(http: HttpConfig): Promise<HttpConfig> {
+  if (!http.pre_request) return http;
+  const pre = http.pre_request;
+  const headers = { ...(pre.headers ?? {}), "User-Agent": "Mozilla/5.0", Accept: "*/*" };
+  const resp = await fetch(pre.url, { method: pre.method ?? "GET", headers });
+  // Parse Set-Cookie. node fetch returns the combined Set-Cookie header on `getSetCookie()`.
+  const setCookies: string[] = (resp.headers as any).getSetCookie?.() ?? [];
+  const cookieMap: Record<string, string> = {};
+  for (const sc of setCookies) {
+    const first = sc.split(";")[0].trim();
+    const eq = first.indexOf("=");
+    if (eq <= 0) continue;
+    cookieMap[first.slice(0, eq)] = first.slice(eq + 1);
+  }
+  const next: HttpConfig = {
+    ...http,
+    headers: { ...(http.headers ?? {}) },
+    cookies: { ...(http.cookies ?? {}) },
+  };
+  for (const cap of pre.captures) {
+    if (cap.from !== "cookie") continue;
+    const value = cookieMap[cap.name];
+    if (value == null) continue;
+    if (cap.to.startsWith("headers.")) {
+      next.headers![cap.to.slice("headers.".length)] = value;
+    } else if (cap.to.startsWith("cookies.")) {
+      next.cookies![cap.to.slice("cookies.".length)] = value;
+    }
+  }
+  return next;
 }
 
 export async function fetchOnePage(

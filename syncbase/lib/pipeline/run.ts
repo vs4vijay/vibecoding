@@ -4,7 +4,7 @@ import { getDb, getDriver, getRawClient } from "../db";
 import { runs, type Source } from "../db/schema";
 import { canonicalHash } from "./hash";
 import { extractScalar } from "./extract";
-import { paginate, type HttpConfig, type PaginationConfig } from "./fetch";
+import { paginate, applyPreRequest, type HttpConfig, type PaginationConfig } from "./fetch";
 import { applyLocation } from "./location";
 import type { LocationConfig, RunLocation } from "../validation";
 
@@ -51,7 +51,8 @@ export async function runPipeline(
   try {
     const rawHttp = source.http as HttpConfig;
     const location = (source as Source & { location?: LocationConfig | null }).location ?? null;
-    const http = applyLocation(rawHttp, location, runLocation, source.name);
+    const httpAfterLoc = applyLocation(rawHttp, location, runLocation, source.name);
+    const http = await applyPreRequest(httpAfterLoc);
     const pagination = source.pagination as PaginationConfig;
 
     // Dedupe by external_id across the entire run, last-wins. This is necessary
@@ -100,6 +101,18 @@ export async function runPipeline(
         recordsSkipped,
       })
       .where(sql`id = ${runId}`);
+
+    // Auto-dedup: kick off intra-source dedup for this source if it has a config
+    // AND the run actually wrote something. Errors here are logged but never fail the run.
+    if ((recordsCreated > 0 || recordsUpdated > 0) && (source as any).dedup) {
+      try {
+        const { detectDuplicatesForSource } = await import("./dedup");
+        const summary = await detectDuplicatesForSource(source.name);
+        console.log(`[pipeline] auto-dedup ${source.name}: ${summary.pairs_flagged} pairs, ${summary.duration_ms}ms`);
+      } catch (err) {
+        console.error(`[pipeline] auto-dedup failed for ${source.name}:`, err);
+      }
+    }
 
     return {
       runId,

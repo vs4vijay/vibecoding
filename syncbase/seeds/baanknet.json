@@ -1,0 +1,92 @@
+{
+  "name": "baanknet",
+  "enabled": true,
+  "category": "bank-auction",
+  "location": { "mode": "none", "supports_all": true },
+  "http": {
+    "method": "POST",
+    "url": "https://baanknet.com/eauction-psb/api/auction-listing-data/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Origin": "https://baanknet.com",
+      "Referer": "https://baanknet.com/search-auction"
+    },
+    "pre_request": {
+      "method": "GET",
+      "url": "https://baanknet.com/eauction-psb/api/get-session",
+      "captures": [
+        { "from": "cookie", "name": "XSRF-TOKEN", "to": "headers.X-XSRF-TOKEN" },
+        { "from": "cookie", "name": "JSESSIONID", "to": "cookies.JSESSIONID" }
+      ]
+    },
+    "body": {
+      "auctionID": null,
+      "bankPropertyId": null,
+      "propertyTypeID": "",
+      "propertySubTypeID": "",
+      "propertyTypeOfAction": "",
+      "reservedPriceFrom": "",
+      "reservedPriceTo": "",
+      "stateID": "",
+      "districtID": "",
+      "cityID": "",
+      "pinCode": null,
+      "bankID": "",
+      "auctionStartDateTimeFrom": null,
+      "auctionStartDateTimeTo": null,
+      "isLoanAvailable": "",
+      "properTyPossessionTypeId": "",
+      "carpetAreaFrom": "",
+      "carpetAreaTo": "",
+      "noOfRooms": null,
+      "carpetAreaUOM": "",
+      "tab": 0,
+      "tabRequired": false,
+      "userId": null
+    }
+  },
+  "pagination": {
+    "style": "page",
+    "page_param": "page",
+    "size_param": "size",
+    "size": 100,
+    "start_page": 0,
+    "stop_when": "empty_records",
+    "max_pages": 100
+  },
+  "records_path": "$.data",
+  "external_id_path": "$.auctionID",
+  "hash_fields": null,
+  "schedule_cron": "*/30 * * * *",
+  "storage_mode": "generic",
+  "dedup": {
+    "key_fields": [
+      { "path": "$.pinCode", "normalize": "pincode" },
+      { "path": "$.reservedPrice", "normalize": "round_10000" },
+      { "path": "$.bankPropertyId", "normalize": "identity" }
+    ],
+    "similarity_threshold": 0.75,
+    "compare_fields": ["$.propertytitle", "$.borrowerName"]
+  },
+  "cross_dedup": {
+    "pincode": "$.pinCode",
+    "city": "$.city",
+    "state": "$.state",
+    "price": "$.reservedPrice",
+    "bank": "$.bankName",
+    "title": "$.propertytitle",
+    "address": "$.borrowerName",
+    "date": "$.auctionStartDateTime"
+  },
+  "display_columns": [
+    { "label": "Property", "jsonpath": "$.propertytitle", "primary": true },
+    { "label": "Bank", "jsonpath": "$.bankName" },
+    { "label": "City", "jsonpath": "$.city" },
+    { "label": "State", "jsonpath": "$.state" },
+    { "label": "Pincode", "jsonpath": "$.pinCode" },
+    { "label": "Reserve ₹", "jsonpath": "$.reservedPrice" },
+    { "label": "Auction start", "jsonpath": "$.auctionStartDateTime" }
+  ]
+}

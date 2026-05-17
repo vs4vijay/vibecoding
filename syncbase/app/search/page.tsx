@@ -108,6 +108,11 @@ export default async function SearchPage({
                 {h.category && <span>· {h.category}</span>}
                 <span>· id {h.id}</span>
                 <span>· ext <code>{h.external_id}</code></span>
+                {h.cluster_id && h.members && h.members.length > 1 && (
+                  <span title={h.members.map((m) => `${m.source}#${m.id}`).join(", ")}>
+                    · <strong>+{h.members.length - 1}</strong> similar from {new Set(h.members.map((m) => m.source)).size - 1} other source(s)
+                  </span>
+                )}
               </div>
             </div>
           ))}
