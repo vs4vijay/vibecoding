@@ -21,6 +21,10 @@ const HttpConfigSchema = z.object({
   form: z.record(z.union([z.string(), z.number()])).optional(),
   body: z.any().optional(),
   pre_request: PreRequestSchema.optional(),
+  // Set true when the source's TLS cert chain isn't in Node's trust store
+  // (corporate proxies, gov-issued certs, etc.). Scoped to the source — far safer
+  // than the process-wide NODE_TLS_REJECT_UNAUTHORIZED=0 env var.
+  insecure_tls: z.boolean().optional(),
 });
 
 const PaginationSchema = z.discriminatedUnion("style", [
@@ -41,6 +45,14 @@ const PaginationSchema = z.discriminatedUnion("style", [
     size: z.number().int().positive(),
     start_offset: z.number().int().nonnegative().optional(),
     stop_when: z.literal("empty_records").optional(),
+    max_pages: z.number().int().positive().optional(),
+  }),
+  z.object({
+    // F3 "values": iterate a fixed list of opaque codes into a `{{value}}` URL template.
+    // Each iteration is independent; we don't stop on empty_records (each shard's emptiness
+    // is unrelated to the next). max_pages caps the iteration as a safety net.
+    style: z.literal("values"),
+    values: z.array(z.string().min(1)).min(1),
     max_pages: z.number().int().positive().optional(),
   }),
 ]);

@@ -138,4 +138,27 @@ describe("D2 — cross-source clustering", () => {
     // The a1↔a2 pair itself is skipped.
     expect(n).toBe(2);
   });
+
+  // Last in this file — it deletes b1, which other tests rely on.
+  test("AC-D2.4: orphan cluster members get swept on next pass", async () => {
+    const db = getDb();
+    // Hard-delete b1 (one half of the original cross-source pair).
+    await db.execute(sql`DELETE FROM entities WHERE source='src_beta' AND external_id='b1'`);
+    const summary = await detectCrossSourceDuplicates();
+    expect(summary.orphans_swept).toBeGreaterThanOrEqual(1);
+    // No surviving cluster_members row should reference a deleted entity.
+    const orphanCheck: any = await db.execute(sql`
+      SELECT count(*)::int AS n FROM entity_cluster_members m
+      WHERE NOT EXISTS (
+        SELECT 1 FROM entities e WHERE e.source = m.source AND e.id = m.entity_id
+      )
+    `);
+    expect(Number((orphanCheck.rows ?? orphanCheck)[0].n)).toBe(0);
+    // Every entity_clusters row still has ≥1 member.
+    const c: any = await db.execute(sql`
+      SELECT cluster_id FROM entity_clusters c
+      WHERE NOT EXISTS (SELECT 1 FROM entity_cluster_members m WHERE m.cluster_id = c.cluster_id)
+    `);
+    expect((c.rows ?? c).length).toBe(0);
+  });
 });

@@ -32,6 +32,6 @@
   "records_path": "$.aaData",
   "external_id_path": "$[1]",
   "hash_fields": null,
-  "schedule_cron": null,
+  "schedule_cron": "*/60 * * * *",
   "storage_mode": "generic"
 }

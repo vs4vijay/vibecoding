@@ -129,7 +129,7 @@ Location is **body-keyed**. F1 config:
 - Full search-form body confirmed: every field present at `clearForm()` defaults, plus `tab: 0`, `tabRequired: false`, `userId: null`. `tab: 0` returns the "all live" feed (8,139 records total). `tab: 2/3/4` open much larger archives (277k+) — pursue if needed.
 - Pre-flight `GET /eauction-psb/api/get-session` captures `JSESSIONID` (HttpOnly, path `/eauction-psb`) and `XSRF-TOKEN`. The latter must be echoed back in the `X-XSRF-TOKEN` header for the POST.
 - The pipeline grew a generic `http.pre_request` capability for this (see `lib/pipeline/fetch.ts:applyPreRequest`). The session is bootstrapped once per run; if it expires mid-pagination during a long sync we'd need an auto-retry hook (not implemented yet).
-- `bun bin/cli.ts run --source baanknet` requires `NODE_TLS_REJECT_UNAUTHORIZED=0` on dev boxes whose trust store doesn't include the baanknet CA. Prod Linux with `ca-certificates` updated is fine. **Don't ship the env var as a default** — it disables TLS verification process-wide.
+- Baanknet's cert chain isn't in Node's default trust store on Windows / some CI images. The seed sets `http.insecure_tls: true` so this single source's calls bypass TLS verification — the rest of the process keeps strict verification. Replaces the earlier process-wide `NODE_TLS_REJECT_UNAUTHORIZED=0` workaround.
 - Cross-source dedup against `eauctiondekho` clusters **2,177 records** — confirmed: `eauctiondekho` aggregates baanknet as a `serviceProvider`, so most baanknet listings have a sibling in eauctiondekho.
 
 ## Known risks

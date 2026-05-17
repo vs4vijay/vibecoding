@@ -15,6 +15,7 @@ type FormState = {
   // Basics
   name: string;
   enabled: boolean;
+  category: string;
 
   // HTTP
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -23,9 +24,14 @@ type FormState = {
   params: KV[];
   form: KV[];
   bodyRaw: string;
+  insecure_tls: boolean;
+  /** Optional pre-flight (e.g. baanknet's get-session). JSON-edited inline.
+   *  Shape: { method?, url, headers?, captures: [{from:'cookie', name, to: 'headers.X' | 'cookies.X'}] }
+   *  Empty string = no pre-request. */
+  pre_request_raw: string;
 
   // Pagination
-  pagination_style: "none" | "page" | "offset";
+  pagination_style: "none" | "page" | "offset" | "values";
   page_param: string;
   size_param: string;
   size: number | "";
@@ -34,6 +40,8 @@ type FormState = {
   start_offset: number | "";
   stop_when_empty: boolean;
   max_pages: number | "";
+  /** For pagination.style === "values": one value per line in the textarea. */
+  values_list: string;
 
   // Extraction
   records_path: string;
@@ -49,6 +57,14 @@ type FormState = {
 
   // Schedule
   schedule_cron: string;
+
+  // Advanced
+  /** location config — JSON-edited inline. Shape: { mode, field?, city_values?, state_values?, templated?, supports_all? } */
+  location_raw: string;
+  /** intra-source dedup config — JSON. Shape: { key_fields:[{path,normalize}], similarity_threshold?, compare_fields? } */
+  dedup_raw: string;
+  /** cross-source dedup config — JSON. Shape: { pincode?, city?, state?, price?, bank?, title?, address?, date? } */
+  cross_dedup_raw: string;
 };
 
 const ALLOWED_TYPES = ["text", "integer", "bigint", "boolean", "numeric", "timestamptz", "date", "jsonb"];
@@ -57,6 +73,7 @@ const ALLOWED_TYPES = ["text", "integer", "bigint", "boolean", "numeric", "times
 const STARTER: FormState = {
   name: "rera_raj_projects",
   enabled: true,
+  category: "",
   method: "POST",
   url: "https://rera.rajasthan.gov.in/Home/GetProjectsList",
   headers: [
@@ -75,6 +92,8 @@ const STARTER: FormState = {
     { key: "applicationStatus", value: "3" },
   ],
   bodyRaw: "",
+  insecure_tls: false,
+  pre_request_raw: "",
   pagination_style: "page",
   page_param: "page",
   size_param: "PageSize",
@@ -84,6 +103,7 @@ const STARTER: FormState = {
   start_offset: "",
   stop_when_empty: true,
   max_pages: "",
+  values_list: "",
   records_path: "$.Data",
   external_id_path: "$.RegNo",
   hash_fields_input: "",
@@ -91,6 +111,9 @@ const STARTER: FormState = {
   typed_columns: [],
   display_columns: [],
   schedule_cron: "",
+  location_raw: "",
+  dedup_raw: "",
+  cross_dedup_raw: "",
 };
 
 const TABS = [
@@ -101,6 +124,7 @@ const TABS = [
   { id: "storage",    label: "Storage" },
   { id: "display",    label: "Display" },
   { id: "schedule",   label: "Schedule" },
+  { id: "advanced",   label: "Advanced" },
   { id: "review",     label: "Review & Test" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -115,6 +139,11 @@ function kvToObject(list: KV[]): Record<string, string> | undefined {
   return obj;
 }
 
+function parseJsonOrUndefined(raw: string): unknown {
+  if (!raw.trim()) return undefined;
+  try { return JSON.parse(raw); } catch { return undefined; }
+}
+
 function buildPayload(s: FormState) {
   const http: any = {
     method: s.method,
@@ -126,6 +155,9 @@ function buildPayload(s: FormState) {
   if (s.bodyRaw.trim()) {
     try { http.body = JSON.parse(s.bodyRaw); } catch { http.body = s.bodyRaw; }
   }
+  if (s.insecure_tls) http.insecure_tls = true;
+  const preReq = parseJsonOrUndefined(s.pre_request_raw);
+  if (preReq) http.pre_request = preReq;
 
   let pagination: any;
   if (s.pagination_style === "none") {
@@ -140,7 +172,7 @@ function buildPayload(s: FormState) {
     if (s.start_page !== "") pagination.start_page   = Number(s.start_page);
     if (s.stop_when_empty)   pagination.stop_when    = "empty_records";
     if (s.max_pages !== "")  pagination.max_pages    = Number(s.max_pages);
-  } else {
+  } else if (s.pagination_style === "offset") {
     pagination = {
       style: "offset",
       offset_param: s.offset_param || "offset",
@@ -150,6 +182,14 @@ function buildPayload(s: FormState) {
     if (s.start_offset !== "") pagination.start_offset = Number(s.start_offset);
     if (s.stop_when_empty)   pagination.stop_when    = "empty_records";
     if (s.max_pages !== "")  pagination.max_pages    = Number(s.max_pages);
+  } else {
+    // style === "values"
+    const values = s.values_list
+      .split(/\r?\n/)
+      .map((v) => v.trim())
+      .filter(Boolean);
+    pagination = { style: "values", values };
+    if (s.max_pages !== "") pagination.max_pages = Number(s.max_pages);
   }
 
   const hash_fields = s.hash_fields_input.trim()
@@ -167,8 +207,15 @@ function buildPayload(s: FormState) {
     schedule_cron: s.schedule_cron.trim() || null,
     storage_mode: s.storage_mode,
   };
+  if (s.category.trim()) payload.category = s.category.trim();
   if (s.storage_mode === "dedicated") payload.typed_columns = s.typed_columns;
   if (s.display_columns.length) payload.display_columns = s.display_columns;
+  const location = parseJsonOrUndefined(s.location_raw);
+  if (location) payload.location = location;
+  const dedup = parseJsonOrUndefined(s.dedup_raw);
+  if (dedup) payload.dedup = dedup;
+  const crossDedup = parseJsonOrUndefined(s.cross_dedup_raw);
+  if (crossDedup) payload.cross_dedup = crossDedup;
   return payload;
 }
 
@@ -335,6 +382,7 @@ export default function NewSourcePage() {
             />
           )}
           {tab === "schedule"   && <ScheduleTab s={s} update={update} />}
+          {tab === "advanced"   && <AdvancedTab s={s} update={update} />}
           {tab === "review"     && <ReviewTab payload={payload} />}
         </>
       )}
@@ -412,6 +460,15 @@ function BasicsTab({ s, update }: { s: FormState; update: (p: Partial<FormState>
           </label>
           <span className="hint">Disabled sources are skipped by the scheduler and refuse adhoc runs.</span>
         </div>
+        <div className="field">
+          <label>Category <span className="dim">(optional, used by search facets and dedup grouping)</span></label>
+          <input
+            value={s.category}
+            onChange={(e) => update({ category: e.target.value })}
+            placeholder="bank-auction"
+          />
+          <span className="hint">Free-form tag — examples in use: <code>bank-auction</code>, <code>govt-eauction</code>, <code>govt-customs</code>.</span>
+        </div>
       </div>
     </div>
   );
@@ -461,6 +518,32 @@ function HttpTab({ s, update }: { s: FormState; update: (p: Partial<FormState>) 
             placeholder='{"filter": {"status": "active"}}'
           />
         </div>
+        <div className="field">
+          <label className="row" style={{ gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={s.insecure_tls}
+              onChange={(e) => update({ insecure_tls: e.target.checked })}
+              style={{ width: "auto" }}
+            />
+            Skip TLS verification (<code>insecure_tls</code>)
+          </label>
+          <span className="hint">
+            Only enable when the upstream's cert chain isn't in Node's trust store (e.g. some gov / corporate
+            issuers). Scoped to this source — strict verification still applies everywhere else.
+          </span>
+        </div>
+        <div className="field">
+          <label>Pre-flight request <span className="dim">(optional JSON; captures cookies → headers/cookies for the main request)</span></label>
+          <textarea
+            value={s.pre_request_raw}
+            onChange={(e) => update({ pre_request_raw: e.target.value })}
+            rows={6}
+            style={{ fontFamily: "ui-monospace, monospace" }}
+            placeholder={'{\n  "method": "GET",\n  "url": "https://example.com/api/get-session",\n  "captures": [\n    { "from": "cookie", "name": "XSRF-TOKEN", "to": "headers.X-XSRF-TOKEN" },\n    { "from": "cookie", "name": "JSESSIONID", "to": "cookies.JSESSIONID" }\n  ]\n}'}
+          />
+          <span className="hint">Used by sources that gate on a session cookie + CSRF token (e.g. baanknet). Leave blank for stateless APIs.</span>
+        </div>
       </div>
     </div>
   );
@@ -490,6 +573,7 @@ function PaginationTab({ s, update }: { s: FormState; update: (p: Partial<FormSt
             <option value="none">none — single request</option>
             <option value="page">page — incrementing page number</option>
             <option value="offset">offset — fixed-size windows</option>
+            <option value="values">values — iterate a fixed list (URL contains {`{{value}}`})</option>
           </select>
         </div>
 
@@ -528,6 +612,26 @@ function PaginationTab({ s, update }: { s: FormState; update: (p: Partial<FormSt
               />
               stop when empty records
             </label>
+          </div>
+        )}
+
+        {s.pagination_style === "values" && (
+          <div className="col">
+            <div className="field">
+              <label>Values <span className="dim">(one per line — substituted for <code>{`{{value}}`}</code> in the URL)</span></label>
+              <textarea
+                value={s.values_list}
+                onChange={(e) => update({ values_list: e.target.value })}
+                rows={6}
+                style={{ fontFamily: "ui-monospace, monospace" }}
+                placeholder="HO&#10;BLR&#10;HYD&#10;..."
+              />
+              <span className="hint">
+                URL must contain <code>{`{{value}}`}</code> — e.g. <code>https://.../getScrollMsg/{`{{value}}`}</code>.
+                Each value becomes one fetch; an empty page does <em>not</em> abort the loop.
+              </span>
+            </div>
+            <FieldNum label="max_pages (optional safety cap)" value={s.max_pages} onChange={(v) => update({ max_pages: v })} />
           </div>
         )}
       </div>
@@ -798,6 +902,71 @@ function ScheduleTab({ s, update }: { s: FormState; update: (p: Partial<FormStat
   );
 }
 
+// -- Tab: Advanced ------------------------------------------------------
+
+function AdvancedTab({ s, update }: { s: FormState; update: (p: Partial<FormState>) => void }) {
+  return (
+    <div className="col">
+      <Help title="Advanced — location filters, dedup, cross-source clustering">
+        These are inline JSON config blocks. Leave any block empty to skip it.
+        Field shapes mirror <code>lib/validation.ts</code>:
+        <ul>
+          <li><strong>Location</strong> — declare how the source accepts a runtime city/state filter. <code>mode</code> ∈ <code>none | query | form | body | path</code>; with <code>supports_all: true</code>, an empty location simply fetches all.</li>
+          <li><strong>Dedup</strong> — intra-source near-duplicate detection. List the <code>key_fields</code> that define a candidate group and the <code>compare_fields</code> whose trigram similarity decides the pair.</li>
+          <li><strong>Cross dedup</strong> — JSONPath mapping into the common cross-source shape (pincode, city, state, price, bank, title, address, date). Required for this source to participate in <code>dedup --cross-source</code>.</li>
+        </ul>
+      </Help>
+
+      <div className="card col">
+        <div className="field">
+          <label>Location config <span className="dim">(JSON; empty = no per-run location filter)</span></label>
+          <textarea
+            value={s.location_raw}
+            onChange={(e) => update({ location_raw: e.target.value })}
+            rows={8}
+            style={{ fontFamily: "ui-monospace, monospace" }}
+            placeholder={'{\n  "mode": "query",\n  "field": "city_id",\n  "city_values": { "ajmer": "16", "bangalore": "23" },\n  "supports_all": true\n}'}
+          />
+          <span className="hint">
+            <strong>mode</strong> = <code>none</code> | <code>query</code> | <code>form</code> | <code>body</code> | <code>path</code>.{' '}
+            For <code>path</code>, set <code>templated: "https://.../{`{{ location.city|slug }}`}"</code>.
+          </span>
+        </div>
+
+        <div className="field">
+          <label>Dedup config <span className="dim">(intra-source D1; JSON)</span></label>
+          <textarea
+            value={s.dedup_raw}
+            onChange={(e) => update({ dedup_raw: e.target.value })}
+            rows={8}
+            style={{ fontFamily: "ui-monospace, monospace" }}
+            placeholder={'{\n  "key_fields": [\n    { "path": "$.address", "normalize": "address" },\n    { "path": "$.reservePrice", "normalize": "round_10000" }\n  ],\n  "similarity_threshold": 0.75,\n  "compare_fields": ["$.title", "$.address"]\n}'}
+          />
+          <span className="hint">
+            <strong>normalize</strong> ∈ <code>address</code> | <code>round_1000</code> | <code>round_10000</code> | <code>date_week</code> | <code>pincode</code> | <code>bank</code> | <code>lower</code> | <code>identity</code>.{' '}
+            Runs automatically after every successful ingest (auto-dedup hook).
+          </span>
+        </div>
+
+        <div className="field">
+          <label>Cross-source dedup config <span className="dim">(cross-source D2; JSON mapping)</span></label>
+          <textarea
+            value={s.cross_dedup_raw}
+            onChange={(e) => update({ cross_dedup_raw: e.target.value })}
+            rows={8}
+            style={{ fontFamily: "ui-monospace, monospace" }}
+            placeholder={'{\n  "pincode": "$.attributes.pincode",\n  "city": "$.attributes.city",\n  "state": "$.attributes.state",\n  "price": "$.attributes.reservePrice",\n  "bank": "$.attributes.bankName",\n  "title": "$.attributes.title",\n  "address": "$.attributes.propertyAddress",\n  "date": "$.attributes.auctionDate"\n}'}
+          />
+          <span className="hint">
+            Pure JSONPath mapping: tell the cross-dedup pass where this source's payload exposes each common
+            field. Sources without this block don't participate in cross-source clustering.
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // -- Tab: Review --------------------------------------------------------
 
 function ReviewTab({ payload }: { payload: any }) {
@@ -913,12 +1082,15 @@ function applyPayloadToState(p: any, setS: React.Dispatch<React.SetStateAction<F
   setS({
     name: p.name ?? "",
     enabled: p.enabled ?? true,
+    category: p.category ?? "",
     method: (http.method ?? "GET") as any,
     url: http.url ?? "",
     headers: objToKv(http.headers),
     params: objToKv(http.params),
     form: objToKv(http.form),
     bodyRaw: http.body == null ? "" : typeof http.body === "string" ? http.body : JSON.stringify(http.body, null, 2),
+    insecure_tls: http.insecure_tls === true,
+    pre_request_raw: http.pre_request ? JSON.stringify(http.pre_request, null, 2) : "",
     pagination_style: pag.style ?? "none",
     page_param: pag.page_param ?? "page",
     size_param: pag.size_param ?? "",
@@ -928,6 +1100,7 @@ function applyPayloadToState(p: any, setS: React.Dispatch<React.SetStateAction<F
     start_offset: pag.start_offset ?? "",
     stop_when_empty: pag.stop_when === "empty_records",
     max_pages: pag.max_pages ?? "",
+    values_list: Array.isArray(pag.values) ? pag.values.join("\n") : "",
     records_path: p.records_path ?? "",
     external_id_path: p.external_id_path ?? "",
     hash_fields_input: Array.isArray(p.hash_fields) ? p.hash_fields.join(", ") : "",
@@ -935,5 +1108,8 @@ function applyPayloadToState(p: any, setS: React.Dispatch<React.SetStateAction<F
     typed_columns: Array.isArray(p.typed_columns) ? p.typed_columns : [],
     display_columns: Array.isArray(p.display_columns) ? p.display_columns : [],
     schedule_cron: p.schedule_cron ?? "",
+    location_raw: p.location ? JSON.stringify(p.location, null, 2) : "",
+    dedup_raw: p.dedup ? JSON.stringify(p.dedup, null, 2) : "",
+    cross_dedup_raw: p.cross_dedup ? JSON.stringify(p.cross_dedup, null, 2) : "",
   });
 }

@@ -1,0 +1,40 @@
+{
+  "name": "bangalorecustoms_media",
+  "enabled": true,
+  "category": "govt-customs",
+  "location": { "mode": "none", "supports_all": true },
+  "http": {
+    "method": "GET",
+    "url": "https://bangalorecustoms.gov.in/wp-json/wp/v2/media",
+    "insecure_tls": true,
+    "params": {
+      "search": "auction",
+      "orderby": "date",
+      "order": "desc"
+    },
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Accept": "application/json"
+    }
+  },
+  "pagination": {
+    "style": "page",
+    "page_param": "page",
+    "size_param": "per_page",
+    "size": 10,
+    "start_page": 1,
+    "stop_when": "empty_records",
+    "max_pages": 1
+  },
+  "records_path": "$",
+  "external_id_path": "$.id",
+  "hash_fields": null,
+  "schedule_cron": "*/30 * * * *",
+  "storage_mode": "generic",
+  "display_columns": [
+    { "label": "Title", "jsonpath": "$.title.rendered", "primary": true },
+    { "label": "Modified", "jsonpath": "$.modified" },
+    { "label": "PDF", "jsonpath": "$.source_url" },
+    { "label": "MIME", "jsonpath": "$.mime_type" }
+  ]
+}

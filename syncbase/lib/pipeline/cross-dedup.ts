@@ -36,14 +36,56 @@ export type CrossDedupSummary = {
   pairs_evaluated: number;
   clusters_created: number;
   members_attached: number;
+  orphans_swept: number;
   duration_ms: number;
 };
+
+/**
+ * Drop entity_cluster_members rows whose (source, entity_id) no longer points at
+ * a live entity in any storage table. There's no foreign key on these rows
+ * (entity_id can reference either `entities` or a dedicated `entities_<slug>` table),
+ * so we cleanup-sweep here at the start of each cross-dedup pass.
+ */
+async function sweepOrphanClusterMembers(db: any, allSrcs: Source[]): Promise<number> {
+  const TABLE_RE = /^[a-z][a-z0-9_]{0,62}$/i;
+  // Build the live (source, entity_id) set from every distinct storage table.
+  const tables = new Set<string>();
+  for (const s of allSrcs) tables.add(s.storageTable);
+  const live = new Set<string>();
+  for (const t of tables) {
+    if (!TABLE_RE.test(t)) continue;
+    const res: any = await db.execute(sql`SELECT source, id FROM ${sql.identifier(t)}`).catch(() => null);
+    if (!res) continue;
+    for (const r of (res.rows ?? res)) live.add(`${r.source}\x00${Number(r.id)}`);
+  }
+  // Pull all cluster members and compute the orphan set in JS, then DELETE them.
+  const cm: any = await db.execute(sql`SELECT cluster_id, source, entity_id FROM entity_cluster_members`);
+  const rows: any[] = cm.rows ?? cm;
+  const orphans = rows.filter((r) => !live.has(`${r.source}\x00${Number(r.entity_id)}`));
+  for (const o of orphans) {
+    await db.execute(sql`
+      DELETE FROM entity_cluster_members
+      WHERE cluster_id = ${Number(o.cluster_id)}
+        AND source = ${o.source}
+        AND entity_id = ${Number(o.entity_id)}
+    `);
+  }
+  // Then prune empty clusters and update member_count for the rest.
+  await db.execute(sql`DELETE FROM entity_clusters WHERE cluster_id NOT IN (SELECT cluster_id FROM entity_cluster_members)`);
+  await db.execute(sql`
+    UPDATE entity_clusters c SET member_count = (
+      SELECT count(*) FROM entity_cluster_members m WHERE m.cluster_id = c.cluster_id
+    )
+  `);
+  return orphans.length;
+}
 
 export async function detectCrossSourceDuplicates(): Promise<CrossDedupSummary> {
   const t0 = Date.now();
   const db = getDb();
   const srcs: Source[] = await db.select().from(sources);
   const eligible = srcs.filter((s) => !!(s as any).crossDedup && s.enabled);
+  const orphansSwept = await sweepOrphanClusterMembers(db, srcs);
 
   // Project every entity from every eligible source into a common shape.
   // We page through each source in chunks because pulling 10k+ JSONB rows in a
@@ -208,6 +250,7 @@ export async function detectCrossSourceDuplicates(): Promise<CrossDedupSummary> 
     pairs_evaluated: pairsEvaluated,
     clusters_created: clustersCreated,
     members_attached: membersAttached,
+    orphans_swept: orphansSwept,
     duration_ms: Date.now() - t0,
   };
 }

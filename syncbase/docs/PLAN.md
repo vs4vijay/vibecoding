@@ -17,13 +17,16 @@ This document is **plan-only**. Implementation is gated on the per-phase ✅ che
 | **S2** | `baanknet.com` (PSB Alliance / IBA) | new seed `baanknet_listing` | F1 |
 | **S3** | `eauctiondekho.com` | new seed `eauctiondekho` | F1 |
 | **S4** | `auctionbazaar.com` | new seed `auctionbazaar` | F1 |
-| **S5** | `mstcindia.co.in` Forthcoming e-Auctions | new seed `mstcindia_forthcoming` (after spike) | F1, spike |
-| **S6** | `foreclosureindia.com` bank-auctions | new seed `foreclosureindia` (after spike) | F1, spike |
-| **S7** | HTML-only sources — deferred bucket | docs only, no seeds | — |
+| **S5** | `mstcindia.co.in` Forthcoming e-Auctions | new seed `mstcindia_forthcoming` (after spike) | F1, spike, **F3** |
+| **S6** | `foreclosureindia.com` bank-auctions | parked — no JSON path, see [`docs/sources/foreclosureindia.md`](./sources/foreclosureindia.md) | — |
+| **S7** | HTML-only sources — parked | per-source docs under `docs/sources/`; each documents *why* it's parked | — |
 | **G1** | Global Search API + UI | `/api/search`, `/search` page, FTS + trigram ranking | F2, ≥3 sources from S1-S4 |
 | **G2** | Source/category filters on Search | search facets on `source`, `location`, `category`, `price_range`, `auction_date` | G1 |
 | **D1** | Duplicate detection (intra-source) | blocking + similarity inside one source; mark `duplicate_of` in `entities` | G1 |
 | **D2** | Cross-source duplicate clusters | cluster across sources; new `entity_clusters` table; UI shows clustered card | D1 |
+| **F3** | `pagination.style: "values"` | iterate a fixed list of string values into a URL template; needed for `mstcindia.co.in` (20 region codes) and any future "sharded by code" source | — |
+| **S8** | `chennaicustoms.gov.in` (WP REST media) | new seed `chennaicustoms_media` | F1 |
+| **S9** | `bangalorecustoms.gov.in` (WP REST media) | new seed `bangalorecustoms_media` | F1 |
 
 Skip cycles: each phase has a **rollback** entry — if the seed fails Test-fetch or the recon documented in `docs/sources/<slug>.md` turns out wrong, that phase parks and the next one starts. We do not gate the global-search phase on every source being live.
 
@@ -276,6 +279,73 @@ Adds facet filters on top of G1. No new endpoint — `/api/search` gains `&sourc
 **Tests:**
 - AC-D3: an ibapi.in entity and a bankeauctions.com entity with identical pincode + reserve_price within ₹10k → joined into one cluster, surfaced as one search hit.
 - AC-D4: operator splits a cluster → the split persists across the next dedup run.
+
+---
+
+---
+
+## F3 — `pagination.style: "values"`
+
+**Goal:** ingest a source whose data is sharded by a fixed list of opaque codes — `mstcindia.co.in` exposes `getScrollMsg/{REGION}` and there are 20 region codes. Without this mode, we'd need 20 separate source rows (each with its own cron, its own runs row, its own dedup config).
+
+**Schema (additive):**
+
+```jsonc
+{
+  "pagination": {
+    "style": "values",
+    "values": ["HO","BBR","BPL","BLR","CDG","ERO","GHY","HYD","JPR","LKO",
+               "NRO","RNC","RPR","SRO","TVC","VAD","BZA","VZG","WRO","PTN"]
+  },
+  "http": {
+    "method": "GET",
+    "url": "https://www.mstcindia.co.in/mstcwebservice/Service.svc/getScrollMsg/{{value}}"
+  }
+}
+```
+
+**Behavior:**
+- `paginate()` iterates `values` in order. For each value, render `{{value}}` into `http.url` (and optionally into `http.body`/`http.params` later if a source needs it) and fetch.
+- `extractRecords(response, recordsPath)` runs per fetch; results are concatenated. A single run sees N pages where N = `values.length`.
+- An empty page does **not** abort the loop (each shard is independent); `stop_when` is ignored.
+- `max_pages` still caps the iteration as a safety net.
+
+**Tests:**
+- AC-V1: a seed with 3 `values` and a `{{value}}` URL template issues exactly 3 GETs to the rendered URLs in order.
+- AC-V2: records across the 3 shards land in `entities` with their distinct external IDs; AC-2 (idle re-run skips) still holds.
+- AC-V3: invalid template (missing `{{value}}` in URL) → run errors with `VALUES_TEMPLATE_REQUIRED`.
+
+---
+
+## S5 — `mstcindia.co.in`
+
+See [`docs/sources/mstcindia.md`](./sources/mstcindia.md). Single seed using F3's `values` pagination. 20 region codes, ~200-500 lots in flight at any time. `category: govt-eauction` (timber, scrap, vehicles, customs disposal — different category from bank-auctions, so it won't enter the bank-auction cross-dedup pool).
+
+**Hash strategy:** whole-record hash (`hash_fields: null`) — the record fields (`id`, `text`, `opening`, `Closing`, `GeneralLots`, `HazardousWaste`, `RVSFLots`, `OFF_NAME`) are small and stable.
+
+**Dedup:** none (single source, distinct category). No cross-dedup either.
+
+**Location:** `mode: "none"` (the region shard is already in the URL; per-run location filtering would mean selecting a subset of values).
+
+**Cron:** `*/30 * * * *` (30 lots/region rotate slower than the bank-auction sources).
+
+---
+
+## S8 — `chennaicustoms.gov.in`
+
+See [`docs/sources/chennaicustoms.md`](./sources/chennaicustoms.md). Standard `pagination.style: "page"` against WP REST. Records are PDF media items: each carries a stable Strapi-style `id`, a `source_url` pointing at the actual auction PDF, a `title.rendered`, and a `modified` timestamp.
+
+**Hash strategy:** whole-record hash (small payloads; `_links` is stable; safer than picking nested paths since `hash_fields` is flat-only today).
+
+**Dedup:** none for now — same source, no per-lot detail until a PDF-parse adapter exists.
+
+**Cron:** `*/30 * * * *`.
+
+---
+
+## S9 — `bangalorecustoms.gov.in`
+
+See [`docs/sources/bangalorecustoms.md`](./sources/bangalorecustoms.md). Mirror of S8 against the Bengaluru zone's WP REST.
 
 ---
 

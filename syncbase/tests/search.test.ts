@@ -74,6 +74,29 @@ describe("G1 — global search", () => {
     for (const h of r.hits) expect(h.category).toBe("govt-eauction");
   });
 
+  test("payload trim: heavy/noise fields are stripped from hits", async () => {
+    const db = getDb();
+    // Build the JSONB payload in JS so we can include 2 KB of 'x' cleanly.
+    const fatPayload = {
+      title: "Trim test fat row",
+      tsv: "x".repeat(2000),
+      _links: { self: "x" },
+      city: "Trimtown",
+    };
+    await db.execute(sql`
+      INSERT INTO entities (source, external_id, payload, content_hash) VALUES
+        ('src_banks', 'fat', ${JSON.stringify(fatPayload)}::jsonb, 'hfat')
+    `);
+    const r = await searchEntities({ q: "Trimtown" });
+    const hit = r.hits.find((h) => h.external_id === "fat");
+    expect(hit).toBeTruthy();
+    expect((hit!.payload as any).tsv).toBeUndefined();
+    expect((hit!.payload as any)._links).toBeUndefined();
+    // Real fields stick around.
+    expect((hit!.payload as any).city).toBe("Trimtown");
+    expect((hit!.payload as any).title).toBe("Trim test fat row");
+  });
+
   test("phrase search via websearch_to_tsquery", async () => {
     const r = await searchEntities({ q: '"Timber Auction"' });
     expect(r.hits.length).toBeGreaterThanOrEqual(1);

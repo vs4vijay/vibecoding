@@ -38,6 +38,8 @@ const PatchSchema = z.object({
     .optional(),
   category: z.string().min(1).max(64).nullable().optional(),
   location: z.any().nullable().optional(),
+  dedup: z.any().nullable().optional(),
+  cross_dedup: z.any().nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -72,6 +74,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (parsed.data.display_columns !== undefined) next.displayColumns = parsed.data.display_columns;
   if (parsed.data.category !== undefined) next.category = parsed.data.category;
   if (parsed.data.location !== undefined) next.location = parsed.data.location;
+  if (parsed.data.dedup !== undefined) next.dedup = parsed.data.dedup;
+  if (parsed.data.cross_dedup !== undefined) next.crossDedup = parsed.data.cross_dedup;
 
   const [updated] = await db
     .update(sources)

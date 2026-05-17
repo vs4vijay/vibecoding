@@ -25,6 +25,6 @@
   "records_path": "$.d",
   "external_id_path": "$.ROWID",
   "hash_fields": null,
-  "schedule_cron": null,
+  "schedule_cron": "*/60 * * * *",
   "storage_mode": "generic"
 }

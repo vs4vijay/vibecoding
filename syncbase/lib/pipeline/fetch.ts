@@ -1,6 +1,16 @@
 import { ofetch } from "ofetch";
 import { extractRecords } from "./extract";
 
+// Lazily-created shared undici Agent used by sources that opt into insecure_tls.
+// One Agent is enough — undici pools connections internally.
+let _insecureAgent: unknown | null = null;
+async function getInsecureDispatcher() {
+  if (_insecureAgent) return _insecureAgent;
+  const { Agent } = await import("undici");
+  _insecureAgent = new Agent({ connect: { rejectUnauthorized: false } });
+  return _insecureAgent;
+}
+
 export type PreRequestCapture = {
   from: "cookie";
   name: string;
@@ -22,6 +32,9 @@ export type HttpConfig = {
   form?: Record<string, string | number>;
   body?: unknown;
   pre_request?: PreRequest;
+  /** Per-source opt-in: skip TLS cert verification. Use only for sources whose
+   *  cert chain isn't in Node's default trust store. Scoped to this source. */
+  insecure_tls?: boolean;
   /** Internal: cookies attached to every request issued by this http config.
    *  Operators should not set this directly; the pipeline writes it after running
    *  pre_request and reads it for paginated requests. */
@@ -49,9 +62,26 @@ export type PaginationConfig =
       start_offset?: number;
       stop_when?: "empty_records";
       max_pages?: number;
+    }
+  | {
+      // Values: iterate a fixed list of opaque codes. Each value is substituted
+      // for `{{value}}` in http.url before fetching. Used for sources that shard
+      // data behind path-segment codes (e.g. mstcindia.co.in regions: HO, BLR, …).
+      style: "values";
+      values: string[];
+      max_pages?: number;
     };
 
 export type FetchHook = (page: number, raw: unknown, records: unknown[]) => void | Promise<void>;
+
+async function attachInsecureTLS(init: any, http: HttpConfig): Promise<any> {
+  if (!http.insecure_tls) return init;
+  // Both Node's undici-fetch (dispatcher) and Bun's fetch (tls option) are set.
+  // The unrecognised one is harmless.
+  init.dispatcher = await getInsecureDispatcher();
+  init.tls = { ...(init.tls ?? {}), rejectUnauthorized: false };
+  return init;
+}
 
 function buildFetchInit(http: HttpConfig, extraForm?: Record<string, string | number>) {
   const method = http.method ?? "GET";
@@ -122,7 +152,9 @@ export async function applyPreRequest(http: HttpConfig): Promise<HttpConfig> {
   if (!http.pre_request) return http;
   const pre = http.pre_request;
   const headers = { ...(pre.headers ?? {}), "User-Agent": "Mozilla/5.0", Accept: "*/*" };
-  const resp = await fetch(pre.url, { method: pre.method ?? "GET", headers });
+  const preInit: any = { method: pre.method ?? "GET", headers };
+  await attachInsecureTLS(preInit, http);
+  const resp = await fetch(pre.url, preInit);
   // Parse Set-Cookie. node fetch returns the combined Set-Cookie header on `getSetCookie()`.
   const setCookies: string[] = (resp.headers as any).getSetCookie?.() ?? [];
   const cookieMap: Record<string, string> = {};
@@ -166,7 +198,8 @@ export async function fetchOnePage(
     extraForm = { [pagination.offset_param]: pagination.start_offset ?? 0 };
     if (pagination.size_param) extraForm[pagination.size_param] = pagination.size;
   }
-  const raw = await ofetch(http.url, buildFetchInit(http, extraForm));
+  const init = await attachInsecureTLS(buildFetchInit(http, extraForm), http);
+  const raw = await ofetch(http.url, init);
   const records = extractRecords(raw, recordsPath);
   return { raw, records };
 }
@@ -177,7 +210,8 @@ export async function* paginate(
   pagination: PaginationConfig
 ): AsyncGenerator<{ page: number; raw: unknown; records: unknown[] }> {
   if (pagination.style === "none") {
-    const raw = await ofetch(http.url, buildFetchInit(http));
+    const init = await attachInsecureTLS(buildFetchInit(http), http);
+    const raw = await ofetch(http.url, init);
     yield { page: 1, raw, records: extractRecords(raw, recordsPath) };
     return;
   }
@@ -190,7 +224,8 @@ export async function* paginate(
       if (pagination.size_param && pagination.size) {
         extra[pagination.size_param] = pagination.size;
       }
-      const raw = await ofetch(http.url, buildFetchInit(http, extra));
+      const init = await attachInsecureTLS(buildFetchInit(http, extra), http);
+      const raw = await ofetch(http.url, init);
       const records = extractRecords(raw, recordsPath);
       yield { page: p, raw, records };
       if (pagination.stop_when === "empty_records" && records.length === 0) break;
@@ -199,18 +234,40 @@ export async function* paginate(
     return;
   }
 
-  // style === "offset"
-  const offsetStart = pagination.start_offset ?? 0;
-  const size = pagination.size;
-  const maxPages = pagination.max_pages ?? 1000;
-  for (let i = 0; i < maxPages; i++) {
-    const offset = offsetStart + i * size;
-    const extra: Record<string, string | number> = { [pagination.offset_param]: offset };
-    if (pagination.size_param) extra[pagination.size_param] = size;
-    const raw = await ofetch(http.url, buildFetchInit(http, extra));
+  if (pagination.style === "offset") {
+    const offsetStart = pagination.start_offset ?? 0;
+    const size = pagination.size;
+    const maxPages = pagination.max_pages ?? 1000;
+    for (let i = 0; i < maxPages; i++) {
+      const offset = offsetStart + i * size;
+      const extra: Record<string, string | number> = { [pagination.offset_param]: offset };
+      if (pagination.size_param) extra[pagination.size_param] = size;
+      const init = await attachInsecureTLS(buildFetchInit(http, extra), http);
+      const raw = await ofetch(http.url, init);
+      const records = extractRecords(raw, recordsPath);
+      yield { page: i + 1, raw, records };
+      if (records.length === 0) break;
+      if (records.length < size) break;
+    }
+    return;
+  }
+
+  // style === "values"
+  if (!/\{\{\s*value\s*\}\}/.test(http.url)) {
+    const err = new Error(`source uses pagination.style=values but http.url has no {{value}} placeholder`);
+    (err as any).code = "VALUES_TEMPLATE_REQUIRED";
+    throw err;
+  }
+  const maxValues = Math.min(pagination.values.length, pagination.max_pages ?? pagination.values.length);
+  for (let i = 0; i < maxValues; i++) {
+    const value = pagination.values[i];
+    const renderedHttp: HttpConfig = {
+      ...http,
+      url: http.url.replace(/\{\{\s*value\s*\}\}/g, encodeURIComponent(value)),
+    };
+    const init = await attachInsecureTLS(buildFetchInit(renderedHttp), renderedHttp);
+    const raw = await ofetch(renderedHttp.url, init);
     const records = extractRecords(raw, recordsPath);
     yield { page: i + 1, raw, records };
-    if (records.length === 0) break;
-    if (records.length < size) break;
   }
 }

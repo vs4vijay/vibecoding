@@ -1,0 +1,32 @@
+{
+  "name": "mstcindia_forthcoming",
+  "enabled": true,
+  "category": "govt-eauction",
+  "location": { "mode": "none", "supports_all": true },
+  "http": {
+    "method": "GET",
+    "url": "https://www.mstcindia.co.in/mstcwebservice/Service.svc/getScrollMsg/{{value}}",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Accept": "application/json",
+      "Referer": "https://www.mstcindia.co.in/content/Forthcoming_e_Auctions_for_All_regions.aspx"
+    }
+  },
+  "pagination": {
+    "style": "values",
+    "values": ["HO","BBR","BPL","BLR","CDG","ERO","GHY","HYD","JPR","LKO","NRO","RNC","RPR","SRO","TVC","VAD","BZA","VZG","WRO","PTN"]
+  },
+  "records_path": "$[0].auction",
+  "external_id_path": "$.id",
+  "hash_fields": null,
+  "schedule_cron": "*/30 * * * *",
+  "storage_mode": "generic",
+  "display_columns": [
+    { "label": "Auction ref", "jsonpath": "$.text", "primary": true },
+    { "label": "Region", "jsonpath": "$.region" },
+    { "label": "Opening", "jsonpath": "$.opening" },
+    { "label": "Closing", "jsonpath": "$.Closing" },
+    { "label": "General lots", "jsonpath": "$.GeneralLots" },
+    { "label": "Hazardous waste", "jsonpath": "$.HazardousWaste" }
+  ]
+}

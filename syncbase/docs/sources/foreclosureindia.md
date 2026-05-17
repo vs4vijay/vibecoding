@@ -2,54 +2,53 @@
 
 | | |
 |---|---|
-| Phase | S6 (after spike) |
-| Status | 🟠 Server-rendered; recon spike required |
+| Phase | S6 (re-evaluated) |
+| Status | 🔴 HTML-only confirmed — no API, no feed, no sitemap |
 | Category | bank-auction (aggregator) |
-| Scope | Per-city, paginated by URL segment |
-| Last recon | 2026-05-16 |
+| Scope | All-India, paginated by city slug + page number |
+| Last recon | 2026-05-17 |
 
 ## Behavior
 
-Server-rendered (PHP/Laravel-style) listing pages with a clean URL pattern:
-
-```
-https://foreclosureindia.com/bank-auctions/{city-slug}/{page-number}
-```
-
-Example: `https://foreclosureindia.com/bank-auctions/bengaluru/1` — initial fetch returned 28.9 kB HTML with paginator links to `/bengaluru/2`, `/bengaluru/3`, … `/bengaluru/N`. No JSON API endpoint is visible in the HTML head; no `/api/*` preconnect.
+PHP/Nginx server-rendered listing. URL pattern is `/bank-auctions/{city-slug}/{page}`. Each page is fully server-rendered HTML — no JSON, no XHR, no inline data island. The combined static JS bundle on the CDN (`cdn.foreclosureindia.com/combine/…js`, 452 KB) is third-party widgets (vimeo, GTM, jQuery plugins) — nothing app-specific that hits a data endpoint.
 
 ## URL
 
 - Listing: `https://foreclosureindia.com/bank-auctions/{city}/{page}`
-- Card detail: `https://foreclosureindia.com/auction-detail/{id}` (speculative — spike should confirm).
+- Combined JS: `https://cdn.foreclosureindia.com/combine/4c676fb99738f01473c6390b922931a1-1771491802.js` (third-party widgets only)
 
-## Spike — what to confirm
+## Attempts log
 
-1. Open `https://foreclosureindia.com/bank-auctions/bengaluru/1` in a real browser, inspect the Network tab for XHR/fetch calls. If the page makes secondary calls (e.g. an internal `/ajax/properties?…`), that becomes the seed endpoint.
-2. If everything is rendered inline, this source defers to S7 (HTML parsing).
-3. Confirm the city slug list (`bengaluru` vs `bangalore`?) by fetching `/bank-auctions/` (no city) and reading the city dropdown.
+| Attempt | Result |
+|---|---|
+| Static analysis of `bank-auctions/bengaluru/1` HTML | Pagination links to `/bengaluru/{2..N}` — pure server-rendered. |
+| `GET /sitemap.xml` | 301 → `/` (home page). |
+| `GET /sitemap_index.xml`, `/rss`, `/rss.xml`, `/feed` | All 404 (return the 404 page, 30 KB). |
+| `GET /api/properties`, `/api/auctions`, `/api/v1/properties`, `/properties.json` | All 404. |
+| Static analysis of `cdn.foreclosureindia.com/combine/…js` (452 KB) | `tr ' '` + grep on `^/(api\|ajax\|json\|search\|bank\|properties)` paths → nothing. The bundle is GTM, jQuery, Vimeo embed helpers, modernizr, etc. No app-specific data endpoint. |
+| Search for `fetch(`, `$.ajax`, `$.get`, `$.post` in the rendered HTML | None outside of GTM. |
+| `GET /robots.txt` | 301 → `/`. Nothing useful. |
 
-## Search / location filter
+## Why no JSON exists
 
-**Path-based.** F1 config:
-```jsonc
-"location": {
-  "mode": "path",
-  "templated": "https://foreclosureindia.com/bank-auctions/{{ location.city|slug }}/{{ pagination.page }}",
-  "city_values": { "bangalore": "bengaluru", "ajmer": "ajmer" },
-  "supports_all": false
-}
+Foreclosureindia rebuilds the page server-side on every navigation. The pagination links are real anchor tags (not JS-controlled). The page bundle has no app-specific JS that calls any internal API. This isn't a Next.js / SPA hybrid — it's a classic PHP CMS.
+
+## Recommended verdict
+
+**Skip until HTML-parser storage mode lands.** The pages are clean (Bootstrap cards in a grid), the URL pattern is regular, and the data is high-quality — so once we have Cheerio-on-DOM, this is a strong candidate.
+
+Sample card structure (for the future HTML adapter):
+```html
+<div class="property-card">
+  <h4><a href="/auction/{slug-{id}}">{property title}</a></h4>
+  <div class="city">{city}</div>
+  <div class="price">{reserve price}</div>
+  <div class="bank">{bank name}</div>
+  <div class="auction-date">{date}</div>
+</div>
 ```
 
-If a city-less endpoint exists (e.g. `/bank-auctions/all/{page}`), set `supports_all: true`.
+## Known limitations
 
-## Proposed seed (placeholder — pending spike)
-
-Not authored yet. Two paths:
-- (a) Internal JSON API discovered → standard seed.
-- (b) HTML-only → defer to S7.
-
-## Known risks
-
-- The pagination is in the URL path, not a query parameter. The pipeline's current `pagination.style: "page"` uses `page_param` to set a query string; this source needs the new path-templated pagination introduced in F1.
-- The list page may include both live and archived auctions; the seed must filter by status to avoid hash churn.
+- City-slug ↔ city-name normalization needed (`bengaluru` vs `bangalore` etc.).
+- No `lastmod` signal at the listing level; would need a content-hash to detect changes (which our pipeline already does for JSON — equally applicable to HTML once the adapter exists).

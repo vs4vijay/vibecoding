@@ -15,7 +15,12 @@ export default async function HomePage() {
         (SELECT count(*)::int FROM ${sources}) AS sources,
         (SELECT count(*)::int FROM ${entities}) AS entities,
         (SELECT count(*)::int FROM ${changeLog}) AS changes,
-        (SELECT count(*)::int FROM ${runs}) AS runs`),
+        (SELECT count(*)::int FROM ${runs}) AS runs,
+        (SELECT count(*)::int FROM entity_duplicates) AS dup_pairs,
+        (SELECT count(*)::int FROM entity_clusters) AS clusters,
+        (SELECT count(*)::int FROM entity_cluster_members) AS cluster_members,
+        (SELECT max(updated_at) FROM entity_clusters) AS last_cluster_at,
+        (SELECT max(started_at) FROM ${runs}) AS last_run_at`),
   ]);
   const stats: any = ((counts as any).rows ?? counts)[0] ?? {};
   const enabledCount = srcs.filter((s) => s.enabled).length;
@@ -39,7 +44,10 @@ export default async function HomePage() {
         <Stat label="Sources"  value={stats.sources ?? srcs.length} sub={`${enabledCount} enabled`} href="/sources" />
         <Stat label="Entities" value={stats.entities ?? 0} sub="across all storage tables" href="/entities" />
         <Stat label="Changes"  value={stats.changes ?? 0}  sub="lifetime change_log rows" href="/changes" />
-        <Stat label="Runs"     value={stats.runs ?? 0}     sub="ingest executions" href="/runs" />
+        <Stat label="Runs"     value={stats.runs ?? 0}     sub={stats.last_run_at ? `last ${fmtTime(stats.last_run_at)}` : "ingest executions"} href="/runs" />
+        <Stat label="Dup pairs"   value={stats.dup_pairs ?? 0}        sub="intra-source D1 matches"            href="/duplicates" />
+        <Stat label="Clusters"    value={stats.clusters ?? 0}         sub={stats.cluster_members ? `${stats.cluster_members} cross-source members` : "cross-source D2 groups"} href="/duplicates" />
+        <Stat label="Last dedup"  value={0} sub={stats.last_cluster_at ? fmtTime(stats.last_cluster_at) : "never run"} href="/duplicates" displayValue={stats.last_cluster_at ? fmtAgo(stats.last_cluster_at) : "—"} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 16 }}>
@@ -109,14 +117,41 @@ export default async function HomePage() {
   );
 }
 
-function Stat({ label, value, sub, href }: { label: string; value: number; sub?: string; href: string }) {
+function Stat({
+  label,
+  value,
+  sub,
+  href,
+  displayValue,
+}: {
+  label: string;
+  value: number;
+  sub?: string;
+  href: string;
+  /** Overrides the numeric display when the count itself isn't useful (e.g. "5h ago"). */
+  displayValue?: string;
+}) {
   return (
     <Link href={href} className="stat-tile">
       <div className="label">{label}</div>
-      <div className="value">{value.toLocaleString()}</div>
+      <div className="value">{displayValue ?? value.toLocaleString()}</div>
       {sub && <div className="delta">{sub}</div>}
     </Link>
   );
+}
+
+function fmtAgo(t: unknown): string {
+  if (!t) return "—";
+  try {
+    const ms = Date.now() - new Date(String(t)).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return "—";
+    const m = Math.floor(ms / 60_000);
+    if (m < 1) return "<1m";
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h`;
+    return `${Math.floor(h / 24)}d`;
+  } catch { return "—"; }
 }
 
 function Card({

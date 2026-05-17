@@ -98,7 +98,7 @@ export async function searchEntities(opts: SearchOpts): Promise<{ hits: SearchHi
           storage_table: table,
           title: r.title ?? null,
           snippet: r.snippet ?? null,
-          payload: r.payload,
+          payload: trimPayload(r.payload),
           score: tsv * 0.7 + trgm * 0.3,
         });
       }
@@ -176,4 +176,26 @@ function rollupClusters(hits: SearchHit[]): SearchHit[] {
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
+}
+
+/**
+ * Drop noisy/heavy fields from a payload before shipping it as a search hit.
+ * Currently strips:
+ *   - tsv / tsvector / search_tsv  — Typesense / Strapi full-text vectors (auctionbazaar
+ *     records ship a 1.5 kB `tsv` Postgres-style ts vector that's useless to clients).
+ *   - _embedded / _links            — HATEOAS junk on WP REST responses.
+ *   - Any value larger than 4 kB     — guards against future surprise blobs.
+ */
+function trimPayload(payload: unknown): Record<string, unknown> {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload as any;
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(payload as Record<string, unknown>)) {
+    if (k === "tsv" || k === "tsvector" || k === "search_tsv") continue;
+    if (k === "_embedded" || k === "_links") continue;
+    if (typeof v === "string" && v.length > 4096) continue;
+    out[k] = v;
+  }
+  return out;
 }
