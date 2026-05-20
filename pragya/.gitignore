@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Bun
+bun.lockb
+
+# Python / uv
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+*.egg-info/
+
+# Next.js
+.next/
+out/
+build/
+
+# Drizzle / DB
+**/drizzle/meta/
+*.db
+*.db-journal
+.pglite/
+pglite-data/
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Models / artefacts (local-only)
+artefacts/
+*.pkl
+*.joblib
+
+# TypeScript
+*.tsbuildinfo

@@ -1,0 +1,27 @@
+{
+  "name": "drishti",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/worker",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "dev:web": "bun run --cwd apps/web dev",
+    "dev:worker": "bun run --cwd apps/worker dev",
+    "dev:ml": "cd apps/ml && uv run uvicorn drishti_ml.main:app --reload --port 8000",
+    "seed:synth": "bun run --cwd apps/web seed:synth",
+    "build": "bun run --filter '*' build",
+    "typecheck": "bun run --filter '*' typecheck",
+    "db:generate": "bun run --cwd apps/web db:generate",
+    "db:migrate": "bun run --cwd apps/web db:migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  }
+}
