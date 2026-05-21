@@ -49,7 +49,12 @@ export type PaginationConfig =
       size_param?: string;
       size?: number;
       start_page?: number;
-      stop_when?: "empty_records";
+      /** Pagination terminator:
+       *  - "empty_records": stop when the page's array is empty.
+       *  - "no_new_records": stop when the page produced 0 created + 0 updated
+       *    rows (i.e. everything was already known). Used for incremental sync
+       *    against APIs that order newest-first. */
+      stop_when?: "empty_records" | "no_new_records";
       max_pages?: number;
     }
   | {
@@ -60,7 +65,7 @@ export type PaginationConfig =
       size_param?: string;
       size: number;
       start_offset?: number;
-      stop_when?: "empty_records";
+      stop_when?: "empty_records" | "no_new_records";
       max_pages?: number;
     }
   | {

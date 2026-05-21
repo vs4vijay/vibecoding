@@ -17,15 +17,28 @@ function canonicalize(value: unknown): string {
   );
 }
 
+/** Walk a dot-path inside a value. `"title.rendered"` returns
+ *  `value.title.rendered`. Missing intermediate keys return undefined; numeric
+ *  segments index into arrays. Flat keys (no dot) behave exactly like the prior
+ *  implementation. */
+function readPath(value: unknown, path: string): unknown {
+  if (!path.includes(".")) return (value as any)?.[path];
+  let cur: any = value;
+  for (const seg of path.split(".")) {
+    if (cur == null) return undefined;
+    cur = cur[seg];
+  }
+  return cur;
+}
+
 export function canonicalHash(
   record: unknown,
   fields: string[] | null | undefined
 ): string {
   let target: unknown = record;
   if (fields && fields.length > 0 && record && typeof record === "object") {
-    const src = record as Record<string, unknown>;
     const subset: Record<string, unknown> = {};
-    for (const f of fields) subset[f] = src[f];
+    for (const f of fields) subset[f] = readPath(record, f);
     target = subset;
   }
   return createHash("sha256").update(canonicalize(target)).digest("hex");

@@ -42,10 +42,14 @@ export function applyLocation(
     return { ...http, url: rendered };
   }
 
-  // query | form | body: resolve {field, value}
+  // query | form | body | body_path: resolve {field, value}
   if (!cfg.field) throw new Error(`source "${sourceName}": location.field required when mode=${cfg.mode}`);
-  const value = resolveValue(runLocation, cfg);
-  if (value == null) return http;
+  const rawValue = resolveValue(runLocation, cfg);
+  if (rawValue == null) return http;
+  // Apply value_template if set: substitute {{value}} into the template.
+  const value = cfg.value_template
+    ? cfg.value_template.replace(/\{\{\s*value\s*\}\}/g, String(rawValue))
+    : rawValue;
 
   if (cfg.mode === "query") {
     return { ...http, params: { ...(http.params ?? {}), [cfg.field]: value } };
@@ -53,13 +57,50 @@ export function applyLocation(
   if (cfg.mode === "form") {
     return { ...http, form: { ...(http.form ?? {}), [cfg.field]: value } };
   }
-  // mode === "body"
-  const base = http.body;
-  if (base != null && (typeof base !== "object" || Array.isArray(base))) {
-    throw new Error(`source "${sourceName}": location mode=body requires http.body to be an object`);
+  if (cfg.mode === "body") {
+    const base = http.body;
+    if (base != null && (typeof base !== "object" || Array.isArray(base))) {
+      throw new Error(`source "${sourceName}": location mode=body requires http.body to be an object`);
+    }
+    const next = { ...(base as Record<string, unknown> | undefined), [cfg.field]: value };
+    return { ...http, body: next };
   }
-  const next = { ...(base as Record<string, unknown> | undefined), [cfg.field]: value };
-  return { ...http, body: next };
+  // mode === "body_path": deep-clone http.body and set the value at the JSON-pointer / dot path.
+  const base = http.body;
+  if (base == null) {
+    throw new Error(`source "${sourceName}": location mode=body_path requires http.body to be set`);
+  }
+  const clone = JSON.parse(JSON.stringify(base));
+  setAtPath(clone, cfg.field, value, sourceName);
+  return { ...http, body: clone };
+}
+
+/**
+ * Set `value` at the given path inside `obj`. Path syntax:
+ *   - JSON Pointer (RFC 6901):  "/searches/0/filter_by"
+ *   - Dot/bracket notation:     "searches.0.filter_by", "searches[0].filter_by"
+ * Intermediate path segments must already exist; this is intentional — we don't
+ * want a typo in `field` to silently create a sibling object.
+ */
+function setAtPath(obj: any, path: string, value: unknown, sourceName: string): void {
+  let segments: (string | number)[];
+  if (path.startsWith("/")) {
+    segments = path.slice(1).split("/").map((s) => s.replace(/~1/g, "/").replace(/~0/g, "~"));
+  } else {
+    segments = path.split(/[.\[\]]/).filter(Boolean);
+  }
+  let cur: any = obj;
+  for (let i = 0; i < segments.length - 1; i++) {
+    const seg = segments[i];
+    const key = Array.isArray(cur) && /^\d+$/.test(String(seg)) ? Number(seg) : seg;
+    if (cur[key as any] == null) {
+      throw new Error(`source "${sourceName}": location.field path "${path}" does not exist in http.body (missing segment "${seg}")`);
+    }
+    cur = cur[key as any];
+  }
+  const last = segments[segments.length - 1];
+  const key = Array.isArray(cur) && /^\d+$/.test(String(last)) ? Number(last) : last;
+  cur[key as any] = value;
 }
 
 function resolveValue(input: RunLocation, cfg: LocationConfig): string | number | null {

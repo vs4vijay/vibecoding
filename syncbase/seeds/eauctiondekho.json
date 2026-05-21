@@ -26,8 +26,8 @@
     "size_param": "pagination[pageSize]",
     "size": 100,
     "start_page": 1,
-    "stop_when": "empty_records",
-    "max_pages": 50
+    "stop_when": "no_new_records",
+    "max_pages": 1300
   },
   "records_path": "$.data",
   "external_id_path": "$.id",

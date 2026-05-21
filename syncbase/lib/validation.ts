@@ -35,7 +35,7 @@ const PaginationSchema = z.discriminatedUnion("style", [
     size_param: z.string().optional(),
     size: z.number().int().positive().optional(),
     start_page: z.number().int().nonnegative().optional(),
-    stop_when: z.literal("empty_records").optional(),
+    stop_when: z.enum(["empty_records", "no_new_records"]).optional(),
     max_pages: z.number().int().positive().optional(),
   }),
   z.object({
@@ -44,7 +44,7 @@ const PaginationSchema = z.discriminatedUnion("style", [
     size_param: z.string().optional(),
     size: z.number().int().positive(),
     start_offset: z.number().int().nonnegative().optional(),
-    stop_when: z.literal("empty_records").optional(),
+    stop_when: z.enum(["empty_records", "no_new_records"]).optional(),
     max_pages: z.number().int().positive().optional(),
   }),
   z.object({
@@ -64,8 +64,10 @@ const DisplayColumnSchema = z.object({
 });
 
 const LocationConfigSchema = z.object({
-  mode: z.enum(["none", "query", "form", "body", "path"]).default("none"),
+  mode: z.enum(["none", "query", "form", "body", "body_path", "path"]).default("none"),
   // For mode in {query, form, body}: the parameter / json-key name on the upstream request.
+  // For mode=="body_path": the JSON pointer / dot-path to set inside http.body.
+  //   Examples: "/searches/0/filter_by" (RFC 6901), "searches.0.filter_by" (dot form), "cityId".
   field: z.string().min(1).optional(),
   // Optional value maps so the operator picks human slugs ("ajmer") and the upstream
   // receives the canonical value the API expects ("16").
@@ -74,6 +76,10 @@ const LocationConfigSchema = z.object({
   // For mode=="path": Mustache-ish template — {{ location.city }}, {{ location.state }}.
   // Rendered into http.url (with %-encoding) before the request fires.
   templated: z.string().optional(),
+  // Optional template for the value written by mode=="body_path" / "body" / "form" / "query".
+  // {{value}} is replaced with the resolved value (after city_values/state_values lookup).
+  // Useful when the upstream takes a composite string like "status:active && city:bangalore".
+  value_template: z.string().optional(),
   // If true and the operator omits a location at runtime, the pipeline fetches the
   // source's full inventory. If false, the run errors out with LOCATION_REQUIRED.
   supports_all: z.boolean().default(true),

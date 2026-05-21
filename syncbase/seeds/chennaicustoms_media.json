@@ -27,7 +27,7 @@
   },
   "records_path": "$",
   "external_id_path": "$.id",
-  "hash_fields": null,
+  "hash_fields": ["modified", "title.rendered", "source_url", "mime_type"],
   "schedule_cron": "*/30 * * * *",
   "storage_mode": "generic",
   "display_columns": [

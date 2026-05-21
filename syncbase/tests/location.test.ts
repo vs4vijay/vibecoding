@@ -91,6 +91,68 @@ describe("applyLocation — unit", () => {
     expect(out.body).toEqual({ pageSize: 50, cityId: "23" });
   });
 
+  test("mode=body_path with dot notation writes nested field", () => {
+    const httpBody: HttpConfig = {
+      method: "POST",
+      url: "https://x.example.com/multi_search",
+      body: { searches: [{ collection: "properties", q: "*", filter_by: "status:active" }] },
+    };
+    const out = applyLocation(
+      httpBody,
+      {
+        mode: "body_path",
+        field: "searches.0.filter_by",
+        value_template: "status:active && city_slug:{{value}}",
+        supports_all: true,
+      },
+      { city: "bangalore" },
+      "s"
+    );
+    expect((out.body as any).searches[0].filter_by).toBe("status:active && city_slug:bangalore");
+    // Other fields preserved.
+    expect((out.body as any).searches[0].collection).toBe("properties");
+    expect((out.body as any).searches[0].q).toBe("*");
+  });
+
+  test("mode=body_path with JSON Pointer also works", () => {
+    const httpBody: HttpConfig = {
+      method: "POST",
+      url: "https://x.example.com/multi_search",
+      body: { searches: [{ filter_by: "x" }] },
+    };
+    const out = applyLocation(
+      httpBody,
+      { mode: "body_path", field: "/searches/0/filter_by", supports_all: true },
+      { city: "Bengaluru" },
+      "s"
+    );
+    expect((out.body as any).searches[0].filter_by).toBe("Bengaluru");
+  });
+
+  test("mode=body_path errors on missing intermediate path segment", () => {
+    const httpBody: HttpConfig = { method: "POST", url: "https://x.example.com/", body: { foo: 1 } };
+    expect(() =>
+      applyLocation(
+        httpBody,
+        { mode: "body_path", field: "searches.0.filter_by", supports_all: true },
+        { city: "x" },
+        "ts"
+      )
+    ).toThrow(/does not exist/);
+  });
+
+  test("mode=body_path does not mutate input body", () => {
+    const original = { searches: [{ filter_by: "x" }] };
+    const httpBody: HttpConfig = { method: "POST", url: "https://x.example.com/", body: original };
+    applyLocation(
+      httpBody,
+      { mode: "body_path", field: "searches.0.filter_by", supports_all: true },
+      { city: "Y" },
+      "s"
+    );
+    expect(original.searches[0].filter_by).toBe("x");
+  });
+
   test("mode=path templates city slug into URL", () => {
     const out = applyLocation(
       { method: "GET", url: "ignored" },

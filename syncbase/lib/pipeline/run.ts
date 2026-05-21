@@ -77,7 +77,17 @@ export async function runPipeline(
       recordsSkipped += result.skipped;
     };
 
+    // If the source asks for incremental "stop when this page produced no new or updated rows",
+    // we have to flush at every page boundary so the created/updated counters reflect the
+    // *current* page in isolation. Without this, a 250-row buffer would straddle pages and
+    // the per-page diff would be invisible.
+    const stopWhen = (pagination as any).stop_when as string | undefined;
+    const incrementalStop = stopWhen === "no_new_records";
+
+    let stopEarly = false;
     for await (const { records } of paginate(http, source.recordsPath, pagination)) {
+      const createdBefore = recordsCreated;
+      const updatedBefore = recordsUpdated;
       for (const rec of records) {
         recordsSeen++;
         const externalId = extractScalar(rec, source.externalIdPath);
@@ -87,8 +97,17 @@ export async function runPipeline(
         dedup.set(externalId, { externalId, payload: rec, contentHash: hash });
         if (dedup.size >= BATCH_SIZE) await flush();
       }
+      if (incrementalStop) {
+        await flush();
+        const pageWroteSomething = recordsCreated > createdBefore || recordsUpdated > updatedBefore;
+        if (records.length > 0 && !pageWroteSomething) {
+          stopEarly = true;
+          break;
+        }
+      }
     }
     await flush();
+    void stopEarly; // informational
 
     await db
       .update(runs)

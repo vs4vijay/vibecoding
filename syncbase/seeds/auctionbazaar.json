@@ -2,7 +2,12 @@
   "name": "auctionbazaar",
   "enabled": true,
   "category": "bank-auction",
-  "location": { "mode": "none", "supports_all": true },
+  "location": {
+    "mode": "body_path",
+    "field": "searches.0.filter_by",
+    "value_template": "status:active && dump.location.city_slug:{{value}}",
+    "supports_all": true
+  },
   "http": {
     "method": "POST",
     "url": "https://863av92kw7rsz0ogp.a1.typesense.net/multi_search",
