@@ -23,6 +23,7 @@ OPENCODE_SERVER_USERNAME=viz OPENCODE_SERVER_PASSWORD=VerySecurePasswordHere ope
 ### Tools used
 
 - rtk-ai
+- android-cli - https://developer.android.com/tools/agents/android-cli
 
 ### Skills used
 
