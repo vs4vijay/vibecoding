@@ -100,6 +100,9 @@ function Shell({ client, onSessionExpired }: ShellProps): JSX.Element {
   const [palette, setPalette] = useState(false);
   const [viewHints, setViewHints] = useState<KeyHint[]>([]);
   const [expiredReported, setExpiredReported] = useState(false);
+  /** A view sets this to true while a TextInput owns the keyboard, so the
+   *  global single-letter shortcuts (r, q, 1/2/3, ?) don't steal characters. */
+  const [textInputActive, setTextInputActive] = useState(false);
 
   const reportExpired = useCallback((): void => {
     setExpiredReported((already) => {
@@ -144,6 +147,10 @@ function Shell({ client, onSessionExpired }: ShellProps): JSX.Element {
       if (input === "?" || key.escape) setHelp(false);
       return;
     }
+    // When a view's TextInput has focus, the user is typing free-form text —
+    // don't steal characters like "r" / "q" / "1" for global shortcuts.
+    // Esc and other special keys still pass through (the view handles those).
+    if (textInputActive) return;
     if (input === "?") {
       setHelp(true);
       return;
@@ -183,9 +190,11 @@ function Shell({ client, onSessionExpired }: ShellProps): JSX.Element {
   }, []);
 
   // Wipe view-specific hints on every tab change so we never display stale
-  // keys from a different view (the new view will re-publish its own).
+  // keys from a different view (the new view will re-publish its own). Also
+  // reset the typing flag — only the active view's TextInput can re-arm it.
   useEffect(() => {
     setViewHints([]);
+    setTextInputActive(false);
   }, [view]);
 
   const isInteractive = !help && !palette;
@@ -226,6 +235,7 @@ function Shell({ client, onSessionExpired }: ShellProps): JSX.Element {
                   user={data!.user}
                   isActive={isInteractive}
                   onContextHintsChange={onContextHintsChange}
+                  onTextInputFocusChange={setTextInputActive}
                 />
               )}
             </>

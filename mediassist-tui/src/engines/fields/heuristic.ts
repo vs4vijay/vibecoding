@@ -27,7 +27,7 @@ function extractFromText(rawText: string): ClaimFields {
   const health = tryHealth(norm);
   if (health) return finalize(rawText, health.fields, health.confidence);
 
-  return finalize(rawText, ...extractGeneric(norm));
+  return finalize(rawText, ...extractGeneric(rawText, norm));
 }
 
 function finalize(rawText: string, fields: PartialFields, confidence: Confidence): ClaimFields {
@@ -158,21 +158,69 @@ function tryHealth(text: string): { fields: PartialFields; confidence: Confidenc
 
 // ---------- generic fallback ----------
 
-function extractGeneric(text: string): [PartialFields, Confidence] {
+function extractGeneric(rawText: string, text: string): [PartialFields, Confidence] {
   const fields: PartialFields = {};
   const conf: Confidence = {};
 
-  const firstLine = text.split(/[\r\n]/).find((l) => l.trim().length > 3);
-  if (firstLine) {
-    fields.clinicName = firstLine.slice(0, 80).trim();
-    conf.clinicName = 0.5;
+  // "Legal Entity Name : Foo Pvt. Ltd." / "Hospital Name : Foo Clinic"
+  const entity = /(?:Legal\s+Entity\s+Name|Hospital\s+Name|Clinic\s+Name|Vendor\s+Name)\s*:\s*([^\n\r]{3,80})/i.exec(rawText);
+  if (entity) {
+    fields.clinicName = entity[1]!.trim().replace(/[.,]+$/, "");
+    conf.clinicName = 0.9;
+  } else {
+    // "For <Company Name>" line just above the authorised signatory — very
+    // common on Indian invoices.
+    const forLine = /\bFor\s+((?:[A-Z][A-Za-z0-9&.'-]*\s*){1,6})(?:\s+Authorised|\s+Authorized)/.exec(rawText);
+    if (forLine) {
+      fields.clinicName = forLine[1]!.trim().slice(0, 80);
+      conf.clinicName = 0.85;
+    } else {
+      // Look for a line with a recognizable company / facility marker.
+      // Must be a real heading line, not a body sentence — cap length at ~70
+      // and ignore lines that look like prose (lowercase article words).
+      const lines = rawText.split(/[\r\n]+/).map((l) => l.trim()).filter((l) => l.length > 3);
+      const headingLike = (l: string) =>
+        l.length <= 80 &&
+        !/^\d/.test(l) &&
+        // Reject prose: lots of common stop-words means it's a sentence.
+        !/\b(?:is|of|on|by|the|and|for\s+each|may|due\s+to)\b/i.test(l);
+      const named = lines.find(
+        (l) =>
+          headingLike(l) &&
+          /(?:Pvt\.?\s*Ltd\.?|Private\s+Limited|Limited|LLP|Hospital|Clinic|Diagnostics?|Healthcare|Laboratory|Path\s*Labs?|Pathlab|Pathology|Pharmacy|Medical\s+Centre|Medical\s+Center)/i.test(l),
+      );
+      if (named) {
+        fields.clinicName = named.slice(0, 80).trim();
+        conf.clinicName = 0.75;
+      } else {
+        // Final fallback: first "heading-like" line.
+        const first = lines.find(headingLike);
+        if (first) {
+          fields.clinicName = first.slice(0, 80);
+          conf.clinicName = 0.4;
+        }
+      }
+    }
   }
 
+  // "Patient Name : Vijay" / "Patient Name Vijay" / "Bill To: …"
+  // The label and value must be on the same line — `[ \t]*` (not `\s*`) so the
+  // regex doesn't span newlines into the next field's label.
+  const cust = /(?:Customer\s+Name|Patient\s+Name|Bill\s+To|Patient)[ \t]*:?[ \t]*((?:Mr\.?|Mrs\.?|Ms\.?|Miss|Dr\.?)?[ \t]*[A-Z][A-Za-z .'-]{2,60})/i.exec(rawText);
+  if (cust) {
+    const cleaned = cust[1]!.replace(/^[ \t]*(?:Mr\.?|Mrs\.?|Ms\.?|Miss|Dr\.?)[ \t]+/i, "").trim();
+    const name = cleaned.split(/\s+/).slice(0, 4).join(" ");
+    fields.beneficiaryHint = name;
+    conf.beneficiaryHint = 0.85;
+  }
+
+  // Bill number: require either "No./Number/#" or a colon between the keyword
+  // and the captured value. Prevents "BILL FROM" → "FROM" false positives.
   const bn =
-    /(?:Invoice|Bill|Receipt)\s*(?:\/\s*Receipt)?\s*(?:No\.?|Number|#)?\s*:?\s*([A-Z0-9][A-Z0-9-]{2,})/i.exec(text);
+    /(?:Invoice|Bill|Receipt)\s*(?:\/\s*Receipt)?\s*(?:(?:No\.?|Number|#)\s*:?\s*|:\s*)([A-Z0-9][A-Z0-9/-]{2,})/i.exec(text);
   if (bn) {
     fields.billNumber = bn[1];
-    conf.billNumber = 0.7;
+    conf.billNumber = 0.85;
   }
 
   const dateNum = /\b(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\b/.exec(text);
@@ -185,13 +233,17 @@ function extractGeneric(text: string): [PartialFields, Confidence] {
     conf.billDate = 0.75;
   }
 
-  const grand = /Grand\s+Total\s+(?:Advance\s+)?(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d+)?)/i.exec(text);
-  const total = /\bTotal\s+(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d+)?)/i.exec(text);
-  if (grand) {
-    fields.billAmount = parseAmount(grand[1]!);
-    conf.billAmount = 0.85;
-  } else if (total) {
-    fields.billAmount = parseAmount(total[1]!);
+  // Try labelled-amount patterns in descending preference. Each one looks for
+  // a label, then any non-digit/non-newline filler (covers "Amount : ", " Rs. ",
+  // " ₹ ", or just spaces), then the number.
+  const labelled =
+    /(?:Grand\s+Total|Net\s+Payable(?:\s+Amount)?|Amount\s+Payable|Paid\s+Amount|Total\s+Amount|Net\s+Amount|Total\s+Order\s+Value|Order\s+Value|Sub\s*total|Grand\s+Total\s+Advance)\s*[:\s]\s*(?:Rs\.?|INR|₹)?\s*([\d][\d,]*(?:\.\d+)?)/i.exec(text);
+  const totalSimple = /\bTotal\s+(?:Rs\.?|INR|₹)\s*([\d][\d,]*(?:\.\d+)?)/i.exec(text);
+  if (labelled) {
+    fields.billAmount = parseAmount(labelled[1]!);
+    conf.billAmount = 0.9;
+  } else if (totalSimple) {
+    fields.billAmount = parseAmount(totalSimple[1]!);
     conf.billAmount = 0.75;
   } else {
     fields.billAmount = pickLargestAmount(text);
@@ -207,7 +259,28 @@ function extractGeneric(text: string): [PartialFields, Confidence] {
   fields.billType = classifyBillType(text);
   conf.billType = 0.6;
 
+  fields.natureOfIllness = defaultNatureFor(fields.billType);
+  conf.natureOfIllness = 0.5;
+
   return [fields, conf];
+}
+
+function defaultNatureFor(billType: BillType): string {
+  switch (billType) {
+    case "Investigation & Labs":
+    case "Investigation & Lab Charges":
+      return "Diagnostic tests";
+    case "Pharmacy & Medicines":
+      return "Prescription medicines";
+    case "Vision & Dental":
+      return "Vision / dental care";
+    case "Vaccination":
+      return "Vaccination";
+    case "Health Check Up":
+      return "Preventive health checkup";
+    default:
+      return "Consultation";
+  }
 }
 
 // ---------- helpers ----------

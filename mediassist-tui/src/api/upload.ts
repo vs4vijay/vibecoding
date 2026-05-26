@@ -45,14 +45,30 @@ export async function uploadDocument(client: MediAssistClient, filePath: string)
   });
   const body = await res.text();
   if (!res.ok) {
-    throw new Error(`Upload failed: HTTP ${res.status}`);
+    throw new Error(`Upload of ${filename} failed: HTTP ${res.status}${sizeHint(buf.length)}`);
   }
   // Success-page contains the text "Upload successful!" inline.
   if (!/Upload\s+successful/i.test(body)) {
+    const reason = pickUploadError(body);
     throw new Error(
-      "Upload did not return a success marker — file may not have been accepted",
+      `Upload of ${filename} not accepted${sizeHint(buf.length)}${reason ? ` — ${reason}` : " — no success marker in response"}`,
     );
   }
+}
+
+function sizeHint(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  return mb >= 1.5 ? ` (file is ${mb.toFixed(1)} MB — portal may reject files over ~2 MB)` : "";
+}
+
+function pickUploadError(body: string): string | null {
+  // The portal embeds error messages in a span like:
+  //   <span id="lblError">File too large</span>
+  const m = /<span[^>]*id="lbl(?:Error|Msg|Status)"[^>]*>([^<]+)<\/span>/i.exec(body);
+  if (m && m[1]) return m[1].trim();
+  // Fall back to common phrases.
+  const known = /(file\s+(?:too\s+large|size\s+exceeds|not\s+supported)|invalid\s+file|maximum\s+(?:size|file))/i.exec(body);
+  return known ? known[0] : null;
 }
 
 function pickHiddenValue(html: string, name: string): string | undefined {

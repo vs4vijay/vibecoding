@@ -11,10 +11,14 @@
  * safety rules in memory/feedback_mediassist_no_submit.md — typed
  * confirmation, no silent submission, step-by-step progress.
  */
-import type { MediAssistClient } from "./client.ts";
+import { SessionExpiredError, type MediAssistClient } from "./client.ts";
 import type { BankDetail } from "./bank.ts";
 import type { ClaimFields } from "../types.ts";
 import { uploadDocument } from "./upload.ts";
+
+/** Page that hosts the OPD claim AJAX endpoints; the portal expects this as
+ *  the Referer for SaveDraft / AddClaimBill / SubmitClaim. */
+const OPD_REFERER = "https://portal.mediassist.in/OPDClaimSubmission.aspx";
 
 export type Beneficiary = {
   /** CMSMemberUserId — the value the portal expects in `benefId`. */
@@ -85,8 +89,8 @@ export function buildPayloadsForDryRun(
   }
   const total = bills.reduce((s, b) => s + b.billAmount, 0);
   const dates = bills.map((b) => parseDDMMYYYY(b.billDate)).filter((d): d is Date => d !== null);
-  const startDate = dates.length > 0 ? toMMDDYYYY(dates.reduce((a, b) => (a < b ? a : b))) : "";
-  const endDate = dates.length > 0 ? toMMDDYYYY(dates.reduce((a, b) => (a > b ? a : b))) : "";
+  const startDate = dates.length > 0 ? toYYYYMMDD(dates.reduce((a, b) => (a < b ? a : b))) : "";
+  const endDate = dates.length > 0 ? toYYYYMMDD(dates.reduce((a, b) => (a > b ? a : b))) : "";
   const firstBill = bills[0]!;
 
   return {
@@ -114,7 +118,10 @@ export function buildSaveDraftBody(
   endDate: string,
 ): Record<string, string> {
   const b = ctx.beneficiary;
-  const ailment = [...new Set(allBills.map((x) => x.natureOfIllness).filter(Boolean))].join(" || ");
+  const ailmentJoined = [...new Set(allBills.map((x) => x.natureOfIllness).filter(Boolean))].join(" || ");
+  // The portal rejects SaveDraft with an empty Ailment. If extraction didn't
+  // produce one, fall back to the bill type so something sensible goes through.
+  const ailment = ailmentJoined || firstBill.billType || "Medical expenses";
   return {
     claimRegnNo: "", // empty → server generates a new one
     accountNum: ctx.bank.accountNumber,
@@ -127,8 +134,8 @@ export function buildSaveDraftBody(
     policyNumber: b.policyNumber,
     maid: String(b.maid),
     insurer: b.insurer,
-    TreatmentStartDate: startDate || toMMDDYYYY(parseDDMMYYYY(firstBill.billDate) ?? new Date()),
-    TreatmentEndDate: endDate || toMMDDYYYY(parseDDMMYYYY(firstBill.billDate) ?? new Date()),
+    TreatmentStartDate: startDate || toYYYYMMDD(parseDDMMYYYY(firstBill.billDate) ?? new Date()),
+    TreatmentEndDate: endDate || toYYYYMMDD(parseDDMMYYYY(firstBill.billDate) ?? new Date()),
     DOA: "",
     DOD: "",
     hospId: "0",
@@ -175,7 +182,11 @@ export function buildAddClaimBillBody(
     clmRegNo: claimRegNo,
     billNum: fields.billNumber,
     billAmnt: String(fields.billAmount),
-    billDate: toMMDDYYYY(parseDDMMYYYY(fields.billDate) ?? new Date()),
+    // The portal's ConvertToDateMMDDYYYYdash() actually emits YYYY-MM-DD
+    // (the name is misleading). Sending MM-DD-YYYY throws an unhandled
+    // exception server-side → the generic "Ooops" page → looks like a
+    // session redirect to the client.
+    billDate: toYYYYMMDD(parseDDMMYYYY(fields.billDate) ?? new Date()),
     billId: String(ctx.billTypeId),
     billDesc: fields.billType,
     VendorName: ctx.hospitalName,
@@ -245,8 +256,8 @@ export async function submitClaimChain(
 
   const total = bills.reduce((s, b) => s + b.billAmount, 0);
   const dates = bills.map((b) => parseDDMMYYYY(b.billDate)).filter((d): d is Date => d !== null);
-  const startDate = dates.length > 0 ? toMMDDYYYY(dates.reduce((a, b) => (a < b ? a : b))) : "";
-  const endDate = dates.length > 0 ? toMMDDYYYY(dates.reduce((a, b) => (a > b ? a : b))) : "";
+  const startDate = dates.length > 0 ? toYYYYMMDD(dates.reduce((a, b) => (a < b ? a : b))) : "";
+  const endDate = dates.length > 0 ? toYYYYMMDD(dates.reduce((a, b) => (a > b ? a : b))) : "";
   const firstBill = bills[0]!;
 
   // --- Step 1: SaveDraft ---
@@ -307,7 +318,14 @@ async function postForm<T>(
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error(`Non-JSON response from ${path}: ${text.slice(0, 200)}`);
+    // The portal returned HTML (or some other non-JSON payload) where we
+    // expected the AJAX JSON envelope. Most often this is the login page
+    // (session expired) or the ASP.NET yellow-screen-of-death.
+    if (looksLikeLogin(text)) throw new SessionExpiredError();
+    const reason = extractHtmlError(text);
+    throw new Error(
+      `${path} returned HTML instead of JSON${reason ? ` — ${reason}` : ""}. The portal likely redirected to login or rejected the request.`,
+    );
   }
 }
 
@@ -323,6 +341,8 @@ async function postFormRaw(
       "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
       Accept: "application/json, text/javascript, */*; q=0.01",
       "X-Requested-With": "XMLHttpRequest",
+      Referer: OPD_REFERER,
+      Origin: "https://portal.mediassist.in",
     },
     body: form.toString(),
   });
@@ -331,6 +351,26 @@ async function postFormRaw(
     throw new Error(`${path} returned HTTP ${res.status}: ${text.slice(0, 200)}`);
   }
   return text;
+}
+
+function looksLikeLogin(body: string): boolean {
+  const head = body.slice(0, 4096).toLowerCase();
+  return (
+    head.includes("<!doctype") &&
+    (head.includes('name="userid"') ||
+      head.includes('id="username"') ||
+      head.includes("forgotusername") ||
+      head.includes("login.aspx"))
+  );
+}
+
+function extractHtmlError(html: string): string | null {
+  // ASP.NET error page: <title>Server Error...</title> or <h2>...</h2>
+  const title = /<title>([^<]+)<\/title>/i.exec(html);
+  const h2 = /<h2[^>]*>([^<]+)<\/h2>/i.exec(html);
+  const label = /<span[^>]*id="lbl(?:Error|Msg|Status)"[^>]*>([^<]+)<\/span>/i.exec(html);
+  const pick = (label?.[1] || h2?.[1] || title?.[1] || "").trim();
+  return pick && !/^\s*$/.test(pick) ? pick.slice(0, 200) : null;
 }
 
 function basenameOf(p: string): string {
@@ -359,4 +399,15 @@ function toMMDDYYYY(input: string | Date): string {
   // assume already DD-MM-YYYY
   const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(input);
   return m ? `${m[2]}-${m[1]}-${m[3]}` : input;
+}
+
+function toYYYYMMDD(input: string | Date): string {
+  if (input instanceof Date) {
+    const m = String(input.getMonth() + 1).padStart(2, "0");
+    const d = String(input.getDate()).padStart(2, "0");
+    const y = String(input.getFullYear());
+    return `${y}-${m}-${d}`;
+  }
+  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(input);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : input;
 }

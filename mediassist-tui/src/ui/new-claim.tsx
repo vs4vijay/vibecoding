@@ -34,6 +34,10 @@ type Props = {
   /** Called when the user opens / closes the dry-run overlay so the parent's
    *  keybinding bar can swap to overlay-specific hints. */
   onContextHintsChange?: (hints: { key: string; label: string }[]) => void;
+  /** Signal to the parent that a TextInput owns the keyboard (path entry or
+   *  field editor). Lets Shell suppress single-letter global shortcuts
+   *  (r/q/1/2/3) so they don't get swallowed as part of typed text. */
+  onTextInputFocusChange?: (focused: boolean) => void;
 };
 
 type FileKind = "bill" | "doc";
@@ -129,7 +133,7 @@ type SubmitFlow =
     };
 
 
-export function NewClaim({ client, user, isActive, onContextHintsChange }: Props): JSX.Element {
+export function NewClaim({ client, user, isActive, onContextHintsChange, onTextInputFocusChange }: Props): JSX.Element {
   const { reportExpired } = useContext(SessionContext);
   const [bills, setBills] = useState<Bill[]>([]);
   const [pathInput, setPathInput] = useState("");
@@ -230,6 +234,15 @@ export function NewClaim({ client, user, isActive, onContextHintsChange }: Props
     const hints = getContextHints(panel, editing, bills.length, billsOnly.length);
     onContextHintsChange?.(hints);
   }, [panel, editing, bills.length, billsOnly.length, flow, isActive, onContextHintsChange]);
+
+  // ----- text-input focus signal (so global shortcuts don't steal "r"/"q"/…) -----
+  useEffect(() => {
+    if (!onTextInputFocusChange) return;
+    // While the submit-flow overlay is open, no inline text input is focused.
+    const typing = !flow && (panel === "input" || editing);
+    onTextInputFocusChange(typing);
+    return () => onTextInputFocusChange(false);
+  }, [panel, editing, flow, onTextInputFocusChange]);
 
   // ----- key bindings -----
   useInput(
@@ -840,7 +853,7 @@ function PreviewStage({
     <Box flexDirection="column" paddingX={1}>
       <Box flexDirection="column" borderStyle="double" borderColor="yellow" paddingX={2} paddingY={1}>
         <Text bold color="yellow">
-          DRY RUN PREVIEW  ·  {billsOnly.length} bill(s), {docCount} doc(s)  ·  total ₹ {fmt(total)}
+          PREVIEW  ·  {billsOnly.length} bill(s), {docCount} doc(s)  ·  total ₹ {fmt(total)}
         </Text>
         <Text dimColor>Nothing has been submitted yet — review and confirm below.</Text>
         <Box marginTop={1} flexDirection="column">
@@ -1063,7 +1076,7 @@ function FailureStage({ flow }: { flow: Extract<SubmitFlow, { stage: "failure" }
 function hintsForFlow(flow: SubmitFlow): { key: string; label: string }[] {
   switch (flow.stage) {
     case "preview":
-      return [{ key: "s", label: "arm submit" }, { key: "esc", label: "close" }];
+      return [{ key: "s", label: "submit" }, { key: "esc", label: "close" }];
     case "confirm":
       return [
         { key: "←/→", label: "switch button" },
@@ -1227,9 +1240,14 @@ function beginSubmission(
   })();
 }
 
-function reverseDate(mmddyyyy: string): string {
-  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(mmddyyyy);
-  return m ? `${m[2]}-${m[1]}-${m[3]}` : mmddyyyy;
+function reverseDate(s: string): string {
+  // AddClaimBill payloads carry billDate as YYYY-MM-DD (portal format).
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (ymd) return `${ymd[3]}-${ymd[2]}-${ymd[1]}`;
+  // SaveDraft / older payloads used MM-DD-YYYY; keep handling for safety.
+  const mdy = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s);
+  if (mdy) return `${mdy[2]}-${mdy[1]}-${mdy[3]}`;
+  return s;
 }
 
 // ============================================================================
@@ -1309,9 +1327,12 @@ function autoMatchBeneficiary(benefs: SubmitBeneficiary[], hint: string | undefi
 
 /**
  * Parse one or more paths from a single text-input value. Handles all the
- * common ways terminals deliver dropped files: a single bare path, a single
- * quoted path with spaces, multiple paths separated by newlines (multi-drop),
- * or multiple `"path1" "path2"` quoted segments.
+ * common ways terminals deliver dropped files:
+ *   - bare path (no special chars)
+ *   - shell-escaped path with backslashes (macOS Terminal default for
+ *     spaces, parens, brackets, etc — e.g. `/x/Vijay_Soni\ \(1\).pdf`)
+ *   - single- or double-quoted path with spaces
+ *   - multiple paths separated by spaces, newlines, or quote groups
  */
 function parsePathsFromInput(raw: string): string[] {
   const trimmed = raw.trim();
@@ -1324,21 +1345,39 @@ function parsePathsFromInput(raw: string): string[] {
       .filter(Boolean);
   }
 
-  // If the entire input (after outer quote strip) is an existing file, it's a
-  // single path that probably contains spaces — keep it whole.
-  const stripped = stripQuotes(trimmed);
-  if (existsSync(stripped)) return [stripped];
+  // Single path with shell-escapes: if the whole input resolves to a real
+  // file once backslashes / quotes are stripped, keep it whole. This is the
+  // common case for drag-and-drop of one file whose name has spaces or `(1)`.
+  const whole = stripQuotes(trimmed);
+  if (existsSync(whole)) return [whole];
 
-  // Otherwise tokenize, respecting double-quote groups.
+  // Tokenize. Respects:
+  //   - "..." and '...' quoted groups (no escape processing inside)
+  //   - backslash escapes outside quotes (\ <space>, \(, \), \[, \], etc)
   const tokens: string[] = [];
   let cur = "";
-  let inQuotes = false;
-  for (const ch of trimmed) {
-    if (ch === '"') {
-      inQuotes = !inQuotes;
+  let quote: '"' | "'" | null = null;
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i]!;
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+      } else {
+        cur += ch;
+      }
       continue;
     }
-    if (!inQuotes && ch === " ") {
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === "\\" && i + 1 < trimmed.length) {
+      // Outside quotes: take the next char literally (shell-style escape).
+      cur += trimmed[i + 1];
+      i++;
+      continue;
+    }
+    if (ch === " " || ch === "\t") {
       if (cur) {
         tokens.push(cur);
         cur = "";
@@ -1352,7 +1391,11 @@ function parsePathsFromInput(raw: string): string[] {
 }
 
 function stripQuotes(s: string): string {
-  return s.replace(/^["']|["']$/g, "");
+  // Strip a matched pair of outer quotes…
+  const m = /^(['"])([\s\S]*)\1$/.exec(s);
+  const inner = m ? m[2]! : s;
+  // …and unescape shell-style backslash escapes ("\ " → " ", "\(" → "(", etc.)
+  return inner.replace(/\\(.)/g, "$1");
 }
 
 function stringifyField(fields: ClaimFields, key: EditableField): string {
