@@ -1,0 +1,21 @@
+# DRFT build artifacts
+/build/
+/dist/
+/.cache/
+
+# Local overrides
+/config/versions.local.env
+local.properties
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Secrets — never commit
+*.keystore
+*.jks
+keystore.properties

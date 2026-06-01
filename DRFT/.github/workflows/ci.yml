@@ -1,0 +1,83 @@
+# DRFT PR / push validation.
+#
+# Cheap sanity check on PRs and pushes to main/master: build the debug APK.
+# Release builds (release/beta/nightly + GitHub Release publish) are handled
+# by release.yml on tag push.
+#
+# Kept as a separate workflow so PR runs are obvious in the Checks tab and
+# don't accidentally publish anything.
+
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore: [ '**.md', 'docs/**' ]
+  pull_request:
+    branches: [main, master]
+    paths-ignore: [ '**.md', 'docs/**' ]
+
+# Cancel superseded PR runs to save runner minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-debug:
+    name: Build focusDebug
+    runs-on: ubuntu-22.04
+    timeout-minutes: 75
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load DRFT config
+        id: cfg
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./config/versions.env
+          {
+            echo "firefox_rev=${FIREFOX_REV}"
+            echo "jdk_version=${JDK_VERSION}"
+            echo "android_compile_sdk=${ANDROID_COMPILE_SDK}"
+            echo "android_build_tools=${ANDROID_BUILD_TOOLS}"
+            echo "android_ndk_version=${ANDROID_NDK_VERSION}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '${{ steps.cfg.outputs.jdk_version }}' }
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-${{ steps.cfg.outputs.android_compile_sdk }}
+            build-tools;${{ steps.cfg.outputs.android_build_tools }}
+            ndk;${{ steps.cfg.outputs.android_ndk_version }}
+
+      - uses: actions/cache@v4
+        with:
+          path: build/firefox-src
+          key: firefox-src-${{ steps.cfg.outputs.firefox_rev }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ steps.cfg.outputs.firefox_rev }}-${{ hashFiles('config/versions.env') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-${{ steps.cfg.outputs.firefox_rev }}-
+            gradle-${{ runner.os }}-
+
+      - name: Build (all in one)
+        run: bash scripts/all.sh focusDebug
+
+      - name: Upload debug APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: drft-focusDebug-${{ github.sha }}
+          path: dist/**/*.apk
+          if-no-files-found: error
+          retention-days: 7

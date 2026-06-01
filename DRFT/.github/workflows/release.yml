@@ -1,0 +1,140 @@
+# DRFT release pipeline.
+#
+# Triggers:
+#   - Push of any `v*` tag (e.g. v0.1.0)          → builds + uploads + GH Release
+#   - `workflow_dispatch` (manual run)            → builds + uploads, no release
+#   - Both honor `variant` input (default focusRelease)
+#
+# What this job does:
+#   1. Checks out DRFT (this repo) — small, just scripts/patches/config.
+#   2. Caches the firefox-src snapshot under build/ keyed by FIREFOX_REV
+#      so re-runs don't re-download ~700MB.
+#   3. Runs scripts/all.sh (fetch → patch → build).
+#   4. Uploads every produced APK from dist/ as a workflow artifact.
+#   5. On a `v*` tag push, creates a draft GitHub Release with the APKs attached.
+
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Build variant (focusDebug|focusRelease|focusBeta|focusNightly|klar*)'
+        required: false
+        default: 'focusRelease'
+
+permissions:
+  contents: write  # required to create GitHub Releases
+
+concurrency:
+  # One release build per ref at a time. Pushing a new tag cancels older runs
+  # for the same tag (rare but happens with retries).
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build APK (${{ inputs.variant || 'focusRelease' }})
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout DRFT
+        uses: actions/checkout@v4
+
+      - name: Load DRFT config
+        id: cfg
+        # versions.env is plain KEY=VALUE so we can `source` it and re-export.
+        # We expose the values we'll reference in later steps via $GITHUB_OUTPUT.
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./config/versions.env
+          {
+            echo "firefox_rev=${FIREFOX_REV}"
+            echo "firefox_version=${FIREFOX_VERSION}"
+            echo "jdk_version=${JDK_VERSION}"
+            echo "android_compile_sdk=${ANDROID_COMPILE_SDK}"
+            echo "android_build_tools=${ANDROID_BUILD_TOOLS}"
+            echo "android_ndk_version=${ANDROID_NDK_VERSION}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Set up JDK ${{ steps.cfg.outputs.jdk_version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.cfg.outputs.jdk_version }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # Pin to the same artifacts we declared in versions.env so local
+          # builds and CI use the same SDK level.
+          packages: |
+            platform-tools
+            platforms;android-${{ steps.cfg.outputs.android_compile_sdk }}
+            build-tools;${{ steps.cfg.outputs.android_build_tools }}
+            ndk;${{ steps.cfg.outputs.android_ndk_version }}
+
+      - name: Cache extracted firefox source (keyed by FIREFOX_REV)
+        # ~700MB extracted; saves ~3 min on warm runs.
+        uses: actions/cache@v4
+        with:
+          path: build/firefox-src
+          key: firefox-src-${{ steps.cfg.outputs.firefox_rev }}
+
+      - name: Cache Gradle (.gradle + wrapper)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ steps.cfg.outputs.firefox_rev }}-${{ hashFiles('config/versions.env') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-${{ steps.cfg.outputs.firefox_rev }}-
+            gradle-${{ runner.os }}-
+
+      - name: Fetch sources
+        run: bash scripts/fetch.sh
+
+      - name: Apply patches
+        run: bash scripts/patch.sh
+
+      - name: Build APK
+        env:
+          # Daemon is fine in CI when we run one job per runner.
+          DRFT_USE_GRADLE_DAEMON: '0'
+        run: bash scripts/build.sh "${{ inputs.variant || 'focusRelease' }}"
+
+      - name: List produced APKs
+        run: |
+          echo "Contents of dist/:"
+          find dist -type f -printf '%P  %s bytes\n' | sort
+
+      - name: Upload APKs as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: drft-${{ inputs.variant || 'focusRelease' }}-${{ steps.cfg.outputs.firefox_version }}
+          path: dist/**/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release (tag pushes only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          # Draft so a human can sanity-check before publishing.
+          draft: true
+          generate_release_notes: true
+          name: ${{ github.ref_name }}
+          body: |
+            DRFT ${{ github.ref_name }}
+
+            Built from `${{ steps.cfg.outputs.firefox_repo || 'mozilla-firefox/firefox' }}` @ `${{ steps.cfg.outputs.firefox_rev }}`
+            (upstream Firefox ${{ steps.cfg.outputs.firefox_version }}).
+
+            Variant: `${{ inputs.variant || 'focusRelease' }}`
+          files: dist/**/*.apk
