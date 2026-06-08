@@ -33,31 +33,46 @@ OPENCODE_SERVER_USERNAME=viz OPENCODE_SERVER_PASSWORD=VerySecurePasswordHere ope
   bun x skills add https://github.com/microsoft/playwright-cli --skill playwright-cli
   bun x skills add https://github.com/browser-use/browser-use --skill browser-use
   bun x skills add vercel-labs/agent-browser
+
   ```
 - superpowers Skills
 
-
+```bash
 bun x skills add https://github.com/vercel-labs/skills --skill find-skills
+
+
+bun x skills add manaflow-ai/cmux -g -y
 
 
 bun x skills add remotion/agent-skills
 bun x skills add heygen-com/hyperframes
+
 
 bun x skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
 
 
 bun x skills@latest add mattpocock/skills
 
+
 android init
 android skills add --skill base
+```
 
 ## MCP used
-
 
 https://mcp.excalidraw.com
 
 ```bash
-claude mcp add --scope project --transport http excalidraw https://mcp.excalidraw.com
+claude mcp add --transport http excalidraw https://mcp.excalidraw.com
+
+claude mcp add --scope project --transport http plane https://mcp.plane.so/http/mcp
+
+codex mcp add context7 -- npx -y @upstash/context7-mcp
+
+codex mcp add github --url https://api.githubcopilot.com/mcp/
+
+codex mcp add plane --url https://mcp.plane.so/http/mcp
+
 ```
 
 ---
