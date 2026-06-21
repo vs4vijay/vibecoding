@@ -8,16 +8,31 @@ A collection of AI-assisted projects built with vibe coding - the art of coding 
 
 These projects were built using:
 
-### [OpenCode](https://github.com/anomalyco/opencode)
+### OpenCode
+
+https://github.com/anomalyco/opencode
 
 The open source AI coding agent. A powerful terminal-based AI assistant for developers, providing intelligent coding assistance directly in your terminal. Supports multiple AI providers including OpenAI, Anthropic Claude, Google Gemini, and more.
 
-### [Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode)
+### Oh My OpenCode
+
+https://github.com/code-yeongyu/oh-my-opencode
 
 The best agent harness - a plugin that transforms OpenCode into a powerful multi-agent orchestration system with specialized agents (Sisyphus, Oracle, Librarian, etc.), MCP support, and parallel execution capabilities.
 
 ```bash
 OPENCODE_SERVER_USERNAME=viz OPENCODE_SERVER_PASSWORD=VerySecurePasswordHere opencode web --hostname 0.0.0.0 --port 3030 --mdns --mdns-domain vizcode.local
+```
+
+### Pi Coding Agent
+
+```bash
+bun add -g @earendil-works/pi-coding-agent
+
+pi install npm:pi-llama-cpp
+pi install npm:pi-web-access
+
+export LLAMA_SERVER_URL=http://127.0.0.1:1100 # or change in ~/.pi/agents/settings.json
 ```
 
 ### Tools used
@@ -29,17 +44,15 @@ OPENCODE_SERVER_USERNAME=viz OPENCODE_SERVER_PASSWORD=VerySecurePasswordHere ope
 
 - claude skill add juliusbrussee/caveman:caveman
 - playwright-cli Skills
-  ```bash
-  bun x skills add https://github.com/microsoft/playwright-cli --skill playwright-cli
-  bun x skills add https://github.com/browser-use/browser-use --skill browser-use
-  bun x skills add vercel-labs/agent-browser
-
-  ```
 - superpowers Skills
-
 ```bash
 bun x skills add https://github.com/vercel-labs/skills --skill find-skills
 
+# TODO: Skill Creator
+
+bun x skills add https://github.com/mi~crosoft/playwright-cli --skill playwright-cli
+bun x skills add https://github.com/browser-use/browser-use --skill browser-use
+bun x skills add vercel-labs/agent-browser
 
 bun x skills add manaflow-ai/cmux -g -y
 
@@ -72,6 +85,8 @@ codex mcp add context7 -- npx -y @upstash/context7-mcp
 codex mcp add github --url https://api.githubcopilot.com/mcp/
 
 codex mcp add plane --url https://mcp.plane.so/http/mcp
+
+codex mcp add deepwiki --url https://mcp.deepwiki.com/mcp
 
 ```
 
@@ -112,6 +127,18 @@ Analyzes news from multiple sources, performs sentiment analysis using FinBERT o
 - **Tech**: Python 3.12+, SQLAlchemy, Textual, python-telegram-bot
 - **Features**: Multi-source news aggregation, FinBERT/LLM sentiment analysis, Telegram bot + TUI interfaces
 - **Package Manager**: uv
+
+---
+
+### [happns](./happns)
+
+**Real-Time Community & Social Feed**
+
+A modern community feed app with real-time updates, posting, and social interactions.
+
+- **URL**: https://happns.onrender.com/
+- **Tech**: Next.js, TypeScript, Tailwind CSS
+- **Features**: Live feed, responsive UI, social activity stream
 
 ---
 
