@@ -1,0 +1,21 @@
+{
+  "name": "@cs-clone/client",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.163.0"
+  },
+  "devDependencies": {
+    "@cs-clone/shared": "workspace:*",
+    "@types/three": "^0.163.0",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11",
+    "vite-plugin-pwa": "^0.19.8"
+  }
+}

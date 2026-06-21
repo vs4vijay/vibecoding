@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <title>CS Clone</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- HUD Overlay -->
+  <div id="hud" class="hidden">
+    <!-- Crosshair -->
+    <div id="crosshair">
+      <div class="crosshair-line crosshair-top"></div>
+      <div class="crosshair-line crosshair-bottom"></div>
+      <div class="crosshair-line crosshair-left"></div>
+      <div class="crosshair-line crosshair-right"></div>
+    </div>
+
+    <!-- Bottom-left: Health & Armor -->
+    <div id="health-panel">
+      <div class="health-bar">
+        <span class="health-icon">❤️</span>
+        <span id="healthValue">100</span>
+      </div>
+      <div class="armor-bar">
+        <span class="armor-icon">🛡️</span>
+        <span id="armorValue">100</span>
+      </div>
+    </div>
+
+    <!-- Bottom-right: Weapon & Ammo -->
+    <div id="weapon-panel">
+      <div id="weaponName">AK-47</div>
+      <div class="ammo-display">
+        <span id="ammoMag">30</span> / <span id="ammoReserve">90</span>
+      </div>
+    </div>
+
+    <!-- Top-center: Timer & Score -->
+    <div id="timer-panel">
+      <div id="matchTimer">01:30</div>
+      <div id="scoreDisplay">
+        <span class="score-t" id="tScore">0</span> - <span class="score-ct" id="ctScore">0</span>
+      </div>
+    </div>
+
+    <!-- Top-right: Kill Feed -->
+    <div id="kill-feed"></div>
+
+    <!-- Top-left: Team Info -->
+    <div id="team-info">
+      <div class="team-label" id="playerTeam">T</div>
+    </div>
+
+    <!-- Minimap -->
+    <canvas id="minimap" width="180" height="180"></canvas>
+  </div>
+
+  <!-- Kill Feed Overlay -->
+  <div id="deathScreen" class="hidden">
+    <div class="death-message">You were killed</div>
+    <div id="killerName"></div>
+    <button id="respawnBtn">Respawn (R)</button>
+  </div>
+
+  <!-- Scoreboard -->
+  <div id="scoreboard" class="hidden">
+    <table>
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>K</th>
+          <th>D</th>
+          <th>Score</th>
+        </tr>
+      </thead>
+      <tbody id="scoreboardBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Login Screen -->
+  <div id="loginScreen">
+    <div class="login-container">
+      <h1>CS Clone</h1>
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="usernameInput" placeholder="Enter your name" maxlength="32" />
+      </div>
+      <div class="form-group">
+        <label>Team</label>
+        <select id="teamSelect">
+          <option value="T">Terrorist</option>
+          <option value="CT">Counter-Terrorist</option>
+        </select>
+      </div>
+      <button id="connectBtn">Connect</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

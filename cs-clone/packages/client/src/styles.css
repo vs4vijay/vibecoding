@@ -1,0 +1,308 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  overflow: hidden;
+  background: #000;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  user-select: none;
+}
+
+canvas#gameCanvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+.hidden { display: none !important; }
+
+/* HUD */
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+}
+
+.crosshair-line {
+  position: absolute;
+  background: #00ff00;
+  opacity: 0.8;
+}
+
+.crosshair-top { width: 2px; height: 6px; left: 50%; top: 0; transform: translateX(-50%); }
+.crosshair-bottom { width: 2px; height: 6px; left: 50%; bottom: 0; transform: translateX(-50%); }
+.crosshair-left { height: 2px; width: 6px; top: 50%; left: 0; transform: translateY(-50%); }
+.crosshair-right { height: 2px; width: 6px; top: 50%; right: 0; transform: translateY(-50%); }
+
+/* Health & Armor */
+#health-panel {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  gap: 12px;
+}
+
+.health-bar, .armor-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.health-bar { border: 1px solid #e74c3c; }
+.armor-bar { border: 1px solid #3498db; }
+
+/* Weapon & Ammo */
+#weapon-panel {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  text-align: right;
+}
+
+#weaponName {
+  font-size: 14px;
+  color: #ccc;
+  text-transform: uppercase;
+}
+
+.ammo-display {
+  font-size: 28px;
+  font-weight: bold;
+  color: #fff;
+}
+
+/* Timer & Score */
+#timer-panel {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+#matchTimer {
+  font-size: 28px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+#scoreDisplay {
+  font-size: 16px;
+  color: #ccc;
+}
+
+.score-t { color: #f39c12; }
+.score-ct { color: #3498db; }
+
+/* Kill Feed */
+#kill-feed {
+  position: absolute;
+  top: 60px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kill-entry {
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 10px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+  animation: fadeOut 3s ease forwards;
+}
+
+@keyframes fadeOut {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Team Info */
+#team-info {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+}
+
+.team-label {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.team-label.T { background: rgba(243, 156, 18, 0.6); color: #fff; }
+.team-label.CT { background: rgba(52, 152, 219, 0.6); color: #fff; }
+
+/* Minimap */
+canvas#minimap {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 4px;
+}
+
+/* Death Screen */
+#deathScreen {
+  position: fixed;
+  inset: 0;
+  background: rgba(139, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  pointer-events: all;
+}
+
+.death-message {
+  font-size: 28px;
+  color: #e74c3c;
+  margin-bottom: 8px;
+}
+
+#killerName {
+  font-size: 16px;
+  color: #fff;
+  margin-bottom: 20px;
+}
+
+#respawnBtn {
+  padding: 10px 30px;
+  font-size: 16px;
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  pointer-events: all;
+}
+
+#respawnBtn:hover { background: #c0392b; }
+
+/* Scoreboard */
+#scoreboard {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.85);
+  padding: 24px;
+  border-radius: 8px;
+  z-index: 30;
+  min-width: 400px;
+  pointer-events: all;
+}
+
+#scoreboard table {
+  width: 100%;
+  color: #fff;
+  border-collapse: collapse;
+}
+
+#scoreboard th {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid #444;
+}
+
+#scoreboard td {
+  padding: 6px 8px;
+}
+
+/* Login Screen */
+#loginScreen {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.login-container {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 320px;
+}
+
+.login-container h1 {
+  color: #fff;
+  margin-bottom: 24px;
+  text-align: center;
+  font-size: 36px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  color: #aaa;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  outline: none;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #3498db;
+}
+
+.form-group select option {
+  background: #1a1a2e;
+  color: #fff;
+}
+
+.login-container button {
+  width: 100%;
+  padding: 12px;
+  font-size: 18px;
+  font-weight: bold;
+  background: #3498db;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.login-container button:hover {
+  background: #2980b9;
+}

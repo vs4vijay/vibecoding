@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+*.lockb
+
+# Environment
+.env
+.env.local
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Data
+data/
+*.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+:memory:/*

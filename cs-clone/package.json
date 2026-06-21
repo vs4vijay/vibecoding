@@ -1,0 +1,19 @@
+{
+  "name": "cs-clone",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"bun run --filter @cs-clone/server dev\" \"bun run --filter @cs-clone/client dev\"",
+    "build": "bun run --filter @cs-clone/client build && bun run --filter @cs-clone/server build",
+    "start": "bun run --filter @cs-clone/server start",
+    "db:generate": "bun run --filter @cs-clone/server db:generate",
+    "db:migrate": "bun run --filter @cs-clone/server db:migrate"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.2",
+    "concurrently": "^8.2.2"
+  }
+}
