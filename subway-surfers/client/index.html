@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#1a1a2e" />
+    <meta name="description" content="Subway Surfers Clone - 3D Endless Runner" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <title>Subway Surfers Clone</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD Overlay -->
+    <div id="hud" class="hidden">
+      <div id="hud-top">
+        <div id="score-display">
+          <span class="hud-label">SCORE</span>
+          <span id="score-value" class="hud-value">0</span>
+        </div>
+        <div id="coins-display">
+          <span class="hud-label">🪙</span>
+          <span id="coins-value" class="hud-value">0</span>
+        </div>
+      </div>
+      <div id="multiplier-display" class="hidden">
+        <span class="hud-label">x<span id="multiplier-value">1</span></span>
+      </div>
+      <div id="combo-display" class="hidden">
+        <span id="combo-value">0</span> COMBO!
+      </div>
+    </div>
+
+    <!-- Menu Screen -->
+    <div id="menu-screen">
+      <div class="menu-container">
+        <h1 class="game-title">
+          <span class="title-sub">SUBWAY</span>
+          <span class="title-main">SURFERS</span>
+        </h1>
+        <div id="username-form">
+          <input
+            type="text"
+            id="username-input"
+            placeholder="Enter your name"
+            maxlength="20"
+            autocomplete="username"
+          />
+          <button id="play-btn" class="btn btn-primary">PLAY</button>
+        </div>
+        <div id="menu-stats" class="hidden">
+          <div class="stat-row">
+            <span>🏆 High Score: <strong id="menu-high-score">0</strong></span>
+          </div>
+          <div class="stat-row">
+            <span>🪙 Coins: <strong id="menu-coins">0</strong></span>
+          </div>
+          <div class="stat-row">
+            <span>🏃 Runs: <strong id="menu-games">0</strong></span>
+          </div>
+        </div>
+        <div class="controls-hint">
+          <p>← → or A/D to switch lanes</p>
+          <p>↑ or W or tap top to jump</p>
+          <p>↓ or S or tap bottom to roll</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameover-screen" class="hidden">
+      <div class="menu-container">
+        <h2 class="gameover-title">GAME OVER</h2>
+        <div class="gameover-stats">
+          <div class="stat-card">
+            <span class="stat-label">SCORE</span>
+            <span class="stat-value" id="go-score">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">DISTANCE</span>
+            <span class="stat-value" id="go-distance">0m</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">COINS</span>
+            <span class="stat-value" id="go-coins">0</span>
+          </div>
+        </div>
+        <div id="new-high-score" class="hidden">
+          <span>🏆 NEW HIGH SCORE! 🏆</span>
+        </div>
+        <div class="gameover-buttons">
+          <button id="retry-btn" class="btn btn-primary">RETRY</button>
+          <button id="menu-btn" class="btn btn-secondary">MENU</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+      <div class="loader">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+      </div>
+    </div>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.172.0/examples/jsm/"
+      }
+    }
+    </script>
+    <script type="module" src="/js/game.js"></script>
+    <script src="/js/pwa-register.js"></script>
+  </body>
+</html>

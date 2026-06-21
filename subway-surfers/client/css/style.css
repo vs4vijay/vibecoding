@@ -1,0 +1,368 @@
+/* === Reset & Base === */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: #1a1a2e;
+  color: #fff;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+/* === Utility === */
+.hidden {
+  display: none !important;
+}
+
+/* === HUD === */
+#hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 10;
+  padding: 16px 20px;
+}
+
+#hud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.hud-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  display: block;
+}
+
+.hud-value {
+  font-size: 28px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+
+#score-display {
+  text-align: left;
+}
+
+#coins-display {
+  text-align: right;
+}
+
+#coins-display .hud-label {
+  font-size: 16px;
+}
+
+#multiplier-display {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 36px;
+  font-weight: 900;
+  color: #ffd700;
+  text-shadow: 0 2px 12px rgba(255, 215, 0, 0.5);
+  animation: pulse 0.5s ease-in-out infinite alternate;
+}
+
+#combo-display {
+  position: fixed;
+  top: 130px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
+  font-weight: 900;
+  color: #ff6b35;
+  text-shadow: 0 2px 8px rgba(255, 107, 53, 0.5);
+}
+
+@keyframes pulse {
+  from {
+    transform: translateX(-50%) scale(1);
+  }
+  to {
+    transform: translateX(-50%) scale(1.1);
+  }
+}
+
+/* === Menu Screen === */
+#menu-screen,
+#gameover-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  background: linear-gradient(
+    135deg,
+    rgba(26, 26, 46, 0.95) 0%,
+    rgba(22, 33, 62, 0.95) 50%,
+    rgba(26, 26, 46, 0.95) 100%
+  );
+  backdrop-filter: blur(10px);
+}
+
+.menu-container {
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  padding: 32px;
+}
+
+.game-title {
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 32px;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.title-sub {
+  color: #ffd700;
+  display: block;
+  font-size: 24px;
+  letter-spacing: 8px;
+}
+
+.title-main {
+  color: #fff;
+  display: block;
+  font-size: 56px;
+  letter-spacing: 4px;
+  background: linear-gradient(180deg, #fff 0%, #ccc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* === Username Form === */
+#username-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+#username-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+#username-input:focus {
+  border-color: rgba(255, 215, 0, 0.5);
+}
+
+#username-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* === Buttons === */
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #ffd700, #ff6b35);
+  color: #1a1a2e;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(255, 215, 0, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* === Menu Stats === */
+#menu-stats {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.stat-row {
+  padding: 6px 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.stat-row strong {
+  color: #ffd700;
+}
+
+/* === Controls Hint === */
+.controls-hint {
+  margin-top: 24px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.8;
+}
+
+/* === Game Over === */
+.gameover-title {
+  font-size: 40px;
+  font-weight: 900;
+  color: #ff4757;
+  margin-bottom: 24px;
+  text-shadow: 0 4px 20px rgba(255, 71, 87, 0.3);
+}
+
+.gameover-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  padding: 16px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.5);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 900;
+  color: #fff;
+  display: block;
+}
+
+#new-high-score {
+  margin-bottom: 24px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #ffd700, #ff6b35);
+  border-radius: 12px;
+  color: #1a1a2e;
+  font-weight: 900;
+  font-size: 16px;
+  animation: pulse 0.5s ease-in-out infinite alternate;
+}
+
+.gameover-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* === Loading === */
+#loading-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a2e;
+  z-index: 100;
+}
+
+.loader {
+  text-align: center;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #ffd700;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* === Responsive === */
+@media (max-width: 480px) {
+  .game-title {
+    font-size: 36px;
+  }
+
+  .title-sub {
+    font-size: 18px;
+  }
+
+  .title-main {
+    font-size: 42px;
+  }
+
+  .hud-value {
+    font-size: 22px;
+  }
+
+  .gameover-stats {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+}
