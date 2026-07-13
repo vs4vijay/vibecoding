@@ -35,22 +35,32 @@ pi install npm:pi-web-access
 export LLAMA_SERVER_URL=http://127.0.0.1:1100 # or change in ~/.pi/agents/settings.json
 ```
 
+### Oh-my-Pi
+
+```bash
+bun install -g @oh-my-pi/pi-coding-agent
+
+# export AZURE_OPENAI_BASE_URL="..../v1"
+# export AZURE_OPENAI_API_KEY="YOUR_AZURE_OPENAI_API_KEY"
+```
+
 ### Tools used
 
 - rtk-ai
+- gnhf - `bun add -g gnhf`
 - android-cli - https://developer.android.com/tools/agents/android-cli
 
 ### Skills used
 
-- claude skill add juliusbrussee/caveman:caveman
+- caveman
 - playwright-cli Skills
 - superpowers Skills
 ```bash
 bun x skills add https://github.com/vercel-labs/skills --skill find-skills
+bun x skills add vercel-labs/agent-skills --skill skill-creator
+bun x skills add anthropics/skills --skill skill-creator
 
-# TODO: Skill Creator
-
-bun x skills add https://github.com/mi~crosoft/playwright-cli --skill playwright-cli
+bun x skills add -g https://github.com/microsoft/playwright-cli --skill playwright-cli
 bun x skills add https://github.com/browser-use/browser-use --skill browser-use
 bun x skills add vercel-labs/agent-browser
 
@@ -61,7 +71,7 @@ bun x skills add remotion/agent-skills
 bun x skills add heygen-com/hyperframes
 
 
-bun x skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
+claude skill add juliusbrussee/caveman:caveman
 
 
 bun x skills@latest add mattpocock/skills
@@ -69,6 +79,13 @@ bun x skills@latest add mattpocock/skills
 
 android init
 android skills add --skill base
+
+# OLD
+bun x skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
+
+
+# List Skills
+bun x skills ls -g
 ```
 
 ## MCP used
@@ -81,6 +98,8 @@ claude mcp add --transport http excalidraw https://mcp.excalidraw.com
 claude mcp add --scope project --transport http plane https://mcp.plane.so/http/mcp
 
 codex mcp add context7 -- npx -y @upstash/context7-mcp
+
+codex mcp add excalidraw --url https://mcp.excalidraw.com
 
 codex mcp add github --url https://api.githubcopilot.com/mcp/
 

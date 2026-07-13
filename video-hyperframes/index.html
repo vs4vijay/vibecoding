@@ -1,630 +1,1035 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WealthIQ Product Demo</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Inter', sans-serif;
-      background: #0A0A0F;
-      color: #FFFFFF;
-      overflow: hidden;
-    }
-
-    .scene {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      display: none;
-    }
-    .scene.active { display: block; }
-
-    .scene-content {
-      display: flex;
-      flex-direction: column;
-      width: 100%;
-      height: 100%;
-      padding: 80px 120px;
-      gap: 32px;
-      box-sizing: border-box;
-    }
-
-    .decorative-glow {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(120px);
-      opacity: 0.3;
-      pointer-events: none;
-    }
-
-    .accent-line {
-      position: absolute;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, #3B82F6, transparent);
-      opacity: 0.4;
-    }
-
-    h1 { font-size: 72px; font-weight: 800; letter-spacing: -0.02em; }
-    h2 { font-size: 48px; font-weight: 700; letter-spacing: -0.01em; }
-    h3 { font-size: 28px; font-weight: 600; }
-    p { font-size: 20px; color: #94A3B8; }
-    .tag { 
-      display: inline-block;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 14px;
-      font-weight: 500;
-    }
-    .tag-blue { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
-    .tag-green { background: rgba(16, 185, 129, 0.2); color: #34D399; }
-    .tag-purple { background: rgba(139, 92, 246, 0.2); color: #A78BFA; }
-
-    .card {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
-      padding: 24px;
-    }
-
-    .logo-mark {
-      width: 64px;
-      height: 64px;
-      background: linear-gradient(135deg, #3B82F6, #6366F1);
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 28px;
-    }
-
-    .stat {
-      text-align: center;
-    }
-    .stat-value {
-      font-size: 36px;
-      font-weight: 700;
-    }
-    .stat-label {
-      font-size: 14px;
-      color: #94A3B8;
-      margin-top: 4px;
-    }
-
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    .data-table th {
-      text-align: left;
-      padding: 12px;
-      color: #94A3B8;
-      font-weight: 500;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    .data-table td {
-      padding: 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-    .data-table .num { font-variant-numeric: tabular-nums; }
-
-    .positive { color: #10B981; }
-    .negative { color: #EF4444; }
-
-    .chart-bar {
-      height: 8px;
-      border-radius: 4px;
-      background: linear-gradient(90deg, #3B82F6, #6366F1);
-    }
-
-    .input-field {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 8px;
-      padding: 12px 16px;
-      color: #FFF;
-      font-size: 16px;
-      width: 100%;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #3B82F6, #6366F1);
-      border: none;
-      border-radius: 8px;
-      padding: 14px 28px;
-      color: #FFF;
-      font-weight: 600;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    .tab-list {
-      display: flex;
-      gap: 8px;
-    }
-    .tab {
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      background: rgba(255,255,255,0.05);
-      color: #94A3B8;
-    }
-    .tab.active {
-      background: #3B82F6;
-      color: #FFF;
-    }
-
-    .flex-row { display: flex; gap: 24px; }
-    .flex-col { display: flex; flex-direction: column; gap: 16px; }
-    .flex-between { display: flex; justify-content: space-between; align-items: center; }
-    .flex-center { display: flex; align-items: center; gap: 16px; }
-    .flex-1 { flex: 1; }
-    .items-center { align-items: center; }
-
-    .w-full { width: 100%; }
-    .text-center { text-align: center; }
-    .mt-4 { margin-top: 16px; }
-    .mb-2 { margin-bottom: 8px; }
-
-    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-
-    .transition-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #0A0A0F;
-      z-index: 100;
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
-    }
-    @keyframes pulse-glow {
-      0%, 100% { opacity: 0.3; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(1.1); }
-    }
-  </style>
-</head>
-<body>
-  <div data-composition-id="wealthiq-demo" data-width="1920" data-height="1080" data-start="0">
-    <div class="transition-overlay" id="transitionOverlay"></div>
-
-  <!-- Scene 1: Title -->
-  <div id="scene-1" class="scene active" data-scene="1">
-    <div class="decorative-glow" style="width: 600px; height: 600px; background: #3B82F6; top: 20%; left: 30%;"></div>
-    <div class="decorative-glow" style="width: 400px; height: 400px; background: #6366F1; bottom: 10%; right: 20%;"></div>
-    
-    <div class="scene-content" style="justify-content: center; align-items: center; text-align: center;">
-      <div class="flex-col items-center" style="gap: 40px;">
-        <div class="logo-mark">W</div>
-        <div class="flex-col items-center" style="gap: 16px;">
-          <h1>WealthIQ</h1>
-          <p style="font-size: 24px; max-width: 600px;">Smart Mutual Fund Analytics for Indian Investors</p>
-        </div>
-        <div class="flex-row" style="margin-top: 20px;">
-          <span class="tag tag-blue">Real-time Data</span>
-          <span class="tag tag-purple">1,000+ Funds</span>
-          <span class="tag tag-green">Free API</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scene 2: Explorer -->
-  <div id="scene-2" class="scene" data-scene="2">
-    <div class="decorative-glow" style="width: 500px; height: 500px; background: #3B82F6; top: -10%; right: -10%;"></div>
-    
-    <div class="scene-content">
-      <div class="flex-between">
-        <div class="flex-col" style="gap: 8px;">
-          <h2>Explore Funds</h2>
-          <p>Search and filter through 1,000+ mutual funds</p>
-        </div>
-        <div class="flex-row" style="align-items: center;">
-          <span class="w-2 h-2 bg-green-500 rounded-full" style="width: 8px; height: 8px; background: #10B981; border-radius: 50%;"></span>
-          <span style="color: #94A3B8; font-size: 14px;">Live Data</span>
-        </div>
-      </div>
-
-      <div class="card flex-1" style="overflow: hidden;">
-        <div class="flex-row mb-2" style="gap: 16px; margin-bottom: 20px;">
-          <input type="text" class="input-field" style="flex: 2;" placeholder="Search funds by name or code..." value="ICICI Prudential Bluechip">
-          <select class="input-field" style="flex: 1;">
-            <option>All Categories</option>
-            <option>Equity</option>
-            <option>Debt</option>
-            <option>Hybrid</option>
-          </select>
-          <select class="input-field" style="flex: 1;">
-            <option>Sort by NAV</option>
-            <option>Sort by Name</option>
-          </select>
-        </div>
-
-        <div style="overflow-y: auto; max-height: 400px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Fund Name</th>
-                <th>Category</th>
-                <th>NAV</th>
-                <th>1Y Return</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>ICICI Prudential Bluechip Fund</strong></td>
-                <td><span class="tag tag-blue">Equity</span></td>
-                <td class="num">₹287.42</td>
-                <td class="num positive">+18.5%</td>
-                <td><span class="tag" style="background: rgba(245, 158, 11, 0.2); color: #FBBF24;">Large Cap</span></td>
-              </tr>
-              <tr>
-                <td><strong>HDFC Top 100 Fund</strong></td>
-                <td><span class="tag tag-blue">Equity</span></td>
-                <td class="num">₹892.15</td>
-                <td class="num positive">+15.2%</td>
-                <td><span class="tag" style="background: rgba(245, 158, 11, 0.2); color: #FBBF24;">Large Cap</span></td>
-              </tr>
-              <tr>
-                <td><strong>SBI Small Cap Fund</strong></td>
-                <td><span class="tag tag-purple">Equity</span></td>
-                <td class="num">₹124.56</td>
-                <td class="num positive">+32.8%</td>
-                <td><span class="tag" style="background: rgba(239, 68, 68, 0.2); color: #F87171;">Small Cap</span></td>
-              </tr>
-              <tr>
-                <td><strong>Nippon India Growth Fund</strong></td>
-                <td><span class="tag tag-purple">Equity</span></td>
-                <td class="num">₹2,456.78</td>
-                <td class="num positive">+28.4%</td>
-                <td><span class="tag" style="background: rgba(139, 92, 246, 0.2); color: #A78BFA;">Mid Cap</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scene 3: Compare -->
-  <div id="scene-3" class="scene" data-scene="3">
-    <div class="decorative-glow" style="width: 400px; height: 400px; background: #6366F1; bottom: -10%; left: -10%;"></div>
-    
-    <div class="scene-content">
-      <div class="flex-col" style="gap: 8px;">
-        <h2>Compare Funds</h2>
-        <p>Analyze performance side-by-side with interactive charts</p>
-      </div>
-
-      <div class="grid-3 flex-1">
-        <div class="card flex-col" style="gap: 16px;">
-          <div class="flex-between">
-            <span class="tag tag-blue">Fund A</span>
-            <span style="color: #3B82F6; font-weight: 600;">Large Cap</span>
-          </div>
-          <h3 style="font-size: 20px;">ICICI Bluechip</h3>
-          <div class="grid-2" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-            <div class="stat">
-              <div class="stat-value">₹287</div>
-              <div class="stat-label">Current NAV</div>
-            </div>
-            <div class="stat">
-              <div class="stat-value positive">+18.5%</div>
-              <div class="stat-label">1 Year Return</div>
-            </div>
-          </div>
-          <div class="chart-bar" style="width: 100%;"></div>
-        </div>
-
-        <div class="card flex-col" style="gap: 16px;">
-          <div class="flex-between">
-            <span class="tag tag-purple">Fund B</span>
-            <span style="color: #8B5CF6; font-weight: 600;">Mid Cap</span>
-          </div>
-          <h3 style="font-size: 20px;">Nippon Growth</h3>
-          <div class="grid-2" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-            <div class="stat">
-              <div class="stat-value">₹2,456</div>
-              <div class="stat-label">Current NAV</div>
-            </div>
-            <div class="stat">
-              <div class="stat-value positive">+28.4%</div>
-              <div class="stat-label">1 Year Return</div>
-            </div>
-          </div>
-          <div class="chart-bar" style="width: 85%; background: linear-gradient(90deg, #8B5CF6, #A78BFA);"></div>
-        </div>
-
-        <div class="card flex-col" style="gap: 16px;">
-          <div class="flex-between">
-            <span class="tag tag-green">Fund C</span>
-            <span style="color: #10B981; font-weight: 600;">Hybrid</span>
-          </div>
-          <h3 style="font-size: 20px;">HDFC Balanced</h3>
-          <div class="grid-2" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-            <div class="stat">
-              <div class="stat-value">₹456</div>
-              <div class="stat-label">Current NAV</div>
-            </div>
-            <div class="stat">
-              <div class="stat-value positive">+12.1%</div>
-              <div class="stat-label">1 Year Return</div>
-            </div>
-          </div>
-          <div class="chart-bar" style="width: 60%; background: linear-gradient(90deg, #10B981, #34D399);"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scene 4: SIP Calculator -->
-  <div id="scene-4" class="scene" data-scene="4">
-    <div class="decorative-glow" style="width: 450px; height: 450px; background: #10B981; top: 30%; right: 10%;"></div>
-    
-    <div class="scene-content">
-      <div class="flex-col" style="gap: 8px;">
-        <h2>SIP Calculator</h2>
-        <p>Plan your investments with systematic withdrawal plans</p>
-      </div>
-
-      <div class="grid-4 flex-1" style="align-items: center;">
-        <div class="card">
-          <p style="font-size: 14px; margin-bottom: 8px;">Monthly Investment</p>
-          <div style="font-size: 32px; font-weight: 700;">₹10,000</div>
-        </div>
-        <div class="card">
-          <p style="font-size: 14px; margin-bottom: 8px;">Duration</p>
-          <div style="font-size: 32px; font-weight: 700;">10 Years</div>
-        </div>
-        <div class="card">
-          <p style="font-size: 14px; margin-bottom: 8px;">Expected Return</p>
-          <div style="font-size: 32px; font-weight: 700;">12%</div>
-        </div>
-        <div class="card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(59, 130, 246, 0.2)); border-color: rgba(16, 185, 129, 0.3);">
-          <p style="font-size: 14px; margin-bottom: 8px; color: #34D399;">Est. Total Value</p>
-          <div style="font-size: 40px; font-weight: 700; color: #10B981;">₹23.2L</div>
-          <p style="font-size: 12px; color: #94A3B8; margin-top: 4px;">+132% returns</p>
-        </div>
-      </div>
-
-      <div class="card" style="padding: 32px;">
-        <p style="font-size: 16px; margin-bottom: 20px;">Investment Breakdown</p>
-        <div style="display: flex; height: 24px; border-radius: 12px; overflow: hidden;">
-          <div style="width: 43%; background: #3B82F6; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">₹12L Invested</div>
-          <div style="width: 57%; background: #10B981; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">₹11.2L Returns</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scene 5: Portfolio -->
-  <div id="scene-5" class="scene" data-scene="5">
-    <div class="decorative-glow" style="width: 400px; height: 400px; background: #3B82F6; bottom: 10%; left: 20%;"></div>
-    
-    <div class="scene-content">
-      <div class="flex-col" style="gap: 8px;">
-        <h2>Your Portfolio</h2>
-        <p>Track your watchlist and recent activity</p>
-      </div>
-
-      <div class="flex-row flex-1" style="gap: 32px;">
-        <div class="card flex-1">
-          <div class="flex-between mb-2">
-            <h3 style="font-size: 20px;">Watchlist</h3>
-            <span class="tag tag-blue">5 funds</span>
-          </div>
-          <div class="flex-col" style="gap: 12px;">
-            <div class="flex-between" style="padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-              <div>
-                <div style="font-weight: 600;">ICICI Bluechip</div>
-                <div style="font-size: 12px; color: #94A3B8;">Large Cap • Equity</div>
-              </div>
-              <div class="text-center">
-                <div style="font-weight: 600;">₹287.42</div>
-                <div class="positive" style="font-size: 12px;">+18.5%</div>
-              </div>
-            </div>
-            <div class="flex-between" style="padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-              <div>
-                <div style="font-weight: 600;">SBI Small Cap</div>
-                <div style="font-size: 12px; color: #94A3B8;">Small Cap • Equity</div>
-              </div>
-              <div class="text-center">
-                <div style="font-weight: 600;">₹124.56</div>
-                <div class="positive" style="font-size: 12px;">+32.8%</div>
-              </div>
-            </div>
-            <div class="flex-between" style="padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-              <div>
-                <div style="font-weight: 600;">Nippon India Growth</div>
-                <div style="font-size: 12px; color: #94A3B8;">Mid Cap • Equity</div>
-              </div>
-              <div class="text-center">
-                <div style="font-weight: 600;">₹2,456.78</div>
-                <div class="positive" style="font-size: 12px;">+28.4%</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card flex-1">
-          <div class="flex-between mb-2">
-            <h3 style="font-size: 20px;">Recent Views</h3>
-            <span class="tag tag-purple">3 funds</span>
-          </div>
-          <div class="flex-col" style="gap: 12px;">
-            <div class="flex-between" style="padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-              <div>
-                <div style="font-weight: 600;">HDFC Top 100</div>
-                <div style="font-size: 12px; color: #94A3B8;">Large Cap • Equity</div>
-              </div>
-              <div class="text-center">
-                <div style="font-weight: 600;">₹892.15</div>
-                <div class="positive" style="font-size: 12px;">+15.2%</div>
-              </div>
-            </div>
-            <div class="flex-between" style="padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-              <div>
-                <div style="font-weight: 600;">Axis Long Term</div>
-                <div style="font-size: 12px; color: #94A3B8;">ELSS • Tax Savings</div>
-              </div>
-              <div class="text-center">
-                <div style="font-weight: 600;">₹1,124.56</div>
-                <div class="positive" style="font-size: 12px;">+19.8%</div>
-              </div>
-            </div>
-            <div class="flex-between" style="padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-              <div>
-                <div style="font-weight: 600;">UTI Nifty Index</div>
-                <div style="font-size: 12px; color: #94A3B8;">Index • Passive</div>
-              </div>
-              <div class="text-center">
-                <div style="font-weight: 600;">₹156.42</div>
-                <div class="positive" style="font-size: 12px;">+11.2%</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scene 6: CTA -->
-  <div id="scene-6" class="scene" data-scene="6">
-    <div class="decorative-glow" style="width: 600px; height: 600px; background: #3B82F6; top: 20%; left: 30%;"></div>
-    <div class="decorative-glow" style="width: 400px; height: 400px; background: #10B981; bottom: 10%; right: 25%;"></div>
-    
-    <div class="scene-content" style="justify-content: center; align-items: center; text-align: center;">
-      <div class="flex-col items-center" style="gap: 40px;">
-        <div class="flex-col items-center" style="gap: 24px;">
-          <h1>Start Your Investment Journey</h1>
-          <p style="font-size: 22px; max-width: 600px;">WealthIQ provides real-time data, powerful tools, and expert insights to help you make smarter investment decisions.</p>
-        </div>
-
-        <div class="flex-row" style="gap: 32px; margin-top: 20px;">
-          <div class="stat">
-            <div class="stat-value" style="color: #3B82F6;">1,000+</div>
-            <div class="stat-label">Mutual Funds</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value" style="color: #10B981;">100%</div>
-            <div class="stat-label">Free API Data</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value" style="color: #8B5CF6;">24/7</div>
-            <div class="stat-label">Live Updates</div>
-          </div>
-        </div>
-
-        <button class="btn-primary" style="margin-top: 20px; padding: 20px 48px; font-size: 20px;">
-          Explore Funds →
-        </button>
-
-        <p style="font-size: 14px; margin-top: 16px;">Data provided by MFapi.in • For informational purposes only</p>
-      </div>
-    </div>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
-  <script>
-    window.__timelines = window.__timelines || {};
-    
-    const tl = gsap.timeline({ paused: true });
-    
-    const scenes = [
-      { id: 1, start: 0, duration: 3 },
-      { id: 2, start: 3, duration: 5 },
-      { id: 3, start: 8, duration: 5 },
-      { id: 4, start: 13, duration: 5 },
-      { id: 5, start: 18, duration: 4 },
-      { id: 6, start: 22, duration: 4 },
-    ];
-
-    const totalDuration = 26;
-    
-    // Scene 1: Title - 0-3s
-    tl.from("#scene-1 .logo-mark", { scale: 0.5, opacity: 0, duration: 0.6, ease: "back.out(1.7)" }, 0.2);
-    tl.from("#scene-1 h1", { y: 40, opacity: 0, duration: 0.7, ease: "power3.out" }, 0.4);
-    tl.from("#scene-1 p", { y: 30, opacity: 0, duration: 0.5, ease: "power2.out" }, 0.7);
-    tl.from("#scene-1 .tag", { y: 20, opacity: 0, duration: 0.4, stagger: 0.15, ease: "power2.out" }, 1.0);
-
-    // Scene 2: Explorer - 3-8s (transition at 3s)
-    tl.from("#scene-2 h2", { x: -40, opacity: 0, duration: 0.6, ease: "power3.out" }, 3.2);
-    tl.from("#scene-2 p", { x: -30, opacity: 0, duration: 0.5, ease: "power2.out" }, 3.5);
-    tl.from("#scene-2 .card", { y: 30, opacity: 0, duration: 0.6, ease: "power3.out" }, 3.8);
-    tl.from("#scene-2 .input-field", { y: 20, opacity: 0, duration: 0.4, stagger: 0.1, ease: "power2.out" }, 4.2);
-    tl.from("#scene-2 tbody tr", { y: 20, opacity: 0, duration: 0.4, stagger: 0.1, ease: "power2.out" }, 4.6);
-
-    // Scene 3: Compare - 8-13s (transition at 8s)
-    tl.from("#scene-3 h2", { y: 30, opacity: 0, duration: 0.6, ease: "power3.out" }, 8.2);
-    tl.from("#scene-3 p", { y: 20, opacity: 0, duration: 0.5, ease: "power2.out" }, 8.4);
-    tl.from("#scene-3 .card", { y: 40, opacity: 0, duration: 0.6, stagger: 0.15, ease: "power3.out" }, 8.7);
-
-    // Scene 4: SIP Calculator - 13-18s (transition at 13s)
-    tl.from("#scene-4 h2", { x: -40, opacity: 0, duration: 0.6, ease: "power3.out" }, 13.2);
-    tl.from("#scene-4 p", { x: -30, opacity: 0, duration: 0.5, ease: "power2.out" }, 13.4);
-    tl.from("#scene-4 .card", { scale: 0.95, opacity: 0, duration: 0.5, stagger: 0.12, ease: "power2.out" }, 13.7);
-
-    // Scene 5: Portfolio - 18-22s (transition at 18s)
-    tl.from("#scene-5 h2", { y: 30, opacity: 0, duration: 0.6, ease: "power3.out" }, 18.2);
-    tl.from("#scene-5 p", { y: 20, opacity: 0, duration: 0.5, ease: "power2.out" }, 18.4);
-    tl.from("#scene-5 .card", { x: -30, opacity: 0, duration: 0.5, stagger: 0.2, ease: "power2.out" }, 18.7);
-    tl.from("#scene-5 .flex-between", { y: 15, opacity: 0, duration: 0.4, stagger: 0.1, ease: "power2.out" }, 19.2);
-
-    // Scene 6: CTA - 22-26s (transition at 22s)
-    tl.from("#scene-6 h1", { y: 40, opacity: 0, duration: 0.7, ease: "power3.out" }, 22.3);
-    tl.from("#scene-6 p", { y: 30, opacity: 0, duration: 0.5, ease: "power2.out" }, 22.6);
-    tl.from("#scene-6 .stat", { y: 20, opacity: 0, duration: 0.5, stagger: 0.12, ease: "power2.out" }, 22.9);
-    tl.from("#scene-6 .btn-primary", { scale: 0.9, opacity: 0, duration: 0.5, ease: "back.out(1.7)" }, 23.3);
-    tl.from("#scene-6 p:last-child", { opacity: 0, duration: 0.4, ease: "power2.out" }, 23.6);
-
-    // Exit animations for final scene
-    tl.to("#scene-6 .btn-primary", { scale: 0.95, duration: 0.3, ease: "power2.in" }, 25.0);
-    tl.to("#scene-6 h1, #scene-6 p, #scene-6 .stat, #scene-6 .btn-primary, #scene-6 p:last-child", { 
-      opacity: 0, 
-      y: -30, 
-      duration: 0.6, 
-      ease: "power2.in" 
-    }, 25.5);
-
-    // Scene visibility control
-    const sceneElements = document.querySelectorAll('.scene');
-    sceneElements.forEach(el => el.classList.remove('active'));
-    document.getElementById('scene-1').classList.add('active');
-
-    tl.eventCallback("onUpdate", () => {
-      const time = tl.time();
-      let currentScene = 1;
-      
-      for (let i = 0; i < scenes.length; i++) {
-        if (time >= scenes[i].start && time < scenes[i].start + scenes[i].duration) {
-          currentScene = scenes[i].id;
-          break;
-        }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aegis Product Presentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
       }
-      
-      sceneElements.forEach(el => el.classList.remove('active'));
-      const activeScene = document.getElementById('scene-' + currentScene);
-      if (activeScene) activeScene.classList.add('active');
-    });
 
-    window.__timelines["wealthiq-demo"] = tl;
-  </script>
-  </div>
-</body>
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #090b0a;
+        color: #f2eee5;
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #090b0a;
+      }
+
+      .scene {
+        position: absolute;
+        inset: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background-color: #090b0a;
+      }
+
+      .scene:not(#scene-1) {
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .scene-content {
+        position: relative;
+        z-index: 10;
+        width: 100%;
+        height: 100%;
+        padding: 92px 118px;
+        display: flex;
+        flex-direction: column;
+        gap: 34px;
+      }
+
+      .grid-bg {
+        position: absolute;
+        inset: -2px;
+        opacity: 0.34;
+        background-image:
+          linear-gradient(rgba(217, 164, 65, 0.12) 2px, rgba(217, 164, 65, 0) 2px),
+          linear-gradient(90deg, rgba(217, 164, 65, 0.12) 2px, rgba(217, 164, 65, 0) 2px);
+        background-size: 120px 120px;
+      }
+
+      .grain {
+        position: absolute;
+        inset: 0;
+        opacity: 0.18;
+        background-image:
+          radial-gradient(circle at 12% 18%, rgba(242, 238, 229, 0.14) 0 1px, rgba(242, 238, 229, 0) 1px),
+          radial-gradient(circle at 73% 61%, rgba(242, 238, 229, 0.11) 0 1px, rgba(242, 238, 229, 0) 1px);
+        background-size: 17px 19px, 23px 29px;
+      }
+
+      .glow {
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(72px);
+        opacity: 0.24;
+        background: #d9a441;
+      }
+
+      .glow.green {
+        background: #60d394;
+      }
+
+      .glow.red {
+        background: #e86d5c;
+      }
+
+      .ghost {
+        position: absolute;
+        font-family: "Fraunces", serif;
+        font-weight: 900;
+        color: rgba(242, 238, 229, 0.065);
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+        pointer-events: none;
+      }
+
+      .ghost::before {
+        content: attr(data-word);
+      }
+
+      .shield span::before {
+        content: attr(data-letter);
+      }
+
+      .kicker,
+      .meta,
+      .chip,
+      .label,
+      .code,
+      .micro,
+      .status {
+        font-family: "IBM Plex Mono", monospace;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .kicker {
+        color: #fff0b8;
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      .title {
+        font-family: "Fraunces", serif;
+        font-size: 148px;
+        line-height: 0.9;
+        font-weight: 900;
+        letter-spacing: 0.01em;
+        margin: 0;
+        max-width: 1280px;
+      }
+
+      .subtitle {
+        max-width: 990px;
+        margin: 0;
+        color: #fff8ec;
+        font-size: 38px;
+        line-height: 1.25;
+        font-weight: 350;
+      }
+
+      .body-large {
+        margin: 0;
+        color: #fff8ec;
+        font-size: 32px;
+        line-height: 1.35;
+      }
+
+      .meta {
+        color: #fff8ec;
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .label,
+      .meta,
+      .module strong,
+      .stat-value,
+      .milestone .label,
+      .shield span {
+        background: #000000 !important;
+        color: #ffffff !important;
+        border-radius: 5px;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+      }
+
+      .label,
+      .meta,
+      .milestone .label {
+        padding: 8px 14px;
+      }
+
+      .label {
+        font-size: 24px;
+        font-weight: 900;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 32px;
+        min-height: 44px;
+      }
+
+      .brand-lockup {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+      }
+
+      .shield {
+        position: relative;
+        width: 132px;
+        height: 154px;
+        display: grid;
+        place-items: center;
+        filter: drop-shadow(0 0 36px rgba(217, 164, 65, 0.34));
+      }
+
+      .shield::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: #d9a441;
+        clip-path: polygon(50% 0%, 93% 16%, 84% 72%, 50% 100%, 16% 72%, 7% 16%);
+      }
+
+      .shield::after {
+        content: "";
+        position: absolute;
+        inset: 14px;
+        background: #090b0a;
+        clip-path: polygon(50% 0%, 93% 16%, 84% 72%, 50% 100%, 16% 72%, 7% 16%);
+      }
+
+      .shield span {
+        position: relative;
+        z-index: 2;
+        color: #fff3c4;
+        font-family: "Fraunces", serif;
+        font-size: 72px;
+        font-weight: 900;
+        padding: 2px 10px 8px;
+        text-shadow: 0 2px 18px rgba(0, 0, 0, 0.85);
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .chip {
+        padding: 16px 20px;
+        border: 2px solid #536050;
+        border-radius: 8px;
+        color: #ffffff;
+        background: #060806;
+        font-size: 24px;
+        font-weight: 800;
+        box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.26);
+      }
+
+      .chip.green {
+        border-color: rgba(185, 247, 207, 0.72);
+        color: #ffffff;
+        background: #07140d;
+      }
+
+      .chip.red {
+        border-color: rgba(255, 178, 168, 0.78);
+        color: #ffffff;
+        background: #210907;
+      }
+
+      .panel {
+        border: 2px solid #536050;
+        border-radius: 8px;
+        background: #090d0a;
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34);
+      }
+
+      .scene-1-layout {
+        justify-content: space-between;
+      }
+
+      .hero-row {
+        display: grid;
+        grid-template-columns: 1.08fr 0.92fr;
+        gap: 76px;
+        align-items: center;
+        flex: 1;
+      }
+
+      .hero-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+
+      .shield-stage {
+        position: relative;
+        min-height: 650px;
+        display: grid;
+        place-items: center;
+      }
+
+      .orbit {
+        position: absolute;
+        width: 540px;
+        height: 540px;
+        border: 2px solid rgba(217, 164, 65, 0.3);
+        border-radius: 999px;
+      }
+
+      .orbit.two {
+        width: 710px;
+        height: 710px;
+        border-color: rgba(96, 211, 148, 0.22);
+      }
+
+      .stage-shield {
+        width: 250px;
+        height: 292px;
+      }
+
+      .stage-shield span {
+        font-size: 128px;
+      }
+
+      .risk-grid {
+        display: grid;
+        grid-template-columns: 0.95fr 1.05fr;
+        gap: 54px;
+        align-items: stretch;
+        flex: 1;
+      }
+
+      .query-box {
+        padding: 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .input-line {
+        border: 2px solid #2c352c;
+        border-radius: 8px;
+        padding: 28px;
+        color: #f2eee5;
+        font-size: 28px;
+        background: #090b0a;
+      }
+
+      .doc-stack {
+        position: relative;
+        min-height: 560px;
+      }
+
+      .doc-card {
+        position: absolute;
+        width: 520px;
+        padding: 26px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .doc-card:nth-child(1) {
+        top: 10px;
+        left: 20px;
+      }
+
+      .doc-card:nth-child(2) {
+        top: 190px;
+        left: 120px;
+      }
+
+      .doc-card:nth-child(3) {
+        top: 370px;
+        left: 44px;
+      }
+
+      .doc-title {
+        font-family: "Fraunces", serif;
+        font-size: 35px;
+        line-height: 1.02;
+      }
+
+      .leak-line {
+        position: absolute;
+        top: 280px;
+        left: 52px;
+        width: 760px;
+        height: 7px;
+        background: #e86d5c;
+        box-shadow: 0 0 34px rgba(232, 109, 92, 0.8);
+        transform-origin: left center;
+      }
+
+      .warning {
+        padding: 34px 42px;
+        border: 3px solid #e86d5c;
+        color: #ffffff;
+        background: #250907;
+        font-size: 36px;
+        line-height: 1.12;
+      }
+
+      .architecture {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 34px;
+        flex: 1;
+      }
+
+      .plane {
+        position: relative;
+        padding: 34px;
+        overflow: hidden;
+      }
+
+      .plane h3 {
+        margin: 0 0 22px;
+        font-family: "Fraunces", serif;
+        font-size: 58px;
+        line-height: 0.95;
+      }
+
+      .lane {
+        display: grid;
+        gap: 16px;
+      }
+
+      .node {
+        border: 2px solid #536050;
+        border-radius: 8px;
+        padding: 20px 22px;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: center;
+        background: #050806;
+        font-size: 24px;
+      }
+
+      .node strong {
+        font-family: "Fraunces", serif;
+        font-size: 30px;
+        color: #fff8ec;
+      }
+
+      .node span {
+        color: #fff8ec;
+      }
+
+      .node.green {
+        border-color: rgba(96, 211, 148, 0.7);
+      }
+
+      .node.amber {
+        border-color: rgba(217, 164, 65, 0.7);
+      }
+
+      .event-thread {
+        position: absolute;
+        left: 50%;
+        top: 170px;
+        bottom: 130px;
+        width: 4px;
+        background: #d9a441;
+        transform-origin: top;
+      }
+
+      .bead {
+        position: absolute;
+        left: calc(50% - 15px);
+        top: 170px;
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        background: #d9a441;
+        box-shadow: 0 0 24px rgba(217, 164, 65, 0.75);
+      }
+
+      .enforcement {
+        display: grid;
+        grid-template-columns: 0.78fr 1.22fr;
+        gap: 44px;
+        flex: 1;
+        align-items: stretch;
+      }
+
+      .candidate-list {
+        padding: 28px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .candidate {
+        display: grid;
+        grid-template-columns: 72px 1fr 138px;
+        align-items: center;
+        gap: 18px;
+        padding: 18px;
+        border: 2px solid #536050;
+        border-radius: 8px;
+        background: #050806;
+      }
+
+      .rank {
+        font-size: 27px;
+        color: #fff3c4;
+      }
+
+      .status {
+        text-align: center;
+        font-size: 20px;
+        font-weight: 900;
+        padding: 10px 12px;
+        border-radius: 6px;
+        border: 2px solid currentColor;
+        background: #090b0a;
+        box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.35);
+      }
+
+      .allow {
+        color: #ffffff;
+        background: #07140d;
+        border-color: #b9f7cf;
+      }
+
+      .deny {
+        color: #ffffff;
+        background: #210907;
+        border-color: #ffb2a8;
+      }
+
+      .llm-box {
+        padding: 34px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .answer-card {
+        padding: 30px;
+        border: 2px solid rgba(96, 211, 148, 0.62);
+        border-radius: 8px;
+        background: #07140d;
+      }
+
+      .proof-board {
+        display: grid;
+        grid-template-columns: 1fr 1.06fr;
+        gap: 44px;
+        flex: 1;
+      }
+
+      .module-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+
+      .module {
+        min-height: 145px;
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      #scene-5 .module,
+      #scene-5 .stat-card {
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .module strong {
+        font-family: "Fraunces", serif;
+        font-size: 34px;
+        padding: 2px 8px 6px;
+        width: fit-content;
+      }
+
+      .stats-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+
+      .stat-card {
+        padding: 26px;
+        min-height: 154px;
+      }
+
+      .stat-value {
+        font-family: "Fraunces", serif;
+        font-size: 58px;
+        line-height: 1;
+        color: #ffffff;
+        font-variant-numeric: tabular-nums;
+        padding: 8px 18px 14px;
+        width: fit-content;
+      }
+
+      .timeline-list {
+        display: grid;
+        gap: 14px;
+        padding: 26px;
+      }
+
+      .milestone {
+        display: grid;
+        grid-template-columns: 82px 1fr;
+        gap: 20px;
+        align-items: start;
+        padding: 14px 0;
+        border-bottom: 2px solid #2c352c;
+      }
+
+      .cta-layout {
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+      }
+
+      .cta-title {
+        font-size: 170px;
+        max-width: 1480px;
+      }
+
+      .founder {
+        font-size: 30px;
+        color: #fff8ec;
+      }
+
+      .email {
+        color: #ffffff;
+      }
+
+      .transition-cover {
+        position: absolute;
+        z-index: 80;
+        top: 0;
+        bottom: 0;
+        left: -12%;
+        width: 124%;
+        background:
+          linear-gradient(90deg, rgba(9, 11, 10, 0), rgba(9, 11, 10, 0.62) 12%, #d9a441 44%, #111612 100%);
+        opacity: 0;
+        transform: translateX(2300px) skewX(-10deg);
+        box-shadow: -36px 0 70px rgba(217, 164, 65, 0.25);
+      }
+
+      .scanner {
+        position: absolute;
+        z-index: 11;
+        top: 0;
+        bottom: 0;
+        width: 5px;
+        background: #60d394;
+        box-shadow: 0 0 28px rgba(96, 211, 148, 0.9);
+        opacity: 0;
+      }
+
+      .blackout {
+        position: absolute;
+        inset: 0;
+        z-index: 120;
+        background: #090b0a;
+        opacity: 0;
+      }
+
+      .line {
+        height: 3px;
+        background: #d9a441;
+        transform-origin: left center;
+      }
+
+      .muted {
+        color: #fff8ec;
+      }
+
+      .green-text {
+        color: #ffffff;
+      }
+
+      .red-text {
+        color: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="aegis-product-presentation"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="48"
+    >
+      <div id="scene-1" class="scene">
+        <div class="grid-bg"></div>
+        <div class="grain"></div>
+        <div class="glow" data-layout-ignore style="width: 640px; height: 640px; right: 120px; top: 160px"></div>
+        <div class="glow green" data-layout-ignore style="width: 420px; height: 420px; left: -120px; bottom: -80px"></div>
+        <div class="ghost" data-word="AEGIS" data-layout-ignore aria-hidden="true" style="font-size: 250px; left: -40px; bottom: 30px"></div>
+        <div class="scene-content scene-1-layout">
+          <div class="topbar">
+            <div class="brand-lockup">
+              <div class="shield"><span data-letter="A"></span></div>
+              <div>
+                <div class="kicker">AIBoomi Startup Weekend</div>
+                <div class="meta">Enterprise ChatGPT product / created by Vijay Soni</div>
+              </div>
+            </div>
+            <div class="meta">ACCESS + ENFORCEMENT FOR GENERATIVE INTELLIGENCE SYSTEMS</div>
+          </div>
+          <div class="hero-row">
+            <div class="hero-copy">
+              <h1 class="title">Aegis</h1>
+              <p class="subtitle">ChatGPT for your company knowledge, with every answer bound to source permissions.</p>
+              <div class="chips">
+                <span class="chip">Company knowledge</span>
+                <span class="chip">Source permissions</span>
+                <span class="chip green">Enterprise ChatGPT</span>
+              </div>
+            </div>
+            <div class="shield-stage">
+              <div class="orbit"></div>
+              <div class="orbit two"></div>
+              <div class="shield stage-shield"><span data-letter="A"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="scene-2" class="scene">
+        <div class="grid-bg"></div>
+        <div class="grain"></div>
+        <div class="glow red" data-layout-ignore style="width: 720px; height: 720px; right: -160px; top: 120px"></div>
+        <div class="ghost" data-word="LEAK" data-layout-ignore aria-hidden="true" style="font-size: 220px; right: -80px; bottom: 20px"></div>
+        <div class="scene-content">
+          <div class="topbar">
+            <div>
+              <div class="kicker">The Problem</div>
+              <p class="body-large">Naive RAG retrieves first and checks later. That is where confidential data leaks.</p>
+            </div>
+            <div class="warning">HR, M&A, finance, and team docs can enter model context.</div>
+          </div>
+          <div class="risk-grid">
+            <div class="query-box panel">
+              <div class="label red-text">User query</div>
+              <div class="input-line">"What are the Q3 revenue targets?"</div>
+              <div class="line"></div>
+              <p class="body-large">Vector search sees semantic relevance. It does not know who should read the source.</p>
+            </div>
+            <div class="doc-stack">
+              <div class="doc-card panel">
+                <div class="doc-title">Q3 Revenue Plan</div>
+                <div class="meta">finance / restricted</div>
+                <span class="status deny">UNAUTHORIZED</span>
+              </div>
+              <div class="doc-card panel">
+                <div class="doc-title">M&A Working Notes</div>
+                <div class="meta">leadership / confidential</div>
+                <span class="status deny">UNAUTHORIZED</span>
+              </div>
+              <div class="doc-card panel">
+                <div class="doc-title">Architecture Overview</div>
+                <div class="meta">engineering / shared</div>
+                <span class="status allow">AUTHORIZED</span>
+              </div>
+              <div class="leak-line"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="scene-3" class="scene">
+        <div class="grid-bg"></div>
+        <div class="grain"></div>
+        <div class="glow" data-layout-ignore style="width: 620px; height: 620px; left: 170px; top: 80px"></div>
+        <div class="glow green" data-layout-ignore style="width: 520px; height: 520px; right: 110px; bottom: -100px"></div>
+        <div class="ghost" data-word="TWO PLANES" data-layout-ignore aria-hidden="true" style="font-size: 190px; left: 110px; bottom: 20px"></div>
+        <div class="scene-content">
+          <div class="topbar">
+            <div>
+              <div class="kicker">The Core Idea</div>
+              <h2 class="title" style="font-size: 92px">Separate relevance from authorization.</h2>
+            </div>
+            <div class="chip green">OpenFGA gate on the hot path</div>
+          </div>
+          <div class="architecture">
+            <div class="plane panel">
+              <h3>Authz Plane</h3>
+              <div class="lane">
+                <div class="node amber"><strong>OpenFGA</strong><span>can_read</span></div>
+                <div class="node"><strong>Tuples</strong><span>viewer / parent / tenant</span></div>
+                <div class="node"><strong>Principals</strong><span>user + group + domain</span></div>
+                <div class="node green"><strong>Fail closed</strong><span>zero leakage target</span></div>
+              </div>
+            </div>
+            <div class="plane panel">
+              <h3>Retrieval Plane</h3>
+              <div class="lane">
+                <div class="node amber"><strong>Vector search</strong><span>semantic candidates</span></div>
+                <div class="node"><strong>Postgres</strong><span>chunks + metadata</span></div>
+                <div class="node"><strong>NATS</strong><span>event-driven ingestion</span></div>
+                <div class="node green"><strong>LLM</strong><span>authorized context only</span></div>
+              </div>
+            </div>
+            <div class="event-thread"></div>
+            <div class="bead"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="scene-4" class="scene">
+        <div class="grid-bg"></div>
+        <div class="grain"></div>
+        <div class="glow green" data-layout-ignore style="width: 700px; height: 700px; right: -120px; top: 90px"></div>
+        <div class="ghost" data-word="CAN READ?" data-layout-ignore aria-hidden="true" style="font-size: 210px; right: -40px; bottom: 28px"></div>
+        <div class="scanner"></div>
+        <div class="scene-content">
+          <div class="topbar">
+            <div>
+              <div class="kicker">Query-Time Enforcement</div>
+              <h2 class="title" style="font-size: 92px">Only authorized chunks reach the model.</h2>
+            </div>
+            <div class="chip green">0 unauthorized chunks</div>
+          </div>
+          <div class="enforcement">
+            <div class="candidate-list panel">
+              <div class="label">ANN candidates</div>
+              <div class="candidate">
+                <div class="rank">01</div>
+                <div>Architecture Overview</div>
+                <div class="status allow">ALLOW</div>
+              </div>
+              <div class="candidate denied-row">
+                <div class="rank">02</div>
+                <div>Q3 Revenue Plan</div>
+                <div class="status deny">DROP</div>
+              </div>
+              <div class="candidate">
+                <div class="rank">03</div>
+                <div>Google Drive ACL Notes</div>
+                <div class="status allow">ALLOW</div>
+              </div>
+              <div class="candidate denied-row">
+                <div class="rank">04</div>
+                <div>M&A Working Notes</div>
+                <div class="status deny">DROP</div>
+              </div>
+              <div class="candidate">
+                <div class="rank">05</div>
+                <div>OpenFGA Model Tests</div>
+                <div class="status allow">ALLOW</div>
+              </div>
+            </div>
+            <div class="llm-box panel">
+              <div>
+                <div class="label green-text">FGA ListObjects / BatchCheck</div>
+                <p class="body-large" style="margin-top: 22px">Aegis filters candidates before answer generation, then re-checks survivors as defense in depth.</p>
+              </div>
+              <div class="answer-card">
+                <div class="label">Answer context sealed</div>
+                <p class="body-large">Citations can only point to documents the signed-in user can read in the source system.</p>
+              </div>
+              <div class="chips">
+                <span class="chip">near-real-time revocation</span>
+                <span class="chip green">authorized citations</span>
+                <span class="chip">tenant-bounded bypass</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="scene-5" class="scene">
+        <div class="grid-bg"></div>
+        <div class="grain"></div>
+        <div class="glow" data-layout-ignore style="width: 560px; height: 560px; left: -120px; top: 160px"></div>
+        <div class="glow green" data-layout-ignore style="width: 520px; height: 520px; right: 120px; bottom: -90px"></div>
+        <div class="ghost" data-word="BUILD PROOF" data-layout-ignore aria-hidden="true" style="font-size: 188px; left: 20px; bottom: 22px"></div>
+        <div class="scene-content">
+          <div class="topbar">
+            <div>
+              <div class="kicker">Built for AIBoomi Startup Weekend</div>
+              <h2 class="title" style="font-size: 88px">A vertical slice, not a slide-only idea.</h2>
+            </div>
+            <div class="chip">OpenFGA + Postgres + NATS + Next.js</div>
+          </div>
+          <div class="proof-board">
+            <div class="module-grid">
+              <div class="module panel"><strong>Core</strong><span class="meta">interfaces + tuple semantics</span></div>
+              <div class="module panel"><strong>Workers</strong><span class="meta">connector → NATS → ingestion</span></div>
+              <div class="module panel"><strong>Web</strong><span class="meta">chat + admin + explain access</span></div>
+              <div class="module panel"><strong>FGA</strong><span class="meta">source-agnostic ACL model</span></div>
+            </div>
+            <div style="display: grid; gap: 18px">
+              <div class="stats-row">
+                <div class="stat-card panel"><div class="stat-value">125</div><div class="meta">tests</div></div>
+                <div class="stat-card panel"><div class="stat-value">10M</div><div class="meta">docs / tenant target</div></div>
+                <div class="stat-card panel"><div class="stat-value">100K</div><div class="meta">users / tenant target</div></div>
+              </div>
+              <div class="timeline-list panel">
+                <div class="milestone"><span class="label">P0</span><span>Generic authorization model and walking skeleton</span></div>
+                <div class="milestone"><span class="label">P1</span><span>Google Drive vertical with real ACL translation</span></div>
+                <div class="milestone"><span class="label">P2</span><span>Revocation enforced in seconds through prioritized ACL sync</span></div>
+                <div class="milestone"><span class="label">P3</span><span>Cardinality router for narrow and broad-access users</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="scene-6" class="scene">
+        <div class="grid-bg"></div>
+        <div class="grain"></div>
+        <div class="glow" data-layout-ignore style="width: 760px; height: 760px; left: 580px; top: 70px"></div>
+        <div class="glow green" data-layout-ignore style="width: 540px; height: 540px; right: -120px; bottom: -80px"></div>
+        <div class="ghost" data-word="AEGIS" data-layout-ignore aria-hidden="true" style="font-size: 240px; left: 40px; bottom: 30px"></div>
+        <div class="scene-content cta-layout">
+          <div class="shield stage-shield"><span data-letter="A"></span></div>
+          <h2 class="title cta-title">Enterprise ChatGPT, without permission leaks.</h2>
+          <p class="subtitle">Aegis lets teams ask across company documents while every retrieved chunk and citation stays authorized.</p>
+          <div class="chips" style="justify-content: center">
+            <span class="chip green">zero unauthorized leakage target</span>
+            <span class="chip">Chat over company docs</span>
+            <span class="chip">OpenFGA-enforced RAG</span>
+          </div>
+          <div class="founder">Created by Vijay Soni · <span class="email">vs4vijay@gmail.com</span></div>
+        </div>
+      </div>
+
+      <div class="transition-cover"></div>
+      <div class="blackout"></div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+
+      const tl = gsap.timeline({ paused: true });
+      const scenes = ["#scene-1", "#scene-2", "#scene-3", "#scene-4", "#scene-5", "#scene-6"];
+      const transitionCover = ".transition-cover";
+      const sceneStarts = [0, 7.8, 15.8, 24.0, 32.0, 40.0];
+
+      gsap.set(transitionCover, { x: 2300, opacity: 0, skewX: -10 });
+      gsap.set(".blackout", { opacity: 0 });
+
+      function enter(selector, target, fromVars, toVars, at) {
+        tl.fromTo(
+          selector + " " + target,
+          fromVars,
+          Object.assign({ immediateRender: false }, toVars),
+          at,
+        );
+      }
+
+      function shieldWipe(fromScene, toScene, at) {
+        tl.set(toScene, { opacity: 1, visibility: "visible", zIndex: 2 }, at);
+        tl.set(fromScene, { visibility: "visible", zIndex: 1 }, at);
+        tl.fromTo(
+          transitionCover,
+          { x: 2300, opacity: 1, skewX: -10 },
+          { x: -2500, opacity: 1, skewX: -10, duration: 0.72, ease: "power3.inOut", immediateRender: false },
+          at,
+        );
+        tl.set(fromScene, { opacity: 0, visibility: "hidden", zIndex: 0 }, at + 0.39);
+        tl.set(transitionCover, { opacity: 0, x: 2300 }, at + 0.74);
+      }
+
+      scenes.forEach((scene, index) => {
+        tl.set(scene, { zIndex: index === 0 ? 2 : 0 }, 0);
+      });
+
+      tl.to("#scene-1 .orbit", { rotation: 22, duration: 7.4, ease: "none" }, 0.2);
+      tl.to("#scene-1 .orbit.two", { rotation: -28, duration: 7.4, ease: "none" }, 0.2);
+      enter("#scene-1", ".brand-lockup", { opacity: 0, x: -52 }, { opacity: 1, x: 0, duration: 0.65, ease: "power3.out" }, 0.18);
+      enter("#scene-1", ".meta", { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.48, ease: "sine.out" }, 0.32);
+      enter("#scene-1", ".title", { opacity: 0, y: 78, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.82, ease: "expo.out" }, 0.58);
+      enter("#scene-1", ".subtitle", { opacity: 0, x: -58 }, { opacity: 1, x: 0, duration: 0.62, ease: "power2.out" }, 0.96);
+      enter("#scene-1", ".chip", { opacity: 0, y: 42, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, stagger: 0.11, ease: "back.out(1.6)" }, 1.28);
+      enter("#scene-1", ".stage-shield", { opacity: 0, scale: 0.7, rotation: -8 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.72, ease: "back.out(1.4)" }, 0.82);
+      tl.to("#scene-1 .glow", { scale: 1.08, duration: 1.4, repeat: 4, yoyo: true, ease: "sine.inOut" }, 0.3);
+
+      shieldWipe("#scene-1", "#scene-2", 7.1);
+      enter("#scene-2", ".kicker", { opacity: 0, x: -44 }, { opacity: 1, x: 0, duration: 0.44, ease: "power3.out" }, 7.9);
+      enter("#scene-2", ".body-large", { opacity: 0, y: 38 }, { opacity: 1, y: 0, duration: 0.64, ease: "expo.out" }, 8.12);
+      enter("#scene-2", ".warning", { opacity: 0, scale: 0.92, rotation: -1.5 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.5, ease: "back.out(1.8)" }, 8.34);
+      enter("#scene-2", ".query-box", { opacity: 0, x: -68 }, { opacity: 1, x: 0, duration: 0.58, ease: "power2.out" }, 8.62);
+      enter("#scene-2", ".doc-card", { opacity: 0, y: 72, rotation: 3 }, { opacity: 1, y: 0, rotation: 0, duration: 0.52, stagger: 0.18, ease: "circ.out" }, 8.92);
+      tl.fromTo("#scene-2 .leak-line", { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: 1, duration: 0.5, ease: "power4.out" }, 9.72);
+      tl.to("#scene-2 .leak-line", { opacity: 0.32, duration: 0.32, repeat: 7, yoyo: true, ease: "sine.inOut" }, 10.28);
+      tl.to("#scene-2 .glow.red", { scale: 1.1, duration: 1.2, repeat: 5, yoyo: true, ease: "sine.inOut" }, 8.1);
+
+      shieldWipe("#scene-2", "#scene-3", 15.1);
+      enter("#scene-3", ".kicker", { opacity: 0, x: -42 }, { opacity: 1, x: 0, duration: 0.42, ease: "power3.out" }, 15.9);
+      enter("#scene-3", ".title", { opacity: 0, y: 54 }, { opacity: 1, y: 0, duration: 0.68, ease: "expo.out" }, 16.12);
+      enter("#scene-3", ".chip", { opacity: 0, x: 50 }, { opacity: 1, x: 0, duration: 0.5, ease: "back.out(1.45)" }, 16.38);
+      enter("#scene-3", ".plane", { opacity: 0, y: 64, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.62, stagger: 0.18, ease: "power2.out" }, 16.62);
+      enter("#scene-3", ".node", { opacity: 0, x: -34 }, { opacity: 1, x: 0, duration: 0.36, stagger: 0.07, ease: "circ.out" }, 17.24);
+      tl.fromTo("#scene-3 .event-thread", { scaleY: 0, opacity: 0 }, { scaleY: 1, opacity: 1, duration: 0.6, ease: "power3.out" }, 17.86);
+      tl.fromTo("#scene-3 .bead", { y: 0, opacity: 0 }, { y: 415, opacity: 1, duration: 2.8, ease: "sine.inOut" }, 18.1);
+      tl.to("#scene-3 .glow", { scale: 1.06, duration: 1.6, repeat: 4, yoyo: true, ease: "sine.inOut" }, 16.0);
+
+      shieldWipe("#scene-3", "#scene-4", 23.3);
+      enter("#scene-4", ".kicker", { opacity: 0, x: -44 }, { opacity: 1, x: 0, duration: 0.42, ease: "power3.out" }, 24.1);
+      enter("#scene-4", ".title", { opacity: 0, y: 58 }, { opacity: 1, y: 0, duration: 0.64, ease: "expo.out" }, 24.28);
+      enter("#scene-4", ".chip", { opacity: 0, scale: 0.84 }, { opacity: 1, scale: 1, duration: 0.44, ease: "back.out(1.7)" }, 24.56);
+      enter("#scene-4", ".candidate-list", { opacity: 0, x: -62 }, { opacity: 1, x: 0, duration: 0.58, ease: "power2.out" }, 24.82);
+      enter("#scene-4", ".candidate", { opacity: 0, x: -38 }, { opacity: 1, x: 0, duration: 0.34, stagger: 0.1, ease: "circ.out" }, 25.22);
+      enter("#scene-4", ".llm-box", { opacity: 0, x: 72 }, { opacity: 1, x: 0, duration: 0.62, ease: "power3.out" }, 25.36);
+      enter("#scene-4", ".answer-card", { opacity: 0, y: 46, scale: 0.97 }, { opacity: 1, y: 0, scale: 1, duration: 0.48, ease: "back.out(1.4)" }, 26.0);
+      tl.fromTo("#scene-4 .scanner", { opacity: 0, x: 160 }, { opacity: 1, x: 1650, duration: 1.2, ease: "power2.inOut" }, 26.18);
+      tl.to("#scene-4 .scanner", { opacity: 0, duration: 0.28, ease: "power1.out" }, 27.38);
+      tl.to("#scene-4 .denied-row", { x: 44, duration: 0.46, ease: "power3.out" }, 27.12);
+      tl.to("#scene-4 .glow.green", { scale: 1.08, duration: 1.2, repeat: 5, yoyo: true, ease: "sine.inOut" }, 24.4);
+
+      shieldWipe("#scene-4", "#scene-5", 31.3);
+      enter("#scene-5", ".kicker", { opacity: 0, x: -44 }, { opacity: 1, x: 0, duration: 0.42, ease: "power3.out" }, 32.1);
+      enter("#scene-5", ".title", { opacity: 0, y: 54 }, { opacity: 1, y: 0, duration: 0.66, ease: "expo.out" }, 32.28);
+      enter("#scene-5", ".topbar .chip", { opacity: 0, x: 54 }, { opacity: 1, x: 0, duration: 0.5, ease: "back.out(1.5)" }, 32.52);
+      tl.set("#scene-5 .module", { visibility: "visible" }, 33.68);
+      enter("#scene-5", ".module", { opacity: 0, y: 58, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.34, stagger: 0.07, ease: "circ.out" }, 33.7);
+      tl.set("#scene-5 .stat-card", { visibility: "visible" }, 34.02);
+      enter("#scene-5", ".stat-card", { opacity: 0, y: 46 }, { opacity: 1, y: 0, duration: 0.34, stagger: 0.07, ease: "power2.out" }, 34.04);
+      enter("#scene-5", ".milestone", { opacity: 0, x: 42 }, { opacity: 1, x: 0, duration: 0.34, stagger: 0.1, ease: "power3.out" }, 34.05);
+      tl.to("#scene-5 .glow", { scale: 1.07, duration: 1.5, repeat: 4, yoyo: true, ease: "sine.inOut" }, 32.2);
+
+      shieldWipe("#scene-5", "#scene-6", 39.3);
+      tl.set("#scene-5 .module, #scene-5 .stat-card", { visibility: "hidden" }, 39.7);
+      enter("#scene-6", ".stage-shield", { opacity: 0, y: 70, scale: 0.78 }, { opacity: 1, y: 0, scale: 1, duration: 0.72, ease: "back.out(1.5)" }, 40.12);
+      enter("#scene-6", ".cta-title", { opacity: 0, y: 76, scale: 0.97 }, { opacity: 1, y: 0, scale: 1, duration: 0.82, ease: "expo.out" }, 40.56);
+      enter("#scene-6", ".subtitle", { opacity: 0, y: 38 }, { opacity: 1, y: 0, duration: 0.58, ease: "power2.out" }, 41.18);
+      enter("#scene-6", ".chip", { opacity: 0, y: 34, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.44, stagger: 0.11, ease: "back.out(1.6)" }, 41.64);
+      enter("#scene-6", ".founder", { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.56, ease: "sine.out" }, 42.26);
+      tl.to("#scene-6 .glow", { scale: 1.08, duration: 1.4, repeat: 4, yoyo: true, ease: "sine.inOut" }, 40.2);
+      tl.to("#scene-6 .scene-content", { opacity: 0, y: -24, duration: 0.7, ease: "power2.in" }, 46.9);
+      tl.to(".blackout", { opacity: 1, duration: 0.65, ease: "power1.inOut" }, 47.3);
+
+      window.__timelines["aegis-product-presentation"] = tl;
+    </script>
+  </body>
 </html>
