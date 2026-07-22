@@ -31,6 +31,8 @@ bun add -g @earendil-works/pi-coding-agent
 
 pi install npm:pi-llama-cpp
 pi install npm:pi-web-access
+pi install npm:context-mode
+
 
 export LLAMA_SERVER_URL=http://127.0.0.1:1100 # or change in ~/.pi/agents/settings.json
 ```
@@ -52,17 +54,26 @@ bun install -g @oh-my-pi/pi-coding-agent
 
 ### Skills used
 
-- caveman
+- caveman - https://github.com/juliusbrussee/caveman
 - playwright-cli Skills
-- superpowers Skills
+- agent-browser
+- superpowers Skills - https://github.com/obra/superpowers
 ```bash
 bun x skills add https://github.com/vercel-labs/skills --skill find-skills
 bun x skills add vercel-labs/agent-skills --skill skill-creator
 bun x skills add anthropics/skills --skill skill-creator
 
-bun x skills add -g https://github.com/microsoft/playwright-cli --skill playwright-cli
+
+# Playwright
+- bun add -g @playwright/cli@latest
+- playwright-cli install --skills
+- # OR
+- bun x skills add -g https://github.com/microsoft/playwright-cli --skill playwright-cli
+
 bun x skills add https://github.com/browser-use/browser-use --skill browser-use
 bun x skills add vercel-labs/agent-browser
+bun add -g agent-browser
+agent-browser install
 
 bun x skills add manaflow-ai/cmux -g -y
 
@@ -74,7 +85,7 @@ bun x skills add heygen-com/hyperframes
 claude skill add juliusbrussee/caveman:caveman
 
 
-bun x skills@latest add mattpocock/skills
+bun x skills@latest add mattpocock/skills --full-depth
 
 
 android init
@@ -108,6 +119,28 @@ codex mcp add plane --url https://mcp.plane.so/http/mcp
 codex mcp add deepwiki --url https://mcp.deepwiki.com/mcp
 
 ```
+
+## Experiments
+
+```
+uv tool install -U batrachian-toad
+
+```
+
+## Prompts
+
+### Browser Automation
+
+Use `agent-browser` for web automation. Run `agent-browser --help` for all commands.
+
+Core workflow:
+
+1. `agent-browser open <url>` - Navigate to page
+2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
+3. `agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
+4. Re-snapshot after page changes
+
+
 
 ---
 
