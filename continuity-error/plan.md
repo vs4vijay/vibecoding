@@ -641,7 +641,22 @@ At the end of this phase:
 
 **Duration:** Weeks 12–16  
 **Goal:** Replace the gray box with the final visual and audio identity.
-**Implementation status:** Ready to start after user approval
+**Implementation status:** Complete — verified 2026-07-24
+
+### Phase 3 verification record
+
+- Production entry point is now `scenes/phase3_presentation_vertical_slice.tscn`; it layers the final presentation over the locked Phase 2 rooms, zones, characters, endings, and security behaviors.
+- The physical hub now has an analog-grime presentation made from modular floor plates, pipes, cable runs, work benches, archive/rack props, localized work lights, and distinct lightweight silhouettes for Nera, Vale, Suri, and Moth.
+- Cyberspace now uses a cold emissive palette, geometric signal monoliths, restyled mission geometry, ambient data particles, and choice-reactive extraction effects. Free and contain aftermaths use distinct cyan and magenta visual language.
+- The final UI uses a consistent high-contrast visual treatment. Topology remains encoded by typed port shape/identifier as well as color, and all dialogue remains fully subtitled and usable with audio muted.
+- Three original procedural soundscapes cover the hub, network, and aftermath. Low and standard quality presets adjust dynamic shadows and cyberspace particle density.
+- All shipped presentation assets are original, generated from Godot primitives or synthesized waveforms; provenance is recorded in `docs/ASSET_LICENSES.md`. No third-party or protected-franchise assets are included.
+- Automated suite: 316 checks passed, 0 failed. Coverage includes all identity/free, identity/contain, backdoor/free, and backdoor/contain combinations, presentation replacement, soundscape availability, both quality presets, subtitle/color-independent readability, extraction effects, evidence retention, and final credits.
+- Single-threaded Compatibility-renderer Web export completed through `scripts/build.sh`.
+- Exported Chromium completed identity/free from opening to credits at 1280×720 with a live WebGL 2 canvas and zero console errors or warnings.
+- Exported Firefox completed backdoor/contain from opening to credits at 1280×720 with zero console errors. Firefox emitted three non-fatal engine/WebGL compatibility warnings.
+- Browser screenshots: `.screenshots/phase3-hub-chromium.png`, `.screenshots/phase3-heist-chromium.png`, `.screenshots/phase3-complete-chromium.png`, and `.screenshots/phase3-complete-firefox.png`.
+- The presentation scene also launched live through the connected Godot 4.7.1 editor. The current run reported no game-runtime errors; older retained editor diagnostics were cleared and code-shadowing warnings found during the audit were corrected.
 
 ### Deliverables
 
@@ -681,7 +696,7 @@ At the end of this phase:
 
 **Duration:** Weeks 17–20  
 **Goal:** Convert the content-complete slice into a reliable public demo.
-**Implementation status:** Blocked on Phase 3
+**Implementation status:** Ready to start after user approval
 
 ### Deliverables
 

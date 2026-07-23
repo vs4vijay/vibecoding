@@ -10,6 +10,7 @@ const VerticalSliceScene = preload("res://scenes/vertical_slice.tscn")
 const Phase0Scene = preload("res://scenes/phase0_feasibility.tscn")
 const Phase1Scene = preload("res://scenes/phase1_core_heist.tscn")
 const Phase2Scene = preload("res://scenes/phase2_graybox_vertical_slice.tscn")
+const Phase3Scene = preload("res://scenes/phase3_presentation_vertical_slice.tscn")
 
 var failures := 0
 var checks := 0
@@ -49,6 +50,8 @@ func _run() -> void:
 	await _test_two_route_heist()
 	await _test_phase_2_vertical_slice()
 	await _test_phase_2_3d_vertical_slice()
+	await _test_phase_3_presentation_slice()
+	await process_frame
 	print("RESULT: %d passed, %d failed" % [checks - failures, failures])
 	quit(1 if failures else 0)
 
@@ -254,5 +257,39 @@ func _test_phase_2_3d_vertical_slice() -> void:
 			check(state.stage == slice.Stage.CREDITS and state.final_choice == ending, "Phase 2 %s/%s reaches distinct credits" % [route, ending])
 			check(state.memories.size() == 2, "Phase 2 %s/%s preserves supporting and undermining evidence" % [route, ending])
 			check(slice.get_node("HubWorld").get_node_or_null("AftermathSignal") != null, "Phase 2 aftermath visibly reflects final choice")
+			slice.queue_free()
+			await process_frame
+
+func _test_phase_3_presentation_slice() -> void:
+	for route in ["identity", "backdoor"]:
+		for ending in ["free", "contain"]:
+			var slice := Phase3Scene.instantiate()
+			root.add_child(slice)
+			await process_frame
+			var presentation: Dictionary = slice.presentation_snapshot()
+			check(presentation.asset_count >= 35, "Phase 3 hub replaces gray-box presentation with authored modular detail")
+			check(presentation.soundscapes == 3, "Phase 3 includes hub, network, and aftermath soundscapes")
+			check(presentation.color_and_shape_readability and presentation.subtitle_complete, "Phase 3 remains readable without color or voice")
+			check(presentation.all_assets_procedural_original, "Phase 3 shipped presentation has documented original provenance")
+			check(slice.set_quality_preset("low") and slice.presentation_snapshot().quality == "low", "Phase 3 low quality preset is available")
+			check(slice.set_quality_preset("standard"), "Phase 3 standard quality preset is available")
+			_drain_dialogue(slice)
+			for contact in range(3):
+				check(slice.visit_contact(contact), "Phase 3 contact %d remains functional" % contact)
+				_drain_dialogue(slice)
+			check(slice.begin_preparation() and slice.select_preparation(route), "Phase 3 selects %s preparation" % route)
+			_drain_dialogue(slice)
+			_drain_dialogue(slice)
+			check(slice.get_node("MissionMount").get_child_count() == 1, "Phase 3 mounts the styled cyberspace mission")
+			for step in range(4):
+				check(slice.advance_heist(), "Phase 3 %s advances zone %d/5" % [route, step + 2])
+				_drain_dialogue(slice)
+				if slice.stage == slice.Stage.HEIST and slice.heist.mission.player_node in ["stacks", "quarantine"]:
+					check(slice.collect_evidence(), "Phase 3 collects evidence at %s" % slice.heist.mission.player_node)
+			check(slice.select_ending(ending), "Phase 3 supports %s ending" % ending)
+			_drain_dialogue(slice)
+			var state: Dictionary = slice.snapshot()
+			check(state.stage == slice.Stage.CREDITS and state.memories.size() == 2, "Phase 3 %s/%s reaches final credits with evidence" % [route, ending])
+			check(slice.get_node("HubWorld").get_node_or_null("ExtractionEffect") != null, "Phase 3 ending has a choice-reactive extraction effect")
 			slice.queue_free()
 			await process_frame

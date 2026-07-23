@@ -238,8 +238,8 @@ func _zone_instruction(node: String) -> String:
 			return "[SPACE] continue"
 
 func _build_hub() -> void:
-	var floor := _box("WorkshopFloor", Vector3(18, 0.3, 12), Vector3(0, -0.15, 0), Color("172236"))
-	hub_world.add_child(floor)
+	var workshop_floor := _box("WorkshopFloor", Vector3(18, 0.3, 12), Vector3(0, -0.15, 0), Color("172236"))
+	hub_world.add_child(workshop_floor)
 	for wall_data in [
 		[Vector3(18, 3.2, 0.3), Vector3(0, 1.6, -6)],
 		[Vector3(0.3, 3.2, 12), Vector3(-9, 1.6, 0)],
@@ -265,13 +265,13 @@ func _apply_aftermath_world() -> void:
 	var marker := _box("AftermathSignal", Vector3(7.5, 0.12, 7.5), Vector3(0, 0.08, 0), color, true)
 	hub_world.add_child(marker)
 
-func _box(node_name: String, size: Vector3, position: Vector3, color: Color, emission := false) -> MeshInstance3D:
+func _box(node_name: String, size: Vector3, world_position: Vector3, color: Color, emission := false) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	node.name = node_name
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	node.mesh = mesh
-	node.position = position
+	node.position = world_position
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
 	material.roughness = 0.72
