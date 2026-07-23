@@ -9,6 +9,7 @@ const DialogueCatalogScript = preload("res://scripts/narrative/dialogue_catalog.
 const VerticalSliceScene = preload("res://scenes/vertical_slice.tscn")
 const Phase0Scene = preload("res://scenes/phase0_feasibility.tscn")
 const Phase1Scene = preload("res://scenes/phase1_core_heist.tscn")
+const Phase2Scene = preload("res://scenes/phase2_graybox_vertical_slice.tscn")
 
 var failures := 0
 var checks := 0
@@ -47,6 +48,7 @@ func _run() -> void:
 	await _test_serialization()
 	await _test_two_route_heist()
 	await _test_phase_2_vertical_slice()
+	await _test_phase_2_3d_vertical_slice()
 	print("RESULT: %d passed, %d failed" % [checks - failures, failures])
 	quit(1 if failures else 0)
 
@@ -214,5 +216,43 @@ func _test_phase_2_vertical_slice() -> void:
 			var state: Dictionary = slice.snapshot()
 			check(state.stage == slice.Stage.CREDITS and state.final_choice == ending, "%s/%s reaches distinct credits state" % [route, ending])
 			check(state.memories.size() == 2, "%s/%s carries supporting and undermining evidence" % [route, ending])
+			slice.queue_free()
+			await process_frame
+
+func _test_phase_2_3d_vertical_slice() -> void:
+	var catalog := DialogueCatalogScript.new()
+	check(catalog.all_ids().size() >= 16, "Phase 2 subtitle catalog covers all authored beats")
+	for route in ["identity", "backdoor"]:
+		for ending in ["free", "contain"]:
+			var slice := Phase2Scene.instantiate()
+			root.add_child(slice)
+			await process_frame
+			check(slice is Node3D and slice.snapshot().is_3d, "Phase 2 %s/%s is a true 3D slice" % [route, ending])
+			check(slice.get_node("HubWorld").get_child_count() >= 10, "Phase 2 hub provides authored rooms, occluders, and contact stations")
+			_drain_dialogue(slice)
+			check(slice.stage == slice.Stage.HUB, "Phase 2 opening flows into the 3D hub")
+			check(not slice.begin_preparation(), "Phase 2 preparation stays locked until all contacts are met")
+			for contact in range(3):
+				check(slice.visit_contact(contact), "Phase 2 contact %d is functional" % contact)
+				_drain_dialogue(slice)
+			check(slice.begin_preparation(), "Phase 2 all contacts unlock preparation")
+			check(slice.select_preparation(route), "Phase 2 selects %s preparation" % route)
+			_drain_dialogue(slice)
+			_drain_dialogue(slice)
+			check(slice.stage == slice.Stage.HEIST, "Phase 2 %s route enters 3D hospice" % route)
+			check(slice.heist is Node3D and not slice.heist.is_processing_unhandled_input(), "Phase 2 embeds the 3D heist without duplicate input")
+			check(slice.heist.mission.game_state.alert_tier == (0 if route == "identity" else 1), "Phase 2 %s route materially changes starting hazard" % route)
+			for step in range(4):
+				check(slice.advance_heist(), "Phase 2 %s advances authored zone %d/5" % [route, step + 2])
+				_drain_dialogue(slice)
+				if slice.stage == slice.Stage.HEIST and slice.heist.mission.player_node in ["stacks", "quarantine"]:
+					check(slice.collect_evidence(), "Phase 2 collects evidence at %s" % slice.heist.mission.player_node)
+			check(slice.stage == slice.Stage.EXTRACTION, "Phase 2 %s reaches Asha containment" % route)
+			check(slice.select_ending(ending), "Phase 2 supports %s ending" % ending)
+			_drain_dialogue(slice)
+			var state: Dictionary = slice.snapshot()
+			check(state.stage == slice.Stage.CREDITS and state.final_choice == ending, "Phase 2 %s/%s reaches distinct credits" % [route, ending])
+			check(state.memories.size() == 2, "Phase 2 %s/%s preserves supporting and undermining evidence" % [route, ending])
+			check(slice.get_node("HubWorld").get_node_or_null("AftermathSignal") != null, "Phase 2 aftermath visibly reflects final choice")
 			slice.queue_free()
 			await process_frame

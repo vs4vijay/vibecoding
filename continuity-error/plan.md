@@ -581,7 +581,20 @@ The existing 2D prototype is reference material for mechanics, narrative flow, a
 
 **Duration:** Weeks 8–11  
 **Goal:** Make the entire demo playable from opening to aftermath before visual polish.
-**Implementation status:** Ready to start after user approval
+**Implementation status:** Complete — verified 2026-07-24
+
+### Phase 2 verification record
+
+- Production entry point is now `scenes/phase2_graybox_vertical_slice.tscn`, a true `Node3D` launch-to-credits gray-box slice. Phase 0, Phase 1, and the legacy 2D narrative prototype remain intact as reference material.
+- The 3D residential workshop hub contains Nera's rig, three distinct contact stations, room dividers/occluders, fixed isometric framing, and readable choice/state overlays.
+- Vale, Suri, and Moth are functional contacts with a complete subtitle-only dialogue draft. Meeting all three unlocks the stolen-identity or hardware-backdoor preparation decision.
+- The verified Phase 1 heist is integrated as a five-zone mission with route-specific identity/bypass dialogue and hazards, tutorial instructions, supporting and undermining evidence, anchors, rewiring, traces, corruption, and fail-forward completion.
+- Both extraction choices lead to route-and-choice-specific aftermath dialogue, visibly different hub states, and distinct credits summaries.
+- Automated suite: 236 checks passed, 0 failed. All identity/free, identity/contain, backdoor/free, and backdoor/contain combinations reach credits with both evidence shards and without missing dialogue or unwinnable state.
+- Single-threaded Compatibility-renderer Web export completed through `scripts/build.sh`.
+- Exported Chromium completed identity/free from opening to credits at 1280×720 with zero console errors or warnings. Exported Firefox completed backdoor/contain with zero console errors; Firefox emitted three non-fatal engine/WebGL compatibility warnings.
+- Browser screenshots: `.screenshots/phase2-hub-chromium.png`, `.screenshots/phase2-heist-chromium.png`, `.screenshots/phase2-complete-chromium.png`, `.screenshots/phase2-hub-firefox.png`, and `.screenshots/phase2-complete-firefox.png`.
+- The scene launched live through the connected Godot 4.7.1 editor and rendered the opening over the 3D hub. The formal unassisted 30–45 minute human timing study remains part of the external playtest rounds; automated E2E runs intentionally skip reading time.
 
 ### Deliverables
 
@@ -628,7 +641,7 @@ At the end of this phase:
 
 **Duration:** Weeks 12–16  
 **Goal:** Replace the gray box with the final visual and audio identity.
-**Implementation status:** Blocked on Phase 2
+**Implementation status:** Ready to start after user approval
 
 ### Deliverables
 
