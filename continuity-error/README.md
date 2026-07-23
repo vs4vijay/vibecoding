@@ -1,6 +1,6 @@
 # Continuity Error
 
-Phase 1 mechanics-only heist for an isometric topology-rewiring game.
+Phase 2 complete gray-box vertical slice for an isometric topology-rewiring game.
 
 ## Run and verify
 
@@ -12,9 +12,9 @@ rtk ./scripts/build.sh
 
 The Web preset is intentionally single-threaded.
 
-The Phase 1 heist supports two preparation routes, graph-driven traversal and
-security, trace escalation, fail-forward memory corruption, anchors, evidence,
-and JSON save/load. Controls are shown in-game: choose a route with `1` or `2`,
-advance with `Space`, collect memories with `M`, trigger a trace with `T`,
-preview/commit rewires with `R`, cancel with `C`, save/load with `K`/`L`, and
-finish with `F`. `F3` toggles the graph, patrol, and signal debug overlay.
+The playable loop runs from Asha's opening message through the three-contact
+hub, preparation, all five hospice zones, the free-or-contain decision,
+choice-dependent aftermath, and credits. Controls and objectives are shown
+in-game. Dialogue advances with `Enter` or `Space`; numbered choices select
+contacts and preparation; `Space` traverses the heist, `M` collects evidence,
+and the final choice uses `F` or `C`.

@@ -2,18 +2,18 @@
 
 ## Vertical Slice Development Plan
 
-**Status:** Phase 1 complete — awaiting approval to begin Phase 2  
+**Status:** Planning reset for a true 3D, Web-first vertical slice — implementation not started  
 **Target:** Polished 30–45 minute public demo  
 **Development model:** Solo developer with AI assistance  
 **Schedule:** 20 weeks of planned production plus 4 weeks of contingency  
-**Initial releases:** Windows 10/11 and Web  
-**Future-compatible target:** Native Android and iOS  
+**Initial release:** Web only  
+**Deferred platforms:** macOS, Windows, and native Android, considered only after the Web vertical slice ships  
 
 ---
 
 ## 1. Product Vision
 
-Continuity Error is an original isometric cyberpunk stealth-puzzle game inspired by themes of identity, artificial consciousness, memory ownership, and corporate power. It does not use the characters, setting, terminology, or plot of *Neuromancer*.
+Continuity Error is an original 3D isometric cyberpunk stealth-puzzle game inspired by themes of identity, artificial consciousness, memory ownership, and corporate power. It does not use the characters, setting, terminology, or plot of *Neuromancer*.
 
 The player is Nera Voss, a disgraced intrusion specialist contacted by a digital copy of Asha Rhyne, her dead former lover and heist partner. Asha claims she is being held inside a corporate memory hospice that preserves, edits, and monetizes the minds of the dead.
 
@@ -45,6 +45,11 @@ Plan and execute an impossible digital heist where the network is a physical pla
    - The slice contains one compact hub and one authored heist.
    - Environmental detail and reactive dialogue take priority over world size.
 
+6. **True 3D with isometric readability**
+   - The hub, network, characters, traversal, collisions, and security exist in a 3D world.
+   - A perspective or orthographic `Camera3D` presents the game from a controlled isometric angle.
+   - Height, occlusion, lighting, and spatial composition support gameplay without turning the slice into a free-camera action game.
+
 ### Explicit non-goals for the vertical slice
 
 - Conventional combat
@@ -54,6 +59,7 @@ Plan and execute an impossible digital heist where the network is a physical pla
 - Procedural contracts
 - Loot, crafting, or an equipment economy
 - Native mobile store releases
+- Native desktop releases
 - Full voice acting
 - Photorealistic art
 - Direct references to protected *Neuromancer* material
@@ -136,12 +142,14 @@ This produces four supported playthrough combinations. All combinations share th
 
 ## 3. Core Systems
 
-### Isometric movement
+### 3D isometric movement
 
-- Click or tap to move to a reachable position.
+- Use `Node3D` gameplay scenes, 3D collision, and navigation meshes.
+- Click or tap to raycast onto a reachable 3D navigation surface.
 - Support keyboard directional movement as an alternative.
-- Keep the camera at a fixed isometric angle during normal play.
-- Permit limited zoom and rotation only if it remains readable on touch screens.
+- Keep a `Camera3D` at a fixed isometric angle during normal play.
+- Permit limited zoom; camera rotation is optional and should be cut if it harms readability or Web performance.
+- Fade, hide, or simplify foreground geometry when it occludes the player or an active topology interaction.
 - Use navigation meshes for local movement and a separate graph for network connectivity.
 
 ### Network topology
@@ -240,11 +248,29 @@ All dialogue is subtitled. Only Asha and a small number of pivotal Nera lines ar
 
 - Godot 4.7.1 Standard
 - GDScript
-- Compatibility renderer
+- Compatibility renderer and WebGL 2
 - GdUnit4 for unit and integration tests
 - Git for version control
 
-The Compatibility renderer is the project-wide baseline. Desktop presentation must not rely on effects that disappear in WebGL builds.
+The Web build is the source of truth throughout production. Features are accepted only after they work in an exported browser build, not merely in the editor. The Compatibility renderer is the project-wide baseline, and presentation must not rely on desktop-only rendering features.
+
+### Platform strategy
+
+#### Stage 1 — Web vertical slice
+
+- Develop, test, optimize, and release only the Web build.
+- Use a single-threaded export unless browser deployment testing proves a threaded build is worth its hosting requirements.
+- Treat Chrome and Firefox desktop as required browsers.
+- Treat Safari desktop as a best-effort compatibility target.
+- Support responsive desktop browser layouts; tablet browser input is a smoke-test target, not a native Android commitment.
+- Keep build size, startup time, shader compilation, browser storage, and WebGL context recovery visible from Phase 0 onward.
+
+#### Stage 2 — Deferred ports
+
+- Consider macOS first, Windows second, and native Android third only after the Web release gates pass.
+- Create no native packaging, signing, store, certification, or platform-specific feature work during the Web vertical slice.
+- Reuse the Web-tested content and systems, but give each later platform its own feasibility, performance, input, packaging, and release plan.
+- iOS, Linux, consoles, and storefront integrations remain outside this plan.
 
 ### Supporting tools
 
@@ -333,11 +359,13 @@ Contains:
 ### Rendering constraints
 
 - Use low-poly modular geometry and texture atlases.
+- Budget every environment as a real 3D scene with bounded visible geometry, material count, lights, shadows, and draw calls.
 - Prefer baked lighting and simple dynamic lights.
 - Use unshaded or inexpensive materials for cyberspace.
 - Pool repeating constructs and use `MultiMeshInstance3D` where appropriate.
 - Avoid compute shaders, heavy transparency, real-time global illumination, and desktop-only post-processing.
 - Provide low and standard quality presets from the first performance milestone.
+- Test occlusion, depth readability, navigation, picking, and topology-port selection in the exported Web build.
 
 ### Input and accessibility
 
@@ -429,55 +457,48 @@ At the end of the demo, provide an optional external survey asking:
 
 ## 6. Vertical-Slice Phases
 
-## Phase 0 — Project Setup and Risk Validation
+The existing 2D prototype is reference material for mechanics, narrative flow, and test cases. It is not the production foundation for the 3D slice, and its prior completion records do not satisfy the 3D exit criteria below. No later phase begins until the previous phase's Web exit criteria pass.
+
+## Phase 0 — 3D Web Feasibility
 
 **Duration:** Weeks 1–3  
-**Goal:** Prove the riskiest technical assumptions before producing content.
-**Implementation status:** ✅ Complete (2026-07-23)
+**Goal:** Prove that the core interaction is readable, performant, and technically viable as a true 3D browser game before producing content.  
+**Implementation status:** Not started
 
 ### Deliverables
 
-- New Godot 4.7.1 project using the Compatibility renderer
-- Windows and single-threaded Web export presets
-- Automated development build commands
-- Isometric gray-box test room
-- Mouse, keyboard, and basic touch input abstraction
-- Click-to-move and keyboard movement
-- Fixed isometric camera with zoom
+- Godot 4.7.1 3D production foundation using the Compatibility renderer, with the existing 2D prototype retained only as reference
+- Single-threaded Web export preset and automated Web build command
+- Small `Node3D` gray-box test room with representative verticality and occluders
+- Mouse and keyboard input abstraction
+- 3D raycast click-to-move and keyboard movement on a navigation mesh
+- Fixed isometric `Camera3D` with zoom and foreground-occlusion handling
 - Minimal graph containing six nodes and several typed ports
-- Topology-edit mode with slowed time
-- One patrol that reroutes after a connection change
-- Desktop and browser performance benchmark scene
+- 3D topology ports, drag/selection feedback, and slowed-time edit mode
+- One 3D patrol that reroutes after a connection change
+- Browser performance and download/startup benchmark scene
 - Initial automated test harness
 
 ### Exit criteria
 
-- The same project runs in the editor, Windows build, and current Chrome/Firefox.
+- The exported Web build runs in current Chrome and Firefox with no game-code console errors.
 - A player can rewire a connection and visibly redirect a patrol.
 - Invalid edits are rejected without corrupting graph state.
-- Touch interaction can select and connect ports on a tablet-sized viewport.
-- The benchmark holds 60 FPS on the reference laptop and 30 FPS under the mobile browser profile.
+- Click-to-move, port selection, and navigation remain reliable across slopes, height changes, and occluding geometry.
+- The benchmark holds 60 FPS at 1280×720 on the reference laptop in both required browsers.
+- Initial download size, time to first interaction, draw calls, visible triangles, material count, and peak memory are measured and recorded before budgets are locked.
 
 ### Stop or redesign conditions
 
-- If graph changes cannot be communicated clearly, replace free dragging with authored connection slots before proceeding.
-- If WebGL performance misses the target, reduce material complexity and visible graph size before producing final assets.
+- If 3D graph changes cannot be communicated clearly, replace free dragging with authored connection slots or a focused edit camera before proceeding.
+- If Web performance misses the target, reduce visible geometry, materials, shadows, lighting complexity, and graph size before producing final assets.
+- If 3D navigation or picking remains unreliable, redesign movement and port interaction before building the mission.
 - Do not begin hub art or final dialogue until this phase passes.
 
-### Phase 0 implementation record
+### Prior-prototype evidence to preserve
 
-- Godot 4.7.1 Compatibility project, single-threaded Web preset, and Windows x64 preset created.
-- Automated `rtk ./scripts/test.sh` and `rtk ./scripts/build.sh` development commands created.
-- Six-node isometric gray-box includes click/touch destination selection, keyboard movement, fixed camera zoom, typed ports, 15% topology-edit time scale, invalid-edit feedback, and a graph-routed patrol.
-- Mouse and touch port drags commit compatible edits and visibly reroute the patrol.
-- Graph snapshots make invalid edits and cancellation non-destructive.
-- The same main scene loads headlessly, exports as a valid Windows PE32+ executable, and runs as a single-threaded WebGL 2 build.
-- Automated graph/scene suite: 10 passed, 0 failed.
-- Chromium Web E2E at 1280×720: clean startup, mouse movement, keyboard input, topology drag, patrol reroute, and no console warnings/errors.
-- Firefox Web smoke test at 1280×720: clean startup and rendering with no runtime errors (engine-level WebAssembly/WebGL advisory warnings only).
-- Tablet Web E2E at 1024×768: synthetic touch drag committed and rerouted the patrol with all controls and nodes visible.
-- Browser benchmark under 4× CPU throttling: approximately 120 animation frames/sec, exceeding the 30 FPS mobile-profile gate; normal scene counter held 120 FPS on the reference machine.
-- Phase 0 stop/redesign conditions were not triggered. Free dragging remains readable and Compatibility/WebGL performance exceeds the gate.
+- The 2D prototype validated graph snapshots, typed-port rewiring, invalid-edit cancellation, patrol rerouting, and single-threaded Web export.
+- These mechanics and tests should inform the 3D version, but all spatial interaction and performance gates must be revalidated in 3D.
 
 ---
 
@@ -485,7 +506,7 @@ At the end of the demo, provide an optional external survey asking:
 
 **Duration:** Weeks 4–7  
 **Goal:** Produce a complete mechanics-only heist loop.
-**Implementation status:** ✅ Complete (2026-07-23)
+**Implementation status:** Blocked on Phase 0
 
 ### Deliverables
 
@@ -500,6 +521,7 @@ At the end of the demo, provide an optional external survey asking:
 - Evidence inventory
 - Versioned `GameState` and save/load
 - Debug overlays for graph state, patrol routes, and signal propagation
+- 3D spatial feedback for traversal, patrol paths, trace direction, active ports, and affected geometry
 
 ### Exit criteria
 
@@ -509,6 +531,7 @@ At the end of the demo, provide an optional external survey asking:
 - The mission remains completable at maximum alert.
 - Save/load reproduces preparation, topology, alert, and memory state.
 - Automated tests cover graph invariants, corruption, branching state, and serialization.
+- The exported Chrome and Firefox builds pass the mechanics loop and performance budget.
 
 ### Scope protection
 
@@ -516,38 +539,10 @@ At the end of the demo, provide an optional external survey asking:
 - Do not add weapons, health, enemy combat, or skill trees.
 - Prefer authored graph puzzles over procedural network generation.
 
-### Phase 1 implementation record
+### Prior-prototype evidence to preserve
 
-- Added a data-driven `NetworkGraph` resource with typed ports, deterministic
-  traversal, reachability checks, metadata, snapshots, and dictionary
-  serialization.
-- Added `RewireCommand` preview, validation, affected-node reporting, commit,
-  and exact cancel restoration.
-- Added graph-routed patrol visualization and trace pulses, with three alert
-  tiers controlling security speed and edit tolerance.
-- Added network anchors that restore player position and committed topology
-  after detection without reloading the mission.
-- Added evidence collection, deterministic player-selectable memory corruption,
-  and the no-memory fallback that closes an optional safe route.
-- Added a versioned `GameState` covering preparation, checkpoint, topology,
-  alert, memories, branch flags, and final choice, plus JSON save/load with
-  unknown-schema rejection.
-- Added an in-game debug overlay for active connections, patrol routing, trace
-  propagation, security speed, and edit tolerance.
-- Added a complete mechanics-only mission with credential and hardware-backdoor
-  routes; both reach containment at maximum alert.
-- Automated Phase 1 suite: 27 passed, 0 failed, covering graph invariants,
-  rewire preview/cancel/commit, trace propagation, corruption, fallback
-  consequences, alert escalation, checkpoint restoration, branching routes,
-  schema validation, and save serialization.
-- Firefox Web E2E at 1280×720 completed the identity route with both memories
-  and the backdoor route after a no-memory trace; both runs reached containment
-  with no browser errors. The only console warnings were engine-level
-  WebAssembly/WebGL advisories.
-- Windows x64 export validated as a PE32+ executable and the single-threaded Web
-  export loaded successfully.
-- Phase 1 scope protections held: only patrols and traces were implemented, with
-  no combat, health, weapons, procedural generation, or progression systems.
+- The 2D prototype validated the intended graph, security, checkpoint, corruption, branching, and save logic.
+- Port reusable data and logic selectively; rebuild presentation, navigation, collision, picking, and spatial tests for 3D.
 
 ---
 
@@ -555,6 +550,7 @@ At the end of the demo, provide an optional external survey asking:
 
 **Duration:** Weeks 8–11  
 **Goal:** Make the entire demo playable from opening to aftermath before visual polish.
+**Implementation status:** Blocked on Phase 1
 
 ### Deliverables
 
@@ -570,6 +566,7 @@ At the end of the demo, provide an optional external survey asking:
 - Four valid route-and-ending combinations
 - Choice-dependent aftermath scene
 - Complete subtitle-only dialogue draft
+- Complete 3D gray-box environments, collision, navigation, camera framing, and occlusion treatment
 
 ### Exit criteria
 
@@ -579,6 +576,7 @@ At the end of the demo, provide an optional external survey asking:
 - First-time internal testers complete the slice in 30–45 minutes.
 - No choice produces missing dialogue, broken checkpoints, or an unwinnable state.
 - The narrative clearly communicates the personhood question without resolving it.
+- Every scene completes in exported Chrome and Firefox builds within the agreed Web memory and performance budgets.
 
 ### Content lock
 
@@ -588,12 +586,18 @@ At the end of this phase:
 - New ideas go into a post-slice backlog.
 - Subsequent changes must replace existing content rather than expand total scope.
 
+### Prior-prototype evidence to preserve
+
+- The 2D prototype validated the launch-to-credits narrative flow, four branch combinations, content boundaries, and dialogue state coverage.
+- Reuse the authored structure and test expectations while rebuilding and revalidating the complete slice in 3D.
+
 ---
 
 ## Phase 3 — Art, Audio, and Presentation
 
 **Duration:** Weeks 12–16  
 **Goal:** Replace the gray box with the final visual and audio identity.
+**Implementation status:** Blocked on Phase 2
 
 ### Deliverables
 
@@ -629,21 +633,21 @@ At the end of this phase:
 
 ---
 
-## Phase 4 — Accessibility, Telemetry, and Platform Hardening
+## Phase 4 — Accessibility, Telemetry, and Web Hardening
 
 **Duration:** Weeks 17–20  
 **Goal:** Convert the content-complete slice into a reliable public demo.
+**Implementation status:** Blocked on Phase 3
 
 ### Deliverables
 
 - Complete remapping and accessibility settings
 - Responsive UI across supported aspect ratios
-- Touch-ready topology controls
+- Browser mouse and keyboard controls
 - Opt-in consent flow
 - Cloudflare Worker event ingestion
 - D1 schema and retention task
 - End-of-demo survey link
-- Windows packaging
 - Hosted compressed Web build
 - Crash and fatal-error reporting without personal data
 - Loading, pause, settings, restart, and credits flows
@@ -651,7 +655,7 @@ At the end of this phase:
 
 ### Exit criteria
 
-- Windows 10/11 and supported browsers pass the release checklist.
+- Chrome and Firefox pass the Web release checklist.
 - Declining telemetry produces no network event requests.
 - Offline or failed telemetry does not affect gameplay.
 - Save failure produces a clear, recoverable message.
@@ -664,6 +668,7 @@ At the end of this phase:
 
 **Duration:** Weeks 21–24  
 **Goal:** Use the contingency window for evidence-driven polish and release.
+**Implementation status:** Blocked on Phase 4
 
 ### Playtest rounds
 
@@ -676,8 +681,8 @@ At the end of this phase:
    - Five or more new players
    - Focus on Asha’s credibility, preparation reasoning, and final choice
 
-3. **Release-candidate test**
-   - Full platform matrix
+3. **Web release-candidate test**
+   - Required browser matrix
    - Save/load, fresh install, telemetry consent, offline, and performance coverage
 
 ### Release gates
@@ -709,7 +714,7 @@ Do not cut:
 - Fail-forward memory corruption
 - Free-or-contain decision
 - Choice-dependent aftermath
-- Windows and Web release builds
+- Web release build
 - Accessibility basics
 
 ---
@@ -746,18 +751,18 @@ Do not cut:
 - Use keyboard-only, mouse-only where practical, and touch controls.
 - Resize the browser throughout dialogue and topology editing.
 
-### Supported release matrix
+### Web release matrix
 
 | Target | Release requirement |
 |---|---|
-| Windows 10/11 x64 | Full release gate |
 | Chrome, latest two stable versions | Full release gate |
-| Edge, latest two stable versions | Full release gate |
 | Firefox, latest two stable versions | Full release gate |
 | Safari desktop | Best-effort smoke test |
-| Chrome Android | Touch, layout, and performance smoke test |
-| Safari iOS | Touch and layout smoke test |
-| Native Android/iOS | Deferred until after the vertical slice |
+| Edge desktop | Best-effort smoke test |
+| Tablet-sized browser viewport | Responsive-layout smoke test |
+| macOS native | Deferred until after Web release |
+| Windows native | Deferred until after Web release |
+| Android native | Deferred until after Web release |
 
 ---
 
@@ -770,8 +775,8 @@ The vertical slice is complete when:
 - Rewriting topology changes traversal, patrols, permissions, and signal flow.
 - Failure causes persistent but recoverable memory corruption.
 - Both preparation routes and both endings are complete and tested.
-- Windows and Web builds meet stability and performance requirements.
-- Mobile-ready input and responsive UI are present, even though native packages are deferred.
+- The Web build meets stability, startup, download-size, memory, and performance requirements in Chrome and Firefox.
+- Browser-responsive UI is present; native mobile controls and packages are deferred.
 - Accessibility basics and full subtitles ship with the first public build.
 - Telemetry is anonymous, optional, validated, and non-blocking.
 - Every asset has traceable rights and the game contains no copied *Neuromancer* IP.
@@ -782,7 +787,10 @@ The vertical slice is complete when:
 
 Only consider these after the release candidate passes:
 
-- Native Android and iOS releases
+- macOS feasibility and native release plan
+- Windows feasibility and native release plan
+- Native Android feasibility, touch redesign, and release plan
+- Native iOS releases
 - Controller support
 - Additional hub locations
 - More network security archetypes
@@ -791,6 +799,6 @@ Only consider these after the release candidate passes:
 - Broader faction reputation
 - Localization
 - Expanded voice acting
-- macOS and Linux certification
+- Linux certification
 - Steam or storefront integration
 - Full-game production plan for the 8–12 hour campaign

@@ -5,6 +5,8 @@ const RewireCommandScript = preload("res://scripts/network/rewire_command.gd")
 const GameStateScript = preload("res://scripts/narrative/game_state.gd")
 const MissionStateScript = preload("res://scripts/security/mission_state.gd")
 const SaveServiceScript = preload("res://scripts/autoload/save_service.gd")
+const DialogueCatalogScript = preload("res://scripts/narrative/dialogue_catalog.gd")
+const VerticalSliceScene = preload("res://scenes/vertical_slice.tscn")
 
 var failures := 0
 var checks := 0
@@ -40,6 +42,7 @@ func _run() -> void:
 	await _test_corruption_and_security()
 	await _test_serialization()
 	await _test_two_route_heist()
+	await _test_phase_2_vertical_slice()
 	print("RESULT: %d passed, %d failed" % [checks - failures, failures])
 	quit(1 if failures else 0)
 
@@ -118,3 +121,41 @@ func _test_two_route_heist() -> void:
 		check(snapshot.memories.size() == 2, "%s route exposes evidence inventory" % route)
 		room.queue_free()
 		await process_frame
+
+func _drain_dialogue(slice: Node) -> void:
+	while not slice.dialogue.is_empty():
+		slice.advance_dialogue()
+
+func _test_phase_2_vertical_slice() -> void:
+	var catalog := DialogueCatalogScript.new()
+	check(catalog.all_ids().size() >= 16, "complete subtitle draft covers opening, contacts, zones, and aftermaths")
+	for route in ["identity", "backdoor"]:
+		for ending in ["free", "contain"]:
+			var slice := VerticalSliceScene.instantiate()
+			root.add_child(slice)
+			await process_frame
+			_drain_dialogue(slice)
+			check(slice.stage == slice.Stage.HUB, "%s/%s reaches gray-box hub from opening" % [route, ending])
+			for contact in range(3):
+				check(slice.visit_contact(contact), "contact %d is functional" % contact)
+				_drain_dialogue(slice)
+			check(slice.contacts_seen.size() == 3 and slice.begin_preparation(), "all contacts unlock preparation")
+			check(slice.select_preparation(route), "%s preparation can be selected" % route)
+			_drain_dialogue(slice)
+			_drain_dialogue(slice)
+			check(slice.stage == slice.Stage.HEIST, "%s enters hospice ingress" % route)
+			check(not slice.heist.is_processing_unhandled_input(), "embedded heist cannot double-handle slice input")
+			check(slice.heist.mission.game_state.alert_tier == (0 if route == "identity" else 1), "%s materially changes starting hazard" % route)
+			for step in range(4):
+				check(slice.advance_heist(), "%s advances through hospice zone %d" % [route, step + 2])
+				_drain_dialogue(slice)
+				if slice.stage == slice.Stage.HEIST and slice.heist.mission.player_node in ["stacks", "quarantine"]:
+					check(slice.collect_evidence(), "%s collects evidence in %s" % [route, slice.heist.mission.player_node])
+			check(slice.stage == slice.Stage.EXTRACTION, "%s reaches extraction without intervention" % route)
+			check(slice.select_ending(ending), "%s ending can be selected" % ending)
+			_drain_dialogue(slice)
+			var state: Dictionary = slice.snapshot()
+			check(state.stage == slice.Stage.CREDITS and state.final_choice == ending, "%s/%s reaches distinct credits state" % [route, ending])
+			check(state.memories.size() == 2, "%s/%s carries supporting and undermining evidence" % [route, ending])
+			slice.queue_free()
+			await process_frame
