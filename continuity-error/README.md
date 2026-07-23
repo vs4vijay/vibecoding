@@ -18,3 +18,10 @@ choice-dependent aftermath, and credits. Controls and objectives are shown
 in-game. Dialogue advances with `Enter` or `Space`; numbered choices select
 contacts and preparation; `Space` traverses the heist, `M` collects evidence,
 and the final choice uses `F` or `C`.
+
+---
+
+## Development Setup
+
+codex mcp add godot-ai  --url http://localhost:8007/mcp
+

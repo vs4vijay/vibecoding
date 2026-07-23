@@ -11,6 +11,13 @@
 
 ---
 
+## Development Guidelines
+
+- Make use of godot ai mcp server
+- build for web first, but keep in mind that macos, windows and android would come later.
+
+---
+
 ## 1. Product Vision
 
 Continuity Error is an original 3D isometric cyberpunk stealth-puzzle game inspired by themes of identity, artificial consciousness, memory ownership, and corporate power. It does not use the characters, setting, terminology, or plot of *Neuromancer*.
