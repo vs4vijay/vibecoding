@@ -1,0 +1,147 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/phase1/core_heist_3d.gd" id="1"]
+
+[sub_resource type="Environment" id="Environment"]
+background_mode = 1
+background_color = Color(0.006, 0.012, 0.035, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.16, 0.34, 0.48, 1)
+ambient_light_energy = 1.3
+
+[sub_resource type="BoxMesh" id="FloorMesh"]
+size = Vector3(22, 0.3, 13)
+
+[sub_resource type="StandardMaterial3D" id="FloorMaterial"]
+albedo_color = Color(0.025, 0.06, 0.1, 1)
+metallic = 0.45
+roughness = 0.7
+
+[sub_resource type="CapsuleMesh" id="PlayerMesh"]
+radius = 0.38
+height = 1.5
+
+[sub_resource type="StandardMaterial3D" id="PlayerMaterial"]
+albedo_color = Color(0.97, 0.19, 0.48, 1)
+emission_enabled = true
+emission = Color(0.5, 0.02, 0.16, 1)
+
+[sub_resource type="CapsuleMesh" id="PatrolMesh"]
+radius = 0.3
+height = 1.2
+
+[sub_resource type="StandardMaterial3D" id="PatrolMaterial"]
+albedo_color = Color(1, 0.25, 0.1, 1)
+emission_enabled = true
+emission = Color(0.7, 0.06, 0.01, 1)
+
+[node name="Phase1CoreHeist" type="Node3D"]
+script = ExtResource("1")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment")
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.15, 0.5)
+mesh = SubResource("FloorMesh")
+material_override = SubResource("FloorMaterial")
+
+[node name="Graph" type="Node3D" parent="."]
+[node name="Nodes" type="Node3D" parent="Graph"]
+[node name="Links" type="Node3D" parent="Graph"]
+[node name="Ports" type="Node3D" parent="Graph"]
+[node name="Signals" type="Node3D" parent="Graph"]
+
+[node name="Actors" type="Node3D" parent="."]
+[node name="Player" type="MeshInstance3D" parent="Actors"]
+position = Vector3(-8, 1.15, 3)
+mesh = SubResource("PlayerMesh")
+material_override = SubResource("PlayerMaterial")
+
+[node name="Patrol" type="MeshInstance3D" parent="Actors"]
+position = Vector3(4.2, 2.7, -4.2)
+mesh = SubResource("PatrolMesh")
+material_override = SubResource("PatrolMaterial")
+
+[node name="TracePulse" type="MeshInstance3D" parent="Actors"]
+visible = false
+mesh = SubResource("PatrolMesh")
+material_override = SubResource("PatrolMaterial")
+scale = Vector3(0.45, 0.45, 0.45)
+
+[node name="Camera3D" type="Camera3D" parent="."]
+position = Vector3(13.5, 17.5, 18.5)
+rotation_degrees = Vector3(-38, 36, 0)
+projection = 1
+size = 18.5
+current = true
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-52, -28, 0)
+light_energy = 1.1
+shadow_enabled = true
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Title" type="Label" parent="HUD"]
+offset_left = 30.0
+offset_top = 22.0
+offset_right = 850.0
+offset_bottom = 62.0
+theme_override_colors/font_color = Color(0.35, 0.96, 0.9, 1)
+theme_override_font_sizes/font_size = 26
+text = "CONTINUITY ERROR // PHASE 1 CORE HEIST"
+
+[node name="ObjectivePanel" type="PanelContainer" parent="HUD"]
+offset_left = 30.0
+offset_top = 74.0
+offset_right = 850.0
+offset_bottom = 120.0
+[node name="Margin" type="MarginContainer" parent="HUD/ObjectivePanel"]
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+[node name="VBox" type="VBoxContainer" parent="HUD/ObjectivePanel/Margin"]
+[node name="Objective" type="Label" parent="HUD/ObjectivePanel/Margin/VBox"]
+theme_override_colors/font_color = Color(1, 0.82, 0.38, 1)
+text = "OBJECTIVE // Reach containment"
+
+[node name="DebugPanel" type="PanelContainer" parent="HUD"]
+offset_left = 956.0
+offset_top = 24.0
+offset_right = 1252.0
+offset_bottom = 220.0
+[node name="Margin" type="MarginContainer" parent="HUD/DebugPanel"]
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+[node name="Debug" type="Label" parent="HUD/DebugPanel/Margin"]
+theme_override_colors/font_color = Color(1, 0.56, 0.66, 1)
+theme_override_font_sizes/font_size = 13
+text = "GRAPH DEBUG"
+
+[node name="StatusPanel" type="PanelContainer" parent="HUD"]
+offset_left = 30.0
+offset_top = 570.0
+offset_right = 1252.0
+offset_bottom = 700.0
+[node name="Margin" type="MarginContainer" parent="HUD/StatusPanel"]
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 10
+[node name="VBox" type="VBoxContainer" parent="HUD/StatusPanel/Margin"]
+theme_override_constants/separation = 7
+[node name="Status" type="Label" parent="HUD/StatusPanel/Margin/VBox"]
+theme_override_colors/font_color = Color(0.92, 0.94, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "Loading..."
+[node name="State" type="Label" parent="HUD/StatusPanel/Margin/VBox"]
+theme_override_colors/font_color = Color(0.47, 0.78, 0.91, 1)
+theme_override_font_sizes/font_size = 14
+[node name="Controls" type="Label" parent="HUD/StatusPanel/Margin/VBox"]
+theme_override_colors/font_color = Color(0.62, 0.68, 0.82, 1)
+theme_override_font_sizes/font_size = 13
+text = "[1/2] route   [Space] traverse   [M] evidence   [T] trace   [R] preview/commit   [C] cancel   [K/L] save/load   [F3] debug"

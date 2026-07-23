@@ -1,6 +1,6 @@
 # Continuity Error
 
-Phase 2 complete gray-box vertical slice for an isometric topology-rewiring game.
+Phase 1 complete mechanics-only 3D heist loop for an isometric topology-rewiring game.
 
 ## Run and verify
 
@@ -12,16 +12,14 @@ rtk ./scripts/build.sh
 
 The Web preset is intentionally single-threaded.
 
-The playable loop runs from Asha's opening message through the three-contact
-hub, preparation, all five hospice zones, the free-or-contain decision,
-choice-dependent aftermath, and credits. Controls and objectives are shown
-in-game. Dialogue advances with `Enter` or `Space`; numbered choices select
-contacts and preparation; `Space` traverses the heist, `M` collects evidence,
-and the final choice uses `F` or `C`.
+The production entry point is a true 3D gray-box mission. Choose the stolen
+identity or hardware-backdoor route with `1`/`2`, traverse with `Space`,
+collect evidence with `M`, launch a trace with `T`, preview and commit a
+rewire with `R`, cancel with `C`, save/load with `K`/`L`, and toggle graph
+diagnostics with `F3`.
 
 ---
 
 ## Development Setup
 
 codex mcp add godot-ai  --url http://localhost:8007/mcp
-

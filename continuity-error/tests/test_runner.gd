@@ -8,6 +8,7 @@ const SaveServiceScript = preload("res://scripts/autoload/save_service.gd")
 const DialogueCatalogScript = preload("res://scripts/narrative/dialogue_catalog.gd")
 const VerticalSliceScene = preload("res://scenes/vertical_slice.tscn")
 const Phase0Scene = preload("res://scenes/phase0_feasibility.tscn")
+const Phase1Scene = preload("res://scenes/phase1_core_heist.tscn")
 
 var failures := 0
 var checks := 0
@@ -40,6 +41,7 @@ func build_line_graph() -> NetworkGraph:
 
 func _run() -> void:
 	await _test_phase0_feasibility()
+	await _test_phase1_3d_heist()
 	await _test_graph_and_rewire()
 	await _test_corruption_and_security()
 	await _test_serialization()
@@ -64,6 +66,42 @@ func _test_phase0_feasibility() -> void:
 	check(accepted.valid and slice.patrol_route == ["A", "B", "F", "E"], "Phase 0 valid edit visibly reroutes patrol")
 	slice.queue_free()
 	await process_frame
+
+func _test_phase1_3d_heist() -> void:
+	for route in ["identity", "backdoor"]:
+		var heist := Phase1Scene.instantiate()
+		root.add_child(heist)
+		await process_frame
+		check(heist is Node3D and heist.NODE_POSITIONS.size() == 7, "Phase 1 %s route runs as authored 3D graph" % route)
+		check(heist.select_preparation(route), "Phase 1 selects %s preparation" % route)
+		check(heist.mission.game_state.alert_tier == (0 if route == "identity" else 1), "%s route applies deterministic starting risk" % route)
+		check(heist.invalid_edit_preserves_state(), "Phase 1 invalid edit preserves exact graph state")
+		var topology_before: Array = heist.graph.snapshot()
+		check(heist.preview_or_commit_rewire(), "Phase 1 exposes a valid topology preview")
+		check(heist.cancel_rewire() and heist.graph.snapshot() == topology_before, "Phase 1 cancel restores exact topology")
+		check(heist.preview_or_commit_rewire() and heist.preview_or_commit_rewire(), "Phase 1 valid edit previews and commits")
+		check(heist.advance() and heist.advance(), "%s route reaches first network anchor" % route)
+		check(heist.collect_memory(), "%s route collects spatial memory shard" % route)
+		var consequence: Dictionary = heist.resolve_trace_immediately()
+		check(consequence.consequence == "memory_corrupted", "%s detection corrupts evidence without reload" % route)
+		heist.resolve_trace_immediately()
+		check(heist.mission.game_state.alert_tier == 2, "%s route reaches maximum alert" % route)
+		check(heist.state_snapshot().completable, "%s route remains completable at maximum alert" % route)
+		var path := "user://phase1-3d-%s.json" % route
+		check(heist.save_game(path), "%s route saves 3D mission state" % route)
+		var saved_snapshot: Dictionary = heist.state_snapshot()
+		heist.select_preparation("identity" if route == "backdoor" else "backdoor")
+		check(heist.load_game(path), "%s route reloads 3D mission state" % route)
+		var loaded_snapshot: Dictionary = heist.state_snapshot()
+		check(loaded_snapshot.preparation == saved_snapshot.preparation and loaded_snapshot.alert_tier == saved_snapshot.alert_tier and loaded_snapshot.topology == saved_snapshot.topology and loaded_snapshot.corrupted == saved_snapshot.corrupted, "%s save/load reproduces route, alert, topology, and memory" % route)
+		var progressed: bool = heist.advance()
+		if not heist.state_snapshot().completed:
+			progressed = progressed and heist.advance()
+		check(progressed, "%s route completes from maximum alert" % route)
+		check(heist.state_snapshot().completed, "%s route reaches containment" % route)
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+		heist.queue_free()
+		await process_frame
 
 func _test_graph_and_rewire() -> void:
 	var graph := build_line_graph()

@@ -524,7 +524,20 @@ The existing 2D prototype is reference material for mechanics, narrative flow, a
 
 **Duration:** Weeks 4–7  
 **Goal:** Produce a complete mechanics-only heist loop.
-**Implementation status:** Ready to start after user approval
+**Implementation status:** Complete — verified 2026-07-24
+
+### Phase 1 verification record
+
+- Production entry point is now `scenes/phase1_core_heist.tscn`, a true 3D mechanics-only mission; Phase 0 and the legacy 2D prototype remain intact as reference material.
+- The authored seven-node graph supports stolen-identity and hardware-backdoor routes, typed ports, deterministic preview/commit/cancel rewiring, traversal changes, patrol rerouting, signal paths, and graph diagnostics.
+- Detection is fail-forward: traces corrupt carried evidence, increase one of three alert tiers, restore the latest network anchor, and close an optional route when no clean memory remains.
+- The mission remains completable at maximum alert through both preparation routes, including after topology edits and checkpoint restoration.
+- Versioned JSON save/load reproduces preparation, topology, alert tier, checkpoint, collected/corrupted memories, and branching state.
+- Automated suite: 143 checks passed, 0 failed. Coverage includes graph invariants, typed-port validation, rollback, both routes, traces, corruption, no-memory fallback, maximum-alert completion, and serialization.
+- Single-threaded Compatibility-renderer Web export completed through `scripts/build.sh`.
+- Exported build completed the mechanics loop at 1280×720 in Playwright-managed Chromium and Firefox with zero console errors.
+- Browser screenshots: `.screenshots/phase1-chromium.png`, `.screenshots/phase1-firefox.png`, `.screenshots/phase1-complete-chromium.png`, and `.screenshots/phase1-complete-firefox.png`.
+- The scene also launched live through the connected Godot 4.7.1 editor; the runtime game log contained no errors or warnings.
 
 ### Deliverables
 
@@ -568,7 +581,7 @@ The existing 2D prototype is reference material for mechanics, narrative flow, a
 
 **Duration:** Weeks 8–11  
 **Goal:** Make the entire demo playable from opening to aftermath before visual polish.
-**Implementation status:** Blocked on Phase 1
+**Implementation status:** Ready to start after user approval
 
 ### Deliverables
 
