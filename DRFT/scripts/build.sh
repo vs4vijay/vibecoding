@@ -1,99 +1,65 @@
 #!/usr/bin/env bash
-# Build the Focus APK from the patched source tree.
-#
-# Defaults to the variant in config/versions.env (DRFT_VARIANT, e.g. focusDebug).
-# Override via:   DRFT_VARIANT=focusRelease scripts/build.sh
-# Or pass:        scripts/build.sh focusRelease
-#
-# Outputs are copied to dist/ at the end so they survive a `clean.sh`-on-build/
-# and are easy to upload as CI artifacts.
-
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./lib/common.sh
+# shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
 drft_load_config
-drft_check_host_basics
-drft_check_jdk
-drft_check_android_sdk
 
-VARIANT="${DRFT_VARIANT}"
-EXTRA_GRADLE_ARGS=()
+VARIANT="$DRFT_VARIANT" EXTRA=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    -h|--help)
-      cat >&2 <<EOF
-Usage: $0 [variant] [-- extra-gradle-args...]
-
-  variant   focus-android build variant (default: \$DRFT_VARIANT = ${DRFT_VARIANT}).
-            Examples: focusDebug | focusRelease | focusBeta | focusNightly
-                      klarDebug  | klarRelease  | klarBeta  | klarNightly
-
-Anything after a literal '--' is forwarded to gradle, e.g.:
-  $0 focusDebug -- --info --stacktrace
-EOF
-      exit 0 ;;
-    --) shift; EXTRA_GRADLE_ARGS=("$@"); break ;;
-    -*) drft_die "unknown flag: $1 (use -- to forward gradle args)" ;;
-    *)  VARIANT="$1" ;;
+    -h|--help) printf 'Usage: %s [focusDebug|focusRelease|focusBeta|focusNightly|klarDebug|klarRelease|klarBeta|klarNightly] [-- gradle-args]\n' "$0"; exit 0 ;;
+    --) shift; EXTRA=("$@"); break ;;
+    -*) drft_die "unknown flag: $1" ;;
+    *) VARIANT="$1" ;;
   esac
   shift
 done
+case "$VARIANT" in focusDebug|focusRelease|focusBeta|focusNightly|klarDebug|klarRelease|klarBeta|klarNightly) ;; *) drft_die "unsupported variant: $VARIANT" ;; esac
+[ -d "$DRFT_FOCUS_DIR" ] || drft_die "source tree not prepared"
+[ -f "$DRFT_STATE_DIR/patches.env" ] || drft_die "patch state missing; run scripts/patch.sh"
+drft_check_host_basics; drft_check_jdk; drft_check_android_sdk
+for tool in git unzip zip; do drft_require_cmd "$tool"; done
+available_kb="$(df -Pk "$DRFT_BUILD_DIR" | awk 'NR==2 {print $4}')"
+[ "$available_kb" -ge "${DRFT_MIN_DISK_KB:-5242880}" ] || drft_die "at least 5 GiB free disk is required"
 
-if [ ! -d "${DRFT_FOCUS_DIR}" ]; then
-  drft_die "source tree not prepared; run scripts/fetch.sh && scripts/patch.sh first"
+task="focus-android:assemble${VARIANT^}"
+mozconfig="$DRFT_BUILD_DIR/mozconfig"
+objdir="$DRFT_BUILD_DIR/obj-android"
+drft_atomic_write "$mozconfig" <<EOF
+ac_add_options --enable-application=mobile/android
+ac_add_options --enable-artifact-builds
+ac_add_options --enable-bootstrap=embedded-uniffi-bindgen,nimbus-fml
+ac_add_options --target=aarch64-linux-android
+ac_add_options --with-android-sdk="$ANDROID_HOME"
+ac_add_options --with-java-bin-path="$JAVA_HOME/bin"
+mk_add_options MOZ_OBJDIR="$objdir"
+EOF
+export MOZCONFIG="$mozconfig"
+[ -x "$DRFT_SRC_DIR/mach" ] || chmod +x "$DRFT_SRC_DIR/mach"
+if [ ! -f "$objdir/config.status.json" ]; then
+  drft_section "Configuring Mozilla Android artifact build"
+  (cd "$DRFT_SRC_DIR" && ./mach configure)
 fi
+drft_section "Installing pinned Mozilla build artifacts"
+(cd "$DRFT_SRC_DIR" && ./mach artifact install --no-tests --tree "$FIREFOX_TREE")
+drft_section "Generating Mozilla pre-export build inputs"
+(cd "$DRFT_SRC_DIR" && ./mach build pre-export)
+output="$objdir/gradle/build/mobile/android/focus-android/app/outputs/apk"
+rm -rf "$DRFT_DIST_DIR"
+mkdir -p "$DRFT_DIST_DIR"
+daemon=--no-daemon; [ "${DRFT_USE_GRADLE_DAEMON:-0}" = 1 ] && daemon=''
+(cd "$DRFT_SRC_DIR" && ./mach gradle ${daemon:+$daemon} --stacktrace "$task" "${EXTRA[@]}")
 
-# Variant name → gradle assemble task. Focus uses `app:assemble<Variant>`,
-# capitalized e.g. focusDebug → assembleFocusDebug.
-capitalize_first() { echo "${1^}"; }
-ASSEMBLE_TASK="app:assemble$(capitalize_first "${VARIANT}")"
-
-drft_section "Building ${DRFT_PRODUCT_NAME} (variant: ${VARIANT})"
-drft_log "Module : ${FOCUS_MODULE_PATH}"
-drft_log "Task   : ${ASSEMBLE_TASK}"
-drft_log "Source : ${DRFT_FOCUS_DIR}"
-
-# focus-android ships its own gradlew. Use it so we honor the wrapper version
-# pinned in the upstream tree.
-cd "${DRFT_FOCUS_DIR}"
-
-# --no-daemon: CI-friendly (no leaked daemons between jobs); local builds may
-# prefer daemon — set DRFT_USE_GRADLE_DAEMON=1 to opt in.
-DAEMON_FLAG="--no-daemon"
-if [ "${DRFT_USE_GRADLE_DAEMON:-0}" = "1" ]; then
-  DAEMON_FLAG=""
-fi
-
-# Ensure gradlew is executable (tarball extraction may drop the +x bit on
-# some filesystems / on Windows it doesn't matter but doesn't hurt).
-chmod +x ./gradlew 2>/dev/null || true
-
-./gradlew \
-  ${DAEMON_FLAG} \
-  --stacktrace \
-  "${ASSEMBLE_TASK}" \
-  "${EXTRA_GRADLE_ARGS[@]}"
-
-# Stage outputs into dist/ for predictable CI artifact upload.
-drft_section "Staging artifacts → dist/"
-mkdir -p "${DRFT_DIST_DIR}"
-OUTPUT_BASE="${DRFT_FOCUS_DIR}/app/build/outputs/apk"
-if [ ! -d "${OUTPUT_BASE}" ]; then
-  drft_die "expected APK output dir missing: ${OUTPUT_BASE}"
-fi
-
-# Find every .apk produced under app/build/outputs/apk and copy to dist/,
-# preserving the variant subdir so multiple builds don't clobber each other.
-count=0
-while IFS= read -r -d '' apk; do
-  rel="${apk#${OUTPUT_BASE}/}"
-  dest="${DRFT_DIST_DIR}/${rel}"
-  mkdir -p "$(dirname "${dest}")"
-  cp -f "${apk}" "${dest}"
-  drft_log "  $(printf '%s' "${rel}")"
-  count=$((count + 1))
-done < <(find "${OUTPUT_BASE}" -type f -name '*.apk' -print0)
-
-[ "${count}" -gt 0 ] || drft_die "no APKs produced for variant ${VARIANT}"
-drft_log "${count} APK(s) staged in ${DRFT_DIST_DIR}"
+count=0 manifest="$DRFT_DIST_DIR/build-manifest.txt"
+{
+  printf 'firefox_repo=%s\nfirefox_rev=%s\nvariant=%s\nbuilt_at=%s\n' "$FIREFOX_REPO" "$FIREFOX_REV" "$VARIANT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  while IFS= read -r -d '' apk; do
+    rel="${apk#"${output}"/}"; dest="$DRFT_DIST_DIR/$rel"; mkdir -p "$(dirname "$dest")"; cp "$apk" "$dest"
+    [ -s "$dest" ] || drft_die "empty APK produced: $rel"
+    printf 'apk=%s sha256=%s\n' "$rel" "$(drft_sha256 "$dest")"
+    count=$((count + 1))
+  done < <(find "$output" -type f -name '*arm64-v8a*.apk' -print0 2>/dev/null)
+} > "$manifest"
+[ "$count" -gt 0 ] || drft_die "no APKs produced for $VARIANT"
+drft_log "$count APK(s) and build manifest staged in dist/"

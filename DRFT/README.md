@@ -1,151 +1,88 @@
 # DRFT
 
-DRFT is an Android browser derived from **Firefox Focus**, built directly from
-Mozilla's source tree with our own patches applied on top. The model is the
-same one [IronFox](https://gitlab.com/ironfox-oss/IronFox) uses for Fenix:
+DRFT is a reproducible build harness for the unmodified Firefox Focus Android
+baseline. Mozilla source is fetched at a pinned revision and is never vendored.
+DRFT-owned scripts are MPL-2.0; fetched source retains its upstream notices.
 
-- pin an upstream commit of `mozilla-firefox/firefox`,
-- check it out fresh on every build,
-- apply DRFT-owned `.patch` files,
-- compile the Focus subtree with its own `gradlew`.
+## Prerequisites
 
-Patches live in this repo; the upstream tree is never committed here.
+- Docker 24+ with BuildKit
+- Bash 4+ for host scripts
+- 16 GB RAM recommended and at least 20 GB free disk
+- `adb` plus one supported Android emulator/device for install/smoke testing
 
-## Repo layout
+No host JDK, Android SDK, or NDK is needed. Versions are pinned in
+`config/versions.env` and installed in the builder image.
 
-```
-.github/workflows/  ci.yml, release.yml             — GitHub Actions
-config/             versions.env                    — upstream pin + toolchain
-patches/
-  focus-android/    *.patch  → mobile/android/focus-android/
-  components/       *.patch  → mobile/android/android-components/
-  tree/             *.patch  → repo root (Gecko, etc.)
-scripts/
-  fetch.sh          download + extract upstream
-  patch.sh          apply patches/
-  build.sh          gradle assemble<Variant>
-  clean.sh          wipe build/ and/or dist/
-  all.sh            fetch + patch + build
-  make.ps1          PowerShell wrapper for Windows
-  lib/common.sh     shared bash helpers
-build/              gitignored — extracted source tree + gradle caches
-dist/               gitignored — staged APK output (also CI artifact)
-```
-
-The directory is small on purpose: everything that bloats (the firefox tree,
-gradle caches, NDK toolchains) lives under `build/` or in CI caches, never
-checked in.
-
-## Build it once
-
-### Prerequisites
-
-| Tool        | Version             | Notes                                          |
-| ----------- | ------------------- | ---------------------------------------------- |
-| JDK         | **21** (Temurin)    | matches `JDK_VERSION` in `config/versions.env`. JDK 17 is **not** enough for current mozilla-central — AGP refuses to start. |
-| Android SDK | compile-sdk 35, build-tools 35.0.0 | `$ANDROID_HOME` must be set      |
-| Android NDK | 27.2.12479018       | installed under `$ANDROID_HOME/ndk/...`        |
-| curl, tar, patch | any recent     | bash basics; Git Bash on Windows is fine       |
-| Python 3    | any recent          | only needed at gradle-build time (Glean); install if the build complains |
-| ~15 GB free | disk                | extracted firefox tree + gradle cache + APKs   |
-
-#### Install JDK 21
-
-- **Windows:** `winget install EclipseAdoptium.Temurin.21.JDK`  then point `$env:JAVA_HOME` at it.
-- **macOS:** `brew install --cask temurin@21`
-- **Linux:** `apt install temurin-21-jdk` (after adding the Adoptium repo) or `sdk install java 21-tem`.
-
-The scripts emit a warning if `java -version` doesn't report major 21, then proceed — gradle will hard-fail later with a clearer message.
-
-### Linux / macOS
+## Build and verify
 
 ```bash
-scripts/all.sh                # fetch + patch + build (focusDebug by default)
-scripts/build.sh focusRelease # rebuild as release
+bash scripts/check.sh
+bash scripts/test.sh
+bash scripts/docker.sh build-image
+bash scripts/docker.sh versions
+bash scripts/docker.sh all focusDebug
+bash scripts/docker.sh shell scripts/verify-artifacts.sh
 ```
 
-### Windows
+Only APKs from the requested invocation and `dist/build-manifest.txt` are
+staged. The current baseline intentionally stages only the `arm64-v8a` APK;
+supporting every Android ABI is not a baseline goal. Source state lives in
+`build/state/source.env`; a matching tree is reused. Gradle uses the
+`drft-gradle-cache` Docker volume. Inspect it with
+`docker system df -v` and remove it with
+`bash scripts/docker.sh clean-cache`. Set `DRFT_GRADLE_CACHE_HOST` to use a
+host directory instead (CI uses `.cache/gradle`).
+If the checkout filesystem is short on space, set `DRFT_BUILD_STORAGE` to an
+absolute host directory with at least 15 GB free; it is mounted at
+`/workspace/build` without changing manifest or build paths.
 
-You need a POSIX shell. Install [Git for Windows](https://git-scm.com/download/win)
-(comes with Git Bash) or WSL — the wrapper finds either:
+## Install and smoke test
 
-```powershell
-.\scripts\make.ps1 all                  # fetch + patch + build
-.\scripts\make.ps1 build focusRelease   # rebuild
-.\scripts\make.ps1 clean                # wipe build/ and dist/
-```
-
-Set `$env:DRFT_BASH` to override the auto-detected shell.
-
-### Output
-
-APKs land in `dist/` mirroring upstream's `app/build/outputs/apk/<variant>/<abi>/` layout, e.g.
-
-```
-dist/focus/arm64-v8a/debug/app-focus-arm64-v8a-debug.apk
-dist/focus/armeabi-v7a/debug/app-focus-armeabi-v7a-debug.apk
-```
-
-## Iterate on a patch
+Device interaction intentionally stays on the host:
 
 ```bash
-# 1. Hand-edit files inside the extracted upstream tree:
-$EDITOR build/firefox-src/mobile/android/focus-android/app/src/main/...
-
-# 2. Test the change without re-fetching:
-scripts/build.sh
-
-# 3. Capture as a patch when you're happy:
-#    See patches/README.md for the exact diff command for each target dir.
+bash scripts/install.sh dist/path/to/the-explicit.apk
+bash scripts/smoke.sh
 ```
 
-## Update the upstream pin
+Set `ANDROID_SERIAL` if more than one device is attached. The baseline package
+is `org.mozilla.focus`; override `DRFT_PACKAGE_ID` only when testing an upstream
+variant with a different ID. After the automated launch check, manually open a
+public HTTPS page, navigate back/forward, tap the erase button, and confirm the
+session disappears without a crash.
 
-When you want a newer Mozilla snapshot:
+## Recovery and maintenance
 
-1. Find the commit SHA you want from
-   <https://github.com/mozilla-firefox/firefox/commits/main>.
-2. Edit `config/versions.env`:
-   ```
-   FIREFOX_REV="<new-sha>"
-   FIREFOX_VERSION="<human-readable-version>"
-   ```
-3. `scripts/fetch.sh --force` — re-download.
-4. `scripts/patch.sh` — re-apply; fix any rejects.
-5. Commit the bump.
+- Interrupted fetch: rerun `bash scripts/docker.sh fetch`; partial files are
+  discarded and an incomplete tree has no valid manifest.
+- Changed/broken patch: `bash scripts/docker.sh fetch --force`, then patch
+  again. Patch state is content-addressed and refuses unsafe double-application.
+- Stale artifacts: `bash scripts/clean.sh --dist`.
+- Full source reset: `bash scripts/clean.sh --build`.
+- Full local reset: `bash scripts/clean.sh --all`, then optionally remove the
+  Gradle volume with `bash scripts/docker.sh clean-cache`.
 
-`config/versions.local.env` (gitignored) is honored if you want to test a pin
-without committing.
+Before changing the upstream pin, verify the new commit exists, update both
+`FIREFOX_REV` and `FIREFOX_VERSION`, run checks and fixture tests, force-fetch,
+dry-run/apply patches, build `focusDebug`, install and smoke-test it, and require
+green CI before merging. Dependabot opens monthly GitHub Actions updates for
+review. Do not commit anything under `build/`, `dist/`, `.cache/`, source
+archives, credentials, or signing keys.
 
-## CI
+## CI and releases
 
-- **`ci.yml`** runs on PRs and pushes to `main`/`master`. Builds `focusDebug`,
-  uploads APKs as a workflow artifact (7-day retention).
-- **`release.yml`** runs on `v*` tag push (or manual dispatch). Builds the
-  variant you choose (default `focusRelease`), uploads as artifact, and on a
-  tag push creates a **draft** GitHub Release with the APKs attached.
+CI runs lightweight validation before building the same Docker path used
+locally. Source cache keys include repository and revision; Gradle keys include
+the upstream revision and toolchain inputs. The artifact contains APKs plus the
+manifest.
 
-The firefox source tarball is cached keyed by `FIREFOX_REV`, so subsequent
-runs at the same pin skip the ~700MB download.
+The manual/tag release workflow accepts only `focusRelease` and currently
+produces an explicitly **unsigned** release candidate. Tag releases remain
+drafts. `SHA256SUMS`, source identity, signing status, and the build manifest
+are attached. Signing and publication require a separate reviewed process; no
+keystore secret is accepted by this workflow.
 
-## How DRFT compares to IronFox
-
-| Aspect         | IronFox                                          | DRFT (today)                                  |
-| -------------- | ------------------------------------------------ | --------------------------------------------- |
-| Target         | Fenix (full Firefox for Android)                 | Focus (privacy browser)                       |
-| Build engine   | `mach gradle` (builds Gecko + GeckoView locally) | upstream `focus-android/gradlew` (prebuilt GeckoView from Mozilla maven) |
-| Build time     | ~6 hours in CI                                   | ~15–30 minutes in CI                          |
-| Patch surface  | 88 patches + 5 overlay dirs                      | empty to start; add as needed                 |
-| Components     | also patches application-services, glean, microG | not yet — add when needed                     |
-
-The lightweight setup is a deliberate first step. When DRFT needs to patch
-Gecko/a-c/etc. itself, drop those `.patch` files into the right bucket under
-`patches/` — the script already supports `patches/tree/` and
-`patches/components/`. Switching to a full `mach`-driven build is a future
-project once we actually need it.
-
-## License
-
-Patches and scripts in this repo are licensed under MPL-2.0 (matching upstream
-Mozilla code). Upstream sources retain their own MPL-2.0 license — they are
-fetched at build time, not vendored.
+DRFT branding and application-ID patches are deliberately gated until the
+unmodified Focus baseline has built and passed the device smoke test in both
+local and CI environments.

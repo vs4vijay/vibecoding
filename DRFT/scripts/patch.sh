@@ -1,98 +1,44 @@
 #!/usr/bin/env bash
-# Apply DRFT patches on top of the extracted upstream tree.
-#
-# Layout:
-#   patches/focus-android/*.patch  → applied at ${FOCUS_MODULE_PATH}, -p1
-#   patches/components/*.patch     → applied at mobile/android/android-components, -p1
-#   patches/tree/*.patch           → applied at the repo root, -p1 (Gecko/etc.)
-#
-# Patches are applied in lexicographic order. Number them like `0001-foo.patch`
-# to control sequencing.
-
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./lib/common.sh
+# shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
 drft_load_config
-
 DRY_RUN=0
-REVERSE=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    --dry-run)  DRY_RUN=1 ;;
-    --reverse)  REVERSE=1 ;;  # Useful when iterating on patches locally
-    -h|--help)
-      cat >&2 <<EOF
-Usage: $0 [--dry-run] [--reverse]
-
-Applies every *.patch under patches/ to the extracted source tree.
-  --dry-run   Run patch with --dry-run; no files modified.
-  --reverse   Reverse-apply (undo) all patches.
-EOF
-      exit 0 ;;
+    --dry-run) DRY_RUN=1 ;;
+    -h|--help) printf 'Usage: %s [--dry-run]\n' "$0"; exit 0 ;;
     *) drft_die "unknown argument: $1" ;;
   esac
   shift
 done
+[ -d "$DRFT_FOCUS_DIR" ] || drft_die "verified source tree missing; run scripts/fetch.sh first"
 
-if [ ! -d "${DRFT_SRC_DIR}" ]; then
-  drft_die "source tree missing; run scripts/fetch.sh first"
-fi
-
-STAMP="patches-applied"
-if [ "${DRY_RUN}" -eq 0 ] && [ "${REVERSE}" -eq 0 ] && drft_stamp_exists "${STAMP}"; then
-  drft_log "Patches already applied (stamp present). Re-run scripts/fetch.sh --force to reset."
-  exit 0
-fi
-
-# Map patch directory → target dir inside the upstream tree. Anything added
-# here works the same way: drop .patch files in, they get applied.
-declare -A PATCH_TARGETS=(
-  ["focus-android"]="${FOCUS_MODULE_PATH}"
-  ["components"]="mobile/android/android-components"
-  ["tree"]="."
-)
-
-# Order of keys matters: tree-wide patches first (deepest changes), then
-# components, then focus-android (most local).
-PATCH_ORDER=("tree" "components" "focus-android")
-
-apply_one_dir() {
-  local subdir="$1" target_rel="$2"
-  local patch_dir="${DRFT_PATCHES_DIR}/${subdir}"
-  local target_abs="${DRFT_SRC_DIR}/${target_rel}"
-
-  [ -d "${patch_dir}" ] || return 0
-  # Collect *.patch files in lexicographic order.
-  local files=()
-  while IFS= read -r -d '' f; do
-    files+=("$f")
-  done < <(find "${patch_dir}" -maxdepth 1 -name '*.patch' -print0 | sort -z)
-
-  [ "${#files[@]}" -gt 0 ] || return 0
-
-  if [ ! -d "${target_abs}" ]; then
-    drft_die "patch target dir does not exist in source tree: ${target_rel}"
-  fi
-
-  drft_section "Applying ${#files[@]} patch(es) from patches/${subdir} → ${target_rel}"
-
-  local patch_args=("-p1" "--no-backup-if-mismatch")
-  [ "${DRY_RUN}" -eq 1 ] && patch_args+=("--dry-run")
-  [ "${REVERSE}" -eq 1 ] && patch_args+=("--reverse")
-
-  for f in "${files[@]}"; do
-    drft_log "  $(basename "$f")"
-    (cd "${target_abs}" && patch "${patch_args[@]}" < "$f") \
-      || drft_die "patch failed: $f"
-  done
+PATCH_MANIFEST="${DRFT_STATE_DIR}/patches.env"
+patch_digest() {
+  { printf 'revision=%s\n' "$FIREFOX_REV"; find "$DRFT_PATCHES_DIR" -type f -name '*.patch' -print0 | sort -z | while IFS= read -r -d '' f; do printf '%s\0' "${f#"${DRFT_PATCHES_DIR}"/}"; drft_sha256 "$f"; done; } | if command -v sha256sum >/dev/null; then sha256sum | awk '{print $1}'; else shasum -a 256 | awk '{print $1}'; fi
 }
+DIGEST="$(patch_digest)"
+if [ "$DRY_RUN" -eq 0 ] && [ -f "$PATCH_MANIFEST" ] && grep -q "^patch_digest='$DIGEST'$" "$PATCH_MANIFEST"; then drft_log "Reusing matching patch state"; exit 0; fi
+if [ "$DRY_RUN" -eq 0 ] && [ -f "$PATCH_MANIFEST" ]; then drft_die "patch set changed after application; run scripts/fetch.sh --force for an atomic clean reapply"; fi
 
-for key in "${PATCH_ORDER[@]}"; do
-  apply_one_dir "${key}" "${PATCH_TARGETS[$key]}"
-done
-
-if [ "${DRY_RUN}" -eq 0 ] && [ "${REVERSE}" -eq 0 ]; then
-  drft_stamp_set "${STAMP}"
+apply_group() {
+  local group="$1" target="$2" f args=(-p1 --batch --forward --no-backup-if-mismatch)
+  [ "$DRY_RUN" -eq 1 ] && args+=(--dry-run)
+  while IFS= read -r -d '' f; do
+    [ -d "$DRFT_SRC_DIR/$target" ] || drft_die "patch target missing: $target"
+    drft_log "Applying ${f#"${DRFT_PATCHES_DIR}"/}"
+    (cd "$DRFT_SRC_DIR/$target" && patch "${args[@]}" < "$f") || drft_die "patch failed: $f; run scripts/fetch.sh --force to recover"
+  done < <(find "$DRFT_PATCHES_DIR/$group" -maxdepth 1 -type f -name '*.patch' -print0 2>/dev/null | sort -z)
+}
+apply_group tree .
+apply_group components mobile/android/android-components
+apply_group focus-android "$FOCUS_MODULE_PATH"
+if [ "$DRY_RUN" -eq 0 ]; then
+  drft_atomic_write "$PATCH_MANIFEST" <<EOF
+firefox_rev='$FIREFOX_REV'
+patch_digest='$DIGEST'
+EOF
 fi
-drft_log "Patches done."
+drft_log "Patch state verified ($DIGEST)"

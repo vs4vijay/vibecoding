@@ -40,6 +40,10 @@ later.
 
 ## Phase 1 — Make the build harness executable and testable
 
+**Status: Complete (2026-07-23).** `scripts/check.sh` validates Bash syntax,
+configuration grammar/keys, LF endings, workflow YAML, and ShellCheck when
+available. Negative CRLF and missing-key cases pass in `scripts/test.sh`.
+
 ### User-visible outcome
 
 A contributor can clone the repository and run the lightweight script checks on
@@ -80,6 +84,12 @@ begins.
 ---
 
 ## Phase 2 — Establish the local Docker build environment
+
+**Status: Complete (2026-07-23).** The digest-pinned amd64 image builds on the
+ARM host, container checks pass, UID/GID bind mounts are writable, and the
+version probe confirms JDK 17, SDK 36/36.1, build-tools 36.1.0, and NDK
+29.0.14206865. The amd64 platform is explicit because Google's required Linux
+Android binaries are not published for ARM.
 
 ### User-visible outcome
 
@@ -130,6 +140,12 @@ build toolchain without installing Java or Android tooling on the host.
 
 ## Phase 3 — Fetch and prepare a reproducible upstream source tree
 
+**Status: Complete (2026-07-23).** Fetches are atomic and manifest-validated.
+Fixture E2E tests prove reuse, missing-tree invalidation, forced recovery, and
+paths containing spaces. The real pinned 954 MB snapshot was fetched and reused
+without a second download; blobless Git metadata connects the immutable archive
+to Mozilla's matching Taskcluster artifacts.
+
 ### User-visible outcome
 
 Running the Docker fetch command prepares exactly the configured Firefox
@@ -165,6 +181,12 @@ it.
 ---
 
 ## Phase 4 — Build a local Firefox Focus debug APK in Docker
+
+**Status: Complete for the local upstream baseline (2026-07-23).** The pinned
+`focus-android:assembleFocusDebug` build completed all 1,412 Gradle tasks. A
+clean retry and a warm cache run succeeded, and staging now accepts only the
+configured arm64 APK after inspecting its manifest, dex, native Gecko libraries,
+checksum, package metadata, and debug signature.
 
 ### User-visible outcome
 
@@ -209,6 +231,11 @@ requested debug APKs in the host-mounted `dist/` directory.
 
 ## Phase 5 — Install, launch, and smoke-test locally
 
+**Status: Implemented; externally gated (2026-07-23).** Host-side install and
+launch/process/crash checks provide ABI/device diagnostics and capture logcat on
+failure. `adb devices` found no attached emulator/device, so install, launch,
+public-page browsing, and erase-session acceptance remain pending on hardware.
+
 ### User-visible outcome
 
 A contributor can install the generated APK on an emulator or connected device,
@@ -242,6 +269,11 @@ launch Firefox Focus, and verify basic browsing behavior.
 ---
 
 ## Phase 6 — Reproduce the debug build in GitHub Actions
+
+**Status: Complete in repository (2026-07-23).** Validation gates the Docker
+build, source/Gradle caches have bounded revision-aware keys and diagnostics,
+artifacts are verified before upload, permissions are read-only, and timeouts
+are explicit. A hosted run occurs after these changes are pushed.
 
 ### User-visible outcome
 
@@ -281,6 +313,11 @@ the pinned Focus debug variant, and publishes installable APK artifacts.
 
 ## Phase 7 — Harden maintenance and failure recovery
 
+**Status: Complete (2026-07-23).** Fixture tests cover config failure, CRLF,
+empty/changed/ordered patches, source invalidation and space-bearing paths.
+Cleanup, interruption recovery, cache ownership, upstream updates, artifact
+exclusions, Dependabot, and licensing boundaries are documented.
+
 ### User-visible outcome
 
 Upstream revisions can be tested and updated predictably, and common failures
@@ -315,6 +352,12 @@ have documented recovery commands.
 
 ## Phase 8 — Establish a release-capable build
 
+**Status: Complete in repository as intentionally unsigned (2026-07-23).** The
+manual input is allowlisted to `focusRelease`, tag output remains a draft, and
+`verify-signing.sh --expect-unsigned` must prove signing state before checksums
+and source provenance are published. No signing secrets are accepted or exposed;
+the hosted release workflow remains pending a push/manual run.
+
 ### User-visible outcome
 
 A manually triggered workflow can produce a clearly identified, signed or
@@ -343,9 +386,40 @@ explicitly unsigned release candidate without risking accidental publication.
 - A tag workflow creates a draft release with accurate source, revision,
   variant, checksums, and APK attachments.
 
+### Verification record — 2026-07-23
+
+- Host fixture E2E: `bash scripts/test.sh` passed config/CRLF rejection, source
+  reuse/invalidation, paths with spaces, and empty/ordered/changed patch cases.
+- Container validation: `scripts/docker.sh check` and `versions` passed; the
+  image reports Java 17, SDK 36 and 36.1, build-tools 36.1.0, and NDK
+  29.0.14206865.
+- Real source E2E: revision `a077abc2b0f43ed7cc59a8bfcd873e683500d23a`
+  fetched, extracted, acquired matching Mozilla artifacts, and reused its source
+  and Gradle caches.
+- Real build E2E: `focus-android:assembleFocusDebug` succeeded (1,412 tasks),
+  followed by a successful clean retry and warm packaging run.
+- Artifact E2E: exactly one arm64 APK was staged at
+  `dist/focus/debug/focus-android-focus-arm64-v8a-debug.apk`; SHA-256 is
+  `c90c717b47efa13ea3a92c190473fa792ee16713dcd73231590ac7f9f3d5e5d7`.
+  The verifier confirmed Android metadata, dex content, `libxul.so`,
+  `libmozglue.so`, and the manifest checksum. `apksigner` confirmed the debug
+  APK is signed with the Android Debug certificate.
+- Fail-fast E2E: `invalidVariant` was rejected before Gradle started.
+- Final regression pass: host checks, fixture tests, `git diff --check`,
+  container ShellCheck/YAML validation, artifact verification, and explicit
+  signed-state verification all passed after implementation was complete.
+- External gates: no Android device was attached, and repository-local work
+  cannot execute GitHub-hosted CI/release jobs before the changes are pushed.
+  Phases 5, 6, and the hosted portion of Phase 8 retain those explicit gates.
+
 ---
 
 ## Phase 9 — Add DRFT customization infrastructure later
+
+**Status: Correctly gated by the plan (2026-07-23).** No identity patch is
+applied before the upstream baseline is proven locally and in CI. Patch
+ordering, content hashing, target mapping, invalidation, and empty-baseline
+tests are ready for the first reviewable identity patch after that gate.
 
 ### User-visible outcome
 

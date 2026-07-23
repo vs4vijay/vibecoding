@@ -2,6 +2,8 @@
 /build/
 /dist/
 /.cache/
+*.tar.gz
+*.partial
 
 # Local overrides
 /config/versions.local.env

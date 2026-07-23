@@ -1,0 +1,11 @@
+.git
+build
+dist
+.cache
+.idea
+.vscode
+.DS_Store
+config/versions.local.env
+*.jks
+*.keystore
+keystore.properties

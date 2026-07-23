@@ -1,52 +1,23 @@
 # DRFT build scripts
 
-Self-contained POSIX shell scripts. Same commands run locally and in CI.
+The harness requires Bash 4+ and is shared by local Docker builds and CI.
 
-| Script             | What it does                                                    |
-| ------------------ | --------------------------------------------------------------- |
-| `fetch.sh`         | Download + extract `mozilla-firefox/firefox` at `FIREFOX_REV`.  |
-| `patch.sh`         | Apply every `*.patch` under `patches/` to the source tree.      |
-| `build.sh [var]`   | Run `app:assemble<Variant>` via Focus's own gradlew.            |
-| `all.sh [var]`     | `fetch` → `patch` → `build`.                                    |
-| `clean.sh [scope]` | Wipe `build/`, `dist/`, or both.                                |
-| `make.ps1 <cmd>`   | Windows entry point — forwards to bash via Git Bash or WSL.     |
+| Script | Purpose |
+| --- | --- |
+| `check.sh` | Fast syntax, config, line-ending, ShellCheck, and workflow checks. |
+| `test.sh` | Network-free fixture E2E tests for fetch, patch, and failure paths. |
+| `docker.sh` | Build/run the pinned image and manage the Gradle cache. |
+| `fetch.sh` | Atomically fetch the pinned Firefox archive and blobless Git metadata. |
+| `patch.sh` | Apply the ordered, content-addressed patch set. |
+| `build.sh [variant]` | Configure Mozilla artifact mode and assemble an allowlisted Focus variant. |
+| `all.sh [variant]` | Run fetch, patch, and build in order. |
+| `verify-artifacts.sh` | Verify manifest checksums, APK metadata, dex, and Gecko native libraries. |
+| `verify-signing.sh` | Prove that staged APKs are signed or unsigned as expected. |
+| `install.sh` / `smoke.sh` | Install and launch through host-side `adb`. |
+| `clean.sh` | Clean generated build or distribution state. |
 
-## Environment
-
-Everything is driven by `config/versions.env`. Override locally without
-committing by creating `config/versions.local.env` (gitignored):
-
-```
-# config/versions.local.env
-DRFT_VARIANT="focusDebug"
-FIREFOX_REV="<some-other-sha>"     # try a different upstream pin
-```
-
-Runtime knobs (env vars, not config file):
-
-| Variable                 | Effect                                                  |
-| ------------------------ | ------------------------------------------------------- |
-| `DRFT_USE_GRADLE_DAEMON` | `1` to use the Gradle daemon (faster local rebuilds).   |
-| `DRFT_BASH` (Windows)    | Explicit path to bash.exe, skipping autodiscovery.      |
-| `JAVA_HOME`              | Standard Java location. Scripts warn on major mismatch. |
-| `ANDROID_HOME`           | Required. `ANDROID_SDK_ROOT` accepted as alias.         |
-
-## Reuse outside DRFT
-
-The scripts are intentionally driven by `config/versions.env` and don't hard-code
-paths or product names. To use the same harness for another Mozilla-derived
-build:
-
-1. Copy `scripts/`, `config/`, `patches/`.
-2. Edit `versions.env` (`FIREFOX_REV`, `FOCUS_MODULE_PATH`, `DRFT_VARIANT`).
-3. Drop in your own patches under `patches/`.
-
-## Stamps
-
-Long steps leave a marker under `build/.stamps/`:
-
-- `fetch-<FIREFOX_REV>` — sources at this commit are extracted.
-- `patches-applied`     — patches successfully applied on top.
-
-Bumping `FIREFOX_REV` invalidates both. `scripts/fetch.sh --force` forces a
-re-fetch regardless.
+Configuration comes from `config/versions.env`. A gitignored
+`config/versions.local.env` may contain assignment-only local overrides.
+Build outputs and state live under `build/` and `dist/`; the source and patch
+manifests replace presence-only stamps. See the root README for prerequisites,
+external build storage, cache cleanup, device testing, and release behavior.
