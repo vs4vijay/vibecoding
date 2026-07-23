@@ -2,7 +2,7 @@
 
 ## Vertical Slice Development Plan
 
-**Status:** Phase 0 complete — awaiting approval to begin Phase 1  
+**Status:** Phase 1 complete — awaiting approval to begin Phase 2  
 **Target:** Polished 30–45 minute public demo  
 **Development model:** Solo developer with AI assistance  
 **Schedule:** 20 weeks of planned production plus 4 weeks of contingency  
@@ -485,6 +485,7 @@ At the end of the demo, provide an optional external survey asking:
 
 **Duration:** Weeks 4–7  
 **Goal:** Produce a complete mechanics-only heist loop.
+**Implementation status:** ✅ Complete (2026-07-23)
 
 ### Deliverables
 
@@ -514,6 +515,39 @@ At the end of the demo, provide an optional external survey asking:
 - Use only two security behaviors.
 - Do not add weapons, health, enemy combat, or skill trees.
 - Prefer authored graph puzzles over procedural network generation.
+
+### Phase 1 implementation record
+
+- Added a data-driven `NetworkGraph` resource with typed ports, deterministic
+  traversal, reachability checks, metadata, snapshots, and dictionary
+  serialization.
+- Added `RewireCommand` preview, validation, affected-node reporting, commit,
+  and exact cancel restoration.
+- Added graph-routed patrol visualization and trace pulses, with three alert
+  tiers controlling security speed and edit tolerance.
+- Added network anchors that restore player position and committed topology
+  after detection without reloading the mission.
+- Added evidence collection, deterministic player-selectable memory corruption,
+  and the no-memory fallback that closes an optional safe route.
+- Added a versioned `GameState` covering preparation, checkpoint, topology,
+  alert, memories, branch flags, and final choice, plus JSON save/load with
+  unknown-schema rejection.
+- Added an in-game debug overlay for active connections, patrol routing, trace
+  propagation, security speed, and edit tolerance.
+- Added a complete mechanics-only mission with credential and hardware-backdoor
+  routes; both reach containment at maximum alert.
+- Automated Phase 1 suite: 27 passed, 0 failed, covering graph invariants,
+  rewire preview/cancel/commit, trace propagation, corruption, fallback
+  consequences, alert escalation, checkpoint restoration, branching routes,
+  schema validation, and save serialization.
+- Firefox Web E2E at 1280×720 completed the identity route with both memories
+  and the backdoor route after a no-memory trace; both runs reached containment
+  with no browser errors. The only console warnings were engine-level
+  WebAssembly/WebGL advisories.
+- Windows x64 export validated as a PE32+ executable and the single-threaded Web
+  export loaded successfully.
+- Phase 1 scope protections held: only patrols and traces were implemented, with
+  no combat, health, weapons, procedural generation, or progression systems.
 
 ---
 

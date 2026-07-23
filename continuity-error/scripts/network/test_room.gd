@@ -22,7 +22,7 @@ var fps_samples: Array[float] = []
 
 func _ready() -> void:
 	_build_graph()
-	patrol_position = graph.nodes["trace"]
+	patrol_position = graph.node_position("trace")
 	_recalculate_patrol()
 	queue_redraw()
 
@@ -133,7 +133,7 @@ func _port_at(position: Vector2) -> String:
 
 func _port_position(id: String) -> Vector2:
 	var port: Dictionary = graph.ports[id]
-	var node_position: Vector2 = graph.nodes[port.node]
+	var node_position: Vector2 = graph.node_position(port.node)
 	var same_node: Array = graph.ports.keys().filter(func(key): return graph.ports[key].node == port.node)
 	var offset_index := same_node.find(id)
 	var angle := -0.5 + offset_index * 1.0
@@ -148,7 +148,7 @@ func _recalculate_patrol() -> void:
 func _move_patrol(delta: float) -> void:
 	if patrol_route.is_empty():
 		return
-	var target: Vector2 = graph.nodes[patrol_route[patrol_route_index]]
+	var target: Vector2 = graph.node_position(patrol_route[patrol_route_index])
 	patrol_position = patrol_position.move_toward(target, PATROL_SPEED * delta)
 	if patrol_position.distance_to(target) < 2:
 		patrol_route_index = (patrol_route_index + 1) % patrol_route.size()
@@ -164,7 +164,7 @@ func _draw() -> void:
 		var valid: bool = graph.validate_connection(drag_port, hover_port).valid if hover_port != "" else false
 		draw_line(_port_position(drag_port), mouse, Color("#66ffb2") if valid else Color("#ff5577"), 4)
 	for id in node_order:
-		var position: Vector2 = graph.nodes[id]
+		var position: Vector2 = graph.node_position(id)
 		var diamond := PackedVector2Array([position + Vector2(0, -NODE_RADIUS), position + Vector2(NODE_RADIUS, 0), position + Vector2(0, NODE_RADIUS), position + Vector2(-NODE_RADIUS, 0)])
 		draw_colored_polygon(diamond, Color("#182448"))
 		draw_polyline(PackedVector2Array([diamond[0], diamond[1], diamond[2], diamond[3], diamond[0]]), Color("#526ca8"), 3)

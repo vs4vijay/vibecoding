@@ -1,10 +1,10 @@
 ; Engine configuration file.
-; Continuity Error — Phase 0 risk-validation prototype.
+; Continuity Error — mechanics-only vertical slice.
 config_version=5
 
 [application]
 config/name="Continuity Error"
-run/main_scene="res://scenes/test_room.tscn"
+run/main_scene="res://scenes/heist_room.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [display]
@@ -29,4 +29,3 @@ topology_edit={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":
 cancel={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194305)]}
 camera_zoom_in={"deadzone":0.2,"events":[Object(InputEventMouseButton,"button_index":4)]}
 camera_zoom_out={"deadzone":0.2,"events":[Object(InputEventMouseButton,"button_index":5)]}
-
