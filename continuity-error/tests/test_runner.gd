@@ -7,6 +7,7 @@ const MissionStateScript = preload("res://scripts/security/mission_state.gd")
 const SaveServiceScript = preload("res://scripts/autoload/save_service.gd")
 const DialogueCatalogScript = preload("res://scripts/narrative/dialogue_catalog.gd")
 const VerticalSliceScene = preload("res://scenes/vertical_slice.tscn")
+const Phase0Scene = preload("res://scenes/phase0_feasibility.tscn")
 
 var failures := 0
 var checks := 0
@@ -38,6 +39,7 @@ func build_line_graph() -> NetworkGraph:
 	return graph
 
 func _run() -> void:
+	await _test_phase0_feasibility()
 	await _test_graph_and_rewire()
 	await _test_corruption_and_security()
 	await _test_serialization()
@@ -45,6 +47,23 @@ func _run() -> void:
 	await _test_phase_2_vertical_slice()
 	print("RESULT: %d passed, %d failed" % [checks - failures, failures])
 	quit(1 if failures else 0)
+
+func _test_phase0_feasibility() -> void:
+	var slice := Phase0Scene.instantiate()
+	root.add_child(slice)
+	await process_frame
+	check(slice.NODE_POSITIONS.size() == 6, "Phase 0 graph exposes exactly six authored nodes")
+	var before: Array = slice.graph_snapshot()
+	var rejected: Dictionary = slice.try_rewire("A", "E")
+	check(not rejected.valid and slice.graph_snapshot() == before, "Phase 0 invalid edit preserves graph state")
+	slice.set_edit_mode(true)
+	check(is_equal_approx(Engine.time_scale, 0.22), "Phase 0 edit mode slows simulation")
+	slice.set_edit_mode(false)
+	check(is_equal_approx(Engine.time_scale, 1.0), "Phase 0 leaving edit mode restores simulation speed")
+	var accepted: Dictionary = slice.try_rewire("B", "F")
+	check(accepted.valid and slice.patrol_route == ["A", "B", "F", "E"], "Phase 0 valid edit visibly reroutes patrol")
+	slice.queue_free()
+	await process_frame
 
 func _test_graph_and_rewire() -> void:
 	var graph := build_line_graph()

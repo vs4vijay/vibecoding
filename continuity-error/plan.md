@@ -14,7 +14,7 @@
 ## Development Guidelines
 
 - Make use of godot ai mcp server
-- build for web first, but keep in mind that macos, windows and android would come later.
+- build for web first (chromium for now), but keep in mind that macos, windows and android would come later.
 
 ---
 
@@ -470,7 +470,18 @@ The existing 2D prototype is reference material for mechanics, narrative flow, a
 
 **Duration:** Weeks 1–3  
 **Goal:** Prove that the core interaction is readable, performant, and technically viable as a true 3D browser game before producing content.  
-**Implementation status:** Not started
+**Implementation status:** Complete — verified 2026-07-24
+
+### Phase 0 verification record
+
+- Production entry point is now `scenes/phase0_feasibility.tscn`; the legacy 2D prototype remains intact as reference material.
+- Automated suite: 109 checks passed, 0 failed, including six-node topology, invalid-edit rollback, slowed-time edit mode, and deterministic patrol rerouting.
+- Single-threaded Compatibility-renderer Web export completed through `scripts/build.sh`.
+- Exported build loaded a live WebGL canvas at 1280×720 in Playwright-managed Chromium and Firefox with zero console errors.
+- Browser screenshots: `.screenshots/phase0-chromium.png`, `.screenshots/phase0-firefox.png`, and `.screenshots/phase0-edit-mode.png`.
+- Reference runtime benchmark: 60 FPS in both exported browser captures; native diagnostic sample reported 43 draw calls, 74,206 visible primitives, 173 render objects, and 55,951,656 bytes static memory.
+- Initial uncompressed export: 39 MB total (39,513,091-byte WASM and 857,872-byte PCK). Compression/hosting optimization remains a Phase 4 concern.
+- Branded Google Chrome was unavailable on the reference machine; its Playwright-managed Chromium equivalent passed. Firefox passed directly.
 
 ### Deliverables
 
@@ -513,7 +524,7 @@ The existing 2D prototype is reference material for mechanics, narrative flow, a
 
 **Duration:** Weeks 4–7  
 **Goal:** Produce a complete mechanics-only heist loop.
-**Implementation status:** Blocked on Phase 0
+**Implementation status:** Ready to start after user approval
 
 ### Deliverables
 
