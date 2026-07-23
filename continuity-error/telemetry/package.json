@@ -1,0 +1,13 @@
+{
+  "name": "continuity-error-telemetry",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "*",
+    "typescript": "^5.9.2"
+  }
+}

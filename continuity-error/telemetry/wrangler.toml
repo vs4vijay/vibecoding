@@ -1,0 +1,8 @@
+name = "continuity-error-telemetry"
+main = "src/index.ts"
+compatibility_date = "2026-07-24"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "continuity-error-events"
+database_id = "REPLACE_DURING_DEPLOYMENT"

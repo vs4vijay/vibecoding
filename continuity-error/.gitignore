@@ -1,5 +1,6 @@
 .godot/
 build/
+telemetry/node_modules/
+telemetry/.wrangler/
 .playwright-cli/
 *.log
-

@@ -11,6 +11,7 @@ const Phase0Scene = preload("res://scenes/phase0_feasibility.tscn")
 const Phase1Scene = preload("res://scenes/phase1_core_heist.tscn")
 const Phase2Scene = preload("res://scenes/phase2_graybox_vertical_slice.tscn")
 const Phase3Scene = preload("res://scenes/phase3_presentation_vertical_slice.tscn")
+const Phase4Scene = preload("res://scenes/phase4_release_vertical_slice.tscn")
 
 var failures := 0
 var checks := 0
@@ -51,6 +52,7 @@ func _run() -> void:
 	await _test_phase_2_vertical_slice()
 	await _test_phase_2_3d_vertical_slice()
 	await _test_phase_3_presentation_slice()
+	await _test_phase_4_release_slice()
 	await process_frame
 	print("RESULT: %d passed, %d failed" % [checks - failures, failures])
 	quit(1 if failures else 0)
@@ -293,3 +295,43 @@ func _test_phase_3_presentation_slice() -> void:
 			check(slice.get_node("HubWorld").get_node_or_null("ExtractionEffect") != null, "Phase 3 ending has a choice-reactive extraction effect")
 			slice.queue_free()
 			await process_frame
+
+func _test_phase_4_release_slice() -> void:
+	var slice := Phase4Scene.instantiate()
+	root.add_child(slice)
+	await process_frame
+	await process_frame
+	var release: Dictionary = slice.release_snapshot()
+	check(release.responsive and release.touch_safe, "Phase 4 provides responsive and touch-safe browser UI")
+	check(release.pause_flow and release.save_recovery, "Phase 4 provides loading, pause, settings, restart, and save-recovery flows")
+	check(str(release.survey).begins_with("https://"), "Phase 4 credits expose an optional external survey")
+	slice.choose_telemetry(false)
+	check(not slice.telemetry.record("session_started") and slice.telemetry.request_count == 0, "Declining telemetry produces no event requests")
+	slice.choose_telemetry(true)
+	check(slice.telemetry.record("scene_entered", {"scene": "hub", "email": "must-be-dropped"}), "Opted-in telemetry accepts a whitelisted event")
+	check(not slice.telemetry.record("unknown_event"), "Telemetry rejects unknown events")
+	check(not slice.telemetry.queued_events[0].payload.has("email"), "Telemetry strips personal and free-form payload fields")
+	check(not slice.telemetry.flush() and slice.telemetry.request_count == 0, "Offline or unconfigured telemetry is non-blocking")
+	slice.apply_accessibility({
+		"ui_scale": 1.25,
+		"subtitle_scale": 1.4,
+		"reduced_motion": true,
+		"reduced_flashing": true,
+		"high_contrast_topology": true,
+		"music_level": 0.0,
+		"effects_level": 0.5,
+		"voice_level": 0.75,
+	})
+	var settings: Dictionary = slice.release_snapshot().settings
+	check(settings.ui_scale == 1.25 and settings.subtitle_scale == 1.4, "UI and subtitles scale independently")
+	check(settings.reduced_motion and settings.reduced_flashing and settings.high_contrast_topology, "Motion, flashing, and topology accessibility settings apply")
+	var remap := InputEventKey.new()
+	remap.physical_keycode = KEY_Q
+	check(slice.accessibility.remap_action("interact", remap), "Keyboard actions can be remapped")
+	slice.save_failure_simulated = true
+	check(not slice.save_with_feedback() and slice.save_notice.visible, "Browser storage failure produces a clear recoverable message")
+	for viewport_size in [Vector2i(1280, 720), Vector2i(1920, 1080), Vector2i(2560, 1080), Vector2i(1024, 768)]:
+		slice._apply_responsive_layout(Vector2(viewport_size))
+		check(slice.get_node("HUD/DialoguePanel").offset_right <= viewport_size.x, "Responsive UI stays within %dx%d viewport" % [viewport_size.x, viewport_size.y])
+	slice.queue_free()
+	await process_frame

@@ -696,7 +696,24 @@ At the end of this phase:
 
 **Duration:** Weeks 17–20  
 **Goal:** Convert the content-complete slice into a reliable public demo.
-**Implementation status:** Ready to start after user approval
+**Implementation status:** Complete — verified 2026-07-24
+
+### Phase 4 verification record
+
+- Production entry point is now `scenes/phase4_release_vertical_slice.tscn`, layered over the locked Phase 3 presentation.
+- All gameplay actions are represented in the InputMap. Keyboard and mouse bindings can be remapped at runtime.
+- Accessibility state supports independent UI and subtitle scaling, reduced motion, reduced flashing, high-contrast topology, and separate music/effects/voice levels.
+- Loading, telemetry consent, pause, settings, restart, recoverable save-failure feedback, touch-safe controls, credits, and optional survey flows are present.
+- Responsive layout checks pass at 1280×720, 1920×1080, 2560×1080 ultrawide, and 1024×768 tablet-shaped viewports.
+- Telemetry remains disabled until explicit consent. Declining produces zero event requests; unknown events and non-whitelisted payload fields are rejected; missing endpoints and failed delivery do not interrupt play.
+- The Cloudflare Worker/D1 implementation includes origin enforcement, a 64 KiB request limit, event/payload validation, batch insertion, a 30-day expiry schema, and a retention deletion task under `telemetry/`.
+- Automated Godot suite: 332 checks passed, 0 failed. Worker validation: 2 checks passed, 0 failed. TypeScript strict typecheck passed.
+- Single-threaded Compatibility-renderer Web export completed through `scripts/build.sh`: 39,513,091-byte WASM, 939,964-byte PCK, and 279,815-byte loader JavaScript before transport compression.
+- Exported Chromium completed identity/free from consent to credits at 1280×720 with zero console errors or warnings and no telemetry request after declining consent.
+- Exported Firefox completed backdoor/contain from consent to credits at 1024×768 with zero console errors. Firefox emitted the same three non-fatal engine/WebGL compatibility warnings recorded in prior phases.
+- Browser screenshots: `.screenshots/phase4-consent-chromium.png`, `.screenshots/phase4-hub-chromium.png`, `.screenshots/phase4-complete-chromium.png`, and `.screenshots/phase4-complete-firefox.png`.
+- The scene launched live through the connected Godot 4.7.1 editor. The current game-run log contains no errors or warnings; two older retained editor parse diagnostics predate this run and do not reproduce in headless tests, exports, either browser, or the current game log.
+- Production hosting and the real D1 identifier/origin are intentionally deployment-time values; the build and Worker are release-ready without embedding credentials in source.
 
 ### Deliverables
 
@@ -727,7 +744,7 @@ At the end of this phase:
 
 **Duration:** Weeks 21–24  
 **Goal:** Use the contingency window for evidence-driven polish and release.
-**Implementation status:** Blocked on Phase 4
+**Implementation status:** Ready to start after user approval
 
 ### Playtest rounds
 
