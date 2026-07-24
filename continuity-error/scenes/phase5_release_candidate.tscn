@@ -1,0 +1,7 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/phase4_release_vertical_slice.tscn" id="1"]
+[ext_resource type="Script" path="res://scripts/phase5/release_candidate_3d.gd" id="2"]
+
+[node name="Phase5ReleaseCandidate" instance=ExtResource("1")]
+script = ExtResource("2")

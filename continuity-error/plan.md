@@ -744,7 +744,20 @@ At the end of this phase:
 
 **Duration:** Weeks 21–24  
 **Goal:** Use the contingency window for evidence-driven polish and release.
-**Implementation status:** Ready to start after user approval
+**Implementation status:** Release-candidate tooling implemented; external playtest rounds pending
+
+### Phase 5 implementation record
+
+- Production entry point is now `scenes/phase5_release_candidate.tscn`, identified in-game and in the Web shell as `rc1-2026.07.24`.
+- Each run receives an anonymous local session ID and records bounded launch-to-credits milestone timings, route, ending, alert/evidence state, and predefined issue codes without names, contact details, recordings, or free-form text.
+- Completed sessions save a local JSON report automatically; `F8` supports early-session report capture.
+- `docs/PLAYTEST_PROTOCOL.md` defines the three independent rounds, observation boundaries, browser matrix, honest aggregation formulas, privacy rules, and release gates.
+- Automated suite: 396 checks passed, 0 failed. Coverage includes all four route/ending combinations, bounded issue codes, milestone capture, privacy flags, and local report generation. Automated success does not count as external playtest evidence.
+- Single-threaded Compatibility-renderer Web export completed through `scripts/build.sh`: 39,513,091-byte WASM, 948,668-byte PCK, and 279,815-byte loader JavaScript. The build script now rejects missing or empty artifacts, including disk-exhaustion failures that Godot's exporter may not surface.
+- Exported Chromium completed identity/free from consent to credits at 1280×720 with a live WebGL 2 canvas, zero console errors or warnings, zero telemetry event requests after declining consent, and a visible confirmation that the anonymous playtest report was saved.
+- Browser screenshots: `.screenshots/phase5-consent-chromium.png`, `.screenshots/phase5-hub-chromium.png`, `.screenshots/phase5-heist-chromium.png`, `.screenshots/phase5-extraction-chromium.png`, and `.screenshots/phase5-complete-chromium.png`.
+- The release-candidate scene launched live through the connected Godot 4.7.1 editor. The current game-run log contained no errors or warnings; two retained editor parse diagnostics predate the run and do not reproduce in the 396-check headless suite, Web export, Chromium run, or current game log.
+- External gates remain pending: at least ten first-time players across the comprehension and narrative rounds, followed by the Web release-candidate matrix. The phase must not be marked complete until genuine results satisfy every release gate.
 
 ### Playtest rounds
 

@@ -12,6 +12,7 @@ const Phase1Scene = preload("res://scenes/phase1_core_heist.tscn")
 const Phase2Scene = preload("res://scenes/phase2_graybox_vertical_slice.tscn")
 const Phase3Scene = preload("res://scenes/phase3_presentation_vertical_slice.tscn")
 const Phase4Scene = preload("res://scenes/phase4_release_vertical_slice.tscn")
+const Phase5Scene = preload("res://scenes/phase5_release_candidate.tscn")
 
 var failures := 0
 var checks := 0
@@ -53,6 +54,7 @@ func _run() -> void:
 	await _test_phase_2_3d_vertical_slice()
 	await _test_phase_3_presentation_slice()
 	await _test_phase_4_release_slice()
+	await _test_phase_5_release_candidate()
 	await process_frame
 	print("RESULT: %d passed, %d failed" % [checks - failures, failures])
 	quit(1 if failures else 0)
@@ -335,3 +337,39 @@ func _test_phase_4_release_slice() -> void:
 		check(slice.get_node("HUD/DialoguePanel").offset_right <= viewport_size.x, "Responsive UI stays within %dx%d viewport" % [viewport_size.x, viewport_size.y])
 	slice.queue_free()
 	await process_frame
+
+func _test_phase_5_release_candidate() -> void:
+	for route in ["identity", "backdoor"]:
+		for ending in ["free", "contain"]:
+			var slice := Phase5Scene.instantiate()
+			root.add_child(slice)
+			await process_frame
+			await process_frame
+			var candidate: Dictionary = slice.candidate_snapshot()
+			check(str(candidate.build_id).begins_with("rc"), "Phase 5 exposes a visible release-candidate build identifier")
+			check(not str(candidate.session_id).is_empty() and not candidate.personal_data, "Phase 5 creates an anonymous local playtest session")
+			slice.choose_telemetry(false)
+			_drain_dialogue(slice)
+			for contact in range(3):
+				check(slice.visit_contact(contact), "Phase 5 contact %d remains functional" % contact)
+				_drain_dialogue(slice)
+			check(slice.begin_preparation() and slice.select_preparation(route), "Phase 5 selects %s preparation" % route)
+			_drain_dialogue(slice)
+			_drain_dialogue(slice)
+			for step in range(4):
+				check(slice.advance_heist(), "Phase 5 %s advances zone %d/5" % [route, step + 2])
+				_drain_dialogue(slice)
+				if slice.stage == slice.Stage.HEIST and slice.heist.mission.player_node in ["stacks", "quarantine"]:
+					slice.collect_evidence()
+			check(slice.select_ending(ending), "Phase 5 supports %s ending" % ending)
+			_drain_dialogue(slice)
+			var report: Dictionary = slice.playtest_report()
+			check(report.completed and report.preparation == route and report.ending == ending, "Phase 5 %s/%s report captures completion branch" % [route, ending])
+			check(report.milestones.has("launch") and report.milestones.has("credits"), "Phase 5 report captures launch-to-credits milestones")
+			check(report.contains_personal_data == false, "Phase 5 report explicitly excludes personal data")
+			check(not slice.add_session_note("free-form text") and slice.add_session_note("technical_issue"), "Phase 5 accepts only bounded issue codes")
+			var path := "user://phase5-test-%s-%s.json" % [route, ending]
+			check(slice.save_playtest_report(path) and FileAccess.file_exists(path), "Phase 5 writes a local anonymous playtest report")
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+			slice.queue_free()
+			await process_frame

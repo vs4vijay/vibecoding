@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Continuity Error"
-run/main_scene="res://scenes/phase4_release_vertical_slice.tscn"
+run/main_scene="res://scenes/phase5_release_candidate.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [autoload]
