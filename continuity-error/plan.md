@@ -760,6 +760,7 @@ At the end of this phase:
 - Phase 5 was re-audited on 2026-07-24: 396 Godot checks, 2 Worker checks, and the strict TypeScript typecheck passed; the single-threaded Web export rebuilt successfully.
 - A fresh exported Chromium smoke test loaded the WebGL 2 canvas at 1280×720 with zero console errors or warnings and successful WASM/PCK requests. Screenshot: `.screenshots/phase5-verification-chromium.png`.
 - The smoke test exposed and fixed an RC build-label overlap with the bottom status strip; the build and report labels now use responsive top-edge anchors, and the corrected export was recaptured.
+- Phase 5 was independently re-verified on 2026-07-24 before external testing: 396 Godot checks, 2 Worker checks, the strict TypeScript typecheck, and a fresh single-threaded Web export all passed. An exported Chromium identity/free run declined telemetry, met all contacts, committed a rewire, collected both evidence shards, resolved a trace, reached credits, and saved its anonymous local report with zero console errors or warnings and no telemetry event request. Audit screenshots: `.screenshots/phase5-audit-consent-chromium.png`, `.screenshots/phase5-audit-hub-chromium.png`, `.screenshots/phase5-audit-heist-chromium.png`, and `.screenshots/phase5-audit-complete-chromium.png`.
 - External gates remain pending: at least ten first-time players across the comprehension and narrative rounds, followed by the Web release-candidate matrix. The phase must not be marked complete until genuine results satisfy every release gate.
 
 ### Playtest rounds
