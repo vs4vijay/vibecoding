@@ -2,7 +2,7 @@
 
 ## Vertical Slice Development Plan
 
-**Status:** Planning reset for a true 3D, Web-first vertical slice — implementation not started  
+**Status:** Phases 0–4 complete; Phase 5 release-candidate tooling complete; external playtest rounds pending  
 **Target:** Polished 30–45 minute public demo  
 **Development model:** Solo developer with AI assistance  
 **Schedule:** 20 weeks of planned production plus 4 weeks of contingency  
@@ -761,6 +761,7 @@ At the end of this phase:
 - A fresh exported Chromium smoke test loaded the WebGL 2 canvas at 1280×720 with zero console errors or warnings and successful WASM/PCK requests. Screenshot: `.screenshots/phase5-verification-chromium.png`.
 - The smoke test exposed and fixed an RC build-label overlap with the bottom status strip; the build and report labels now use responsive top-edge anchors, and the corrected export was recaptured.
 - Phase 5 was independently re-verified on 2026-07-24 before external testing: 396 Godot checks, 2 Worker checks, the strict TypeScript typecheck, and a fresh single-threaded Web export all passed. An exported Chromium identity/free run declined telemetry, met all contacts, committed a rewire, collected both evidence shards, resolved a trace, reached credits, and saved its anonymous local report with zero console errors or warnings and no telemetry event request. Audit screenshots: `.screenshots/phase5-audit-consent-chromium.png`, `.screenshots/phase5-audit-hub-chromium.png`, `.screenshots/phase5-audit-heist-chromium.png`, and `.screenshots/phase5-audit-complete-chromium.png`.
+- Phase 5 engineering verification was refreshed on 2026-07-24 at the phase gate: all 396 Godot checks passed with zero failures and the single-threaded Web export rebuilt successfully. The exported Chromium WebGL 2 build completed the identity/free path from consent through locally saved anonymous report with zero console errors or warnings and no telemetry request after consent was declined. Fresh screenshots: `.screenshots/phase5-fresh-consent-chromium.png`, `.screenshots/phase5-fresh-hub-chromium.png`, `.screenshots/phase5-fresh-route-chromium.png`, `.screenshots/phase5-fresh-heist-chromium.png`, `.screenshots/phase5-fresh-extraction-chromium.png`, and `.screenshots/phase5-fresh-complete-chromium.png`. The production main scene also launched through the connected Godot 4.7.1 editor with a clean current-run game log.
 - External gates remain pending: at least ten first-time players across the comprehension and narrative rounds, followed by the Web release-candidate matrix. The phase must not be marked complete until genuine results satisfy every release gate.
 
 ### Playtest rounds
