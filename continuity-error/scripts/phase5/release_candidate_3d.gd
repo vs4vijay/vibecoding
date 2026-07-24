@@ -130,10 +130,10 @@ func _build_candidate_ui() -> void:
 	report_notice.visible = false
 	$HUD.add_child(report_notice)
 
-func _mark_milestone(name: String) -> void:
-	if milestones.has(name):
+func _mark_milestone(milestone_name: String) -> void:
+	if milestones.has(milestone_name):
 		return
-	milestones[name] = maxi(0, Time.get_ticks_msec() - playtest_started_msec)
+	milestones[milestone_name] = maxi(0, Time.get_ticks_msec() - playtest_started_msec)
 
 func _make_session_id() -> String:
 	return "%08x-%08x" % [randi(), Time.get_ticks_msec()]
