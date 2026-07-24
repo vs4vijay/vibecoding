@@ -49,3 +49,34 @@ Count only unassisted first attempts.
 The release gate cannot be marked passed from automated runs or synthetic
 reports. Archive the anonymous reports and a dated aggregate, never participant
 identities.
+
+## Aggregate the evidence
+
+After adding the observer assessment object to each anonymous report, generate
+the dated aggregate with:
+
+```bash
+rtk bun scripts/aggregate_playtests.ts playtest-reports/*.json > playtest-aggregate.json
+```
+
+The command exits successfully only when all human-sample gates pass. It rejects
+duplicate sessions, synthetic evidence, unknown fields, personal-data flags,
+assisted attempts, and reports from any other build. Keep the raw reports and
+aggregate outside the public repository.
+
+The required assessment shape is:
+
+```json
+{
+  "round": "comprehension",
+  "unassisted_first_attempt": true,
+  "explained_rewire": true,
+  "recognized_corruption": true,
+  "blocker": false,
+  "save_corruption": false,
+  "unwinnable": false
+}
+```
+
+For narrative sessions, use `"round": "narrative"` and add `asha_credible` and
+`choice_informed` with `yes`, `no`, or `uncertain`.
