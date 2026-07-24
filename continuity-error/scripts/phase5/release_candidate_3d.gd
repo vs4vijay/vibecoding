@@ -113,14 +113,16 @@ func _build_candidate_ui() -> void:
 	build_label = Label.new()
 	build_label.name = "BuildLabel"
 	build_label.text = "RELEASE CANDIDATE // %s" % BUILD_ID.to_upper()
-	build_label.position = Vector2(24, 674)
+	build_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	build_label.position = Vector2(24, 2)
 	build_label.add_theme_font_size_override("font_size", 12)
 	build_label.add_theme_color_override("font_color", Color("55dbea"))
 	$HUD.add_child(build_label)
 
 	report_notice = Label.new()
 	report_notice.name = "ReportNotice"
-	report_notice.position = Vector2(760, 674)
+	report_notice.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	report_notice.position = Vector2(-520, 2)
 	report_notice.size = Vector2(496, 24)
 	report_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	report_notice.add_theme_font_size_override("font_size", 12)

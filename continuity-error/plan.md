@@ -757,6 +757,9 @@ At the end of this phase:
 - Exported Chromium completed identity/free from consent to credits at 1280×720 with a live WebGL 2 canvas, zero console errors or warnings, zero telemetry event requests after declining consent, and a visible confirmation that the anonymous playtest report was saved.
 - Browser screenshots: `.screenshots/phase5-consent-chromium.png`, `.screenshots/phase5-hub-chromium.png`, `.screenshots/phase5-heist-chromium.png`, `.screenshots/phase5-extraction-chromium.png`, and `.screenshots/phase5-complete-chromium.png`.
 - The release-candidate scene launched live through the connected Godot 4.7.1 editor. The current game-run log contained no errors or warnings; two retained editor parse diagnostics predate the run and do not reproduce in the 396-check headless suite, Web export, Chromium run, or current game log.
+- Phase 5 was re-audited on 2026-07-24: 396 Godot checks, 2 Worker checks, and the strict TypeScript typecheck passed; the single-threaded Web export rebuilt successfully.
+- A fresh exported Chromium smoke test loaded the WebGL 2 canvas at 1280×720 with zero console errors or warnings and successful WASM/PCK requests. Screenshot: `.screenshots/phase5-verification-chromium.png`.
+- The smoke test exposed and fixed an RC build-label overlap with the bottom status strip; the build and report labels now use responsive top-edge anchors, and the corrected export was recaptured.
 - External gates remain pending: at least ten first-time players across the comprehension and narrative rounds, followed by the Web release-candidate matrix. The phase must not be marked complete until genuine results satisfy every release gate.
 
 ### Playtest rounds
