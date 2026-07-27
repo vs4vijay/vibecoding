@@ -67,24 +67,24 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| IMPR-01 | TBD | Pending |
-| IMPR-02 | TBD | Pending |
-| IMPR-03 | TBD | Pending |
-| IMPR-04 | TBD | Pending |
-| IMPR-05 | TBD | Pending |
-| IMPR-06 | TBD | Pending |
-| BROW-01 | TBD | Pending |
-| BROW-02 | TBD | Pending |
-| BROW-03 | TBD | Pending |
-| BROW-04 | TBD | Pending |
-| SRCH-01 | TBD | Pending |
-| SRCH-02 | TBD | Pending |
-| SRCH-03 | TBD | Pending |
+| IMPR-01 | Phase 3 | Pending |
+| IMPR-02 | Phase 3 | Pending |
+| IMPR-03 | Phase 3 | Pending |
+| IMPR-04 | Phase 1 | Pending |
+| IMPR-05 | Phase 3 | Pending |
+| IMPR-06 | Phase 2 | Pending |
+| BROW-01 | Phase 4 | Pending |
+| BROW-02 | Phase 4 | Pending |
+| BROW-03 | Phase 4 | Pending |
+| BROW-04 | Phase 4 | Pending |
+| SRCH-01 | Phase 5 | Pending |
+| SRCH-02 | Phase 5 | Pending |
+| SRCH-03 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13 ⚠️
+- Mapped to phases: 13
+- Unmapped: 0 ✅
 
 ---
 
