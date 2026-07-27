@@ -6,7 +6,7 @@ A collection of AI-assisted projects built with vibe coding - the art of coding 
 
 ## AI Coding Agents, Skills, and Tools uses
 
-These projects were built using:
+These projects were built using various coding harnesses:
 
 ### OpenCode
 
@@ -14,15 +14,17 @@ https://github.com/anomalyco/opencode
 
 The open source AI coding agent. A powerful terminal-based AI assistant for developers, providing intelligent coding assistance directly in your terminal. Supports multiple AI providers including OpenAI, Anthropic Claude, Google Gemini, and more.
 
-### Oh My OpenCode
-
-https://github.com/code-yeongyu/oh-my-opencode
-
-The best agent harness - a plugin that transforms OpenCode into a powerful multi-agent orchestration system with specialized agents (Sisyphus, Oracle, Librarian, etc.), MCP support, and parallel execution capabilities.
-
 ```bash
 OPENCODE_SERVER_USERNAME=viz OPENCODE_SERVER_PASSWORD=VerySecurePasswordHere opencode web --hostname 0.0.0.0 --port 3030 --mdns --mdns-domain vizcode.local
 ```
+
+### Oh My OpenCode
+
+https://github.com/code-yeongyu/oh-my-opencode
+https://github.com/code-yeongyu/oh-my-openagent
+
+The best agent harness - a plugin that transforms OpenCode into a powerful multi-agent orchestration system with specialized agents (Sisyphus, Oracle, Librarian, etc.), MCP support, and parallel execution capabilities.
+
 
 ### Pi Coding Agent
 
@@ -39,6 +41,8 @@ export LLAMA_SERVER_URL=http://127.0.0.1:1100 # or change in ~/.pi/agents/settin
 
 ### Oh-my-Pi
 
+- https://omp.sh/
+
 ```bash
 bun install -g @oh-my-pi/pi-coding-agent
 
@@ -50,6 +54,8 @@ bun install -g @oh-my-pi/pi-coding-agent
 
 - rtk-ai
 - gnhf - `bun add -g gnhf`
+- gsd
+- omniroute - `bun add -g omniroute`
 - android-cli - https://developer.android.com/tools/agents/android-cli
 
 ### Skills used
@@ -124,6 +130,12 @@ codex mcp add deepwiki --url https://mcp.deepwiki.com/mcp
 
 ```
 uv tool install -U batrachian-toad
+
+OmniRoute
+
+CLIProxyAPI
+
+codewhale
 
 ```
 
