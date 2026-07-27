@@ -462,21 +462,18 @@ export function detectCapWarning(
 
 **Total assumptions:** 3 (all LOW risk, with documented mitigations).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should the parser accept a `locale` hint parameter?**
+1. **RESOLVED — Should the parser accept a `locale` hint parameter?**
    - What we know: 14 format families exist. Some dates are ambiguous (both values ≤12).
-   - What's unclear: The heuristic (AM/PM → US first, no AM/PM → day-first) works for the benchmark but may fail for specific locale combinations.
    - Recommendation: Accept an optional `{ locale?: string }` options parameter. Implement heuristic as default. Document the limitation in the type signature. User can pass `locale: 'en-US'` to force month-first interpretation.
 
-2. **SHA-256 vs FNV-1a for dedup hash?**
+2. **RESOLVED — SHA-256 vs FNV-1a for dedup hash?**
    - What we know: SHA-256 is cryptographically strong but slower. FNV-1a is faster but collision-prone with 32-bit output.
-   - What's unclear: For deduplication, cryptographic strength is overkill. FNV-1a at 64-bit is sufficient for 500K messages (collision probability < 1e-6).
    - Recommendation: Use FNV-1a 64-bit for speed. Expose as `hashMessage(msg): string`. SHA-256 is available as an upgrade path if needed.
 
-3. **Where should the benchmark fixtures live?**
+3. **RESOLVED — Where should the benchmark fixtures live?**
    - What we know: The 24-fixture benchmark is published as a JSON file.
-   - What's unclear: Should we download it to `fixtures/` at build time or commit it?
    - Recommendation: Commit the fixture JSON to `fixtures/chattopdf-2026.07.json` — it's 3 KB, versioned, and the benchmark URL may change. Pin to this version. Future versions can be added alongside.
 
 ## Validation Architecture
