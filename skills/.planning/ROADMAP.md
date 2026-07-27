@@ -25,8 +25,12 @@ Five phases delivering a local-first WhatsApp chat archive: build a format-toler
   3. Each parsed message has a deterministic dedup hash and is classified as text, media (with type), or system event (join/leave/name change)
   4. Parser detects the 40K message export cap and surfaces a warning
   5. Parser passes the chattopdf 24-fixture benchmark covering 14+ date format families
-**Plans**: TBD
+**Plans**: 2 plans
 **Notes**: Pure library — no UI, no storage, no Worker. Testable from terminal. The 24-fixture benchmark is the coverage target.
+
+Plans:
+- [ ] 01-01-PLAN.md — Core Parser Skeleton: project scaffold, type definitions, iOS/Android parse, normalization, classification, dedup hash, 40K cap (tracer-first, Wave 1)
+- [ ] 01-02-PLAN.md — Full Coverage & Benchmark: 14+ pattern families, CJK/fullwidth normalization, 24-fixture benchmark integration (Wave 2)
 
 ---
 
@@ -108,7 +112,7 @@ Five phases delivering a local-first WhatsApp chat archive: build a format-toler
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Parser Library | 0/0 | Not started | - |
+| 1. Parser Library | 0/2 | Planning complete | - |
 | 2. Storage Layer | 0/0 | Not started | - |
 | 3. Import Feature | 0/0 | Not started | - |
 | 4. Chat Browsing | 0/0 | Not started | - |
