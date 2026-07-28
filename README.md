@@ -54,7 +54,7 @@ bun install -g @oh-my-pi/pi-coding-agent
 
 - rtk-ai
 - gnhf - `bun add -g gnhf`
-- gsd
+- gsd - `bun x @opengsd/gsd-core@latest` https://github.com/open-gsd/gsd-core
 - omniroute - `bun add -g omniroute`
 - android-cli - https://developer.android.com/tools/agents/android-cli
 
@@ -136,6 +136,10 @@ OmniRoute
 CLIProxyAPI
 
 codewhale
+
+https://github.com/Fission-AI/OpenSpec
+
+uvx --python 3.11 open-webui@latest serve
 
 ```
 
