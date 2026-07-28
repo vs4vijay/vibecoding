@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { normalize, translateDigits } from '../index';
 
 describe('normalize', () => {
@@ -8,7 +8,7 @@ describe('normalize', () => {
 
 	it('strips BOM character', () => {
 		const bom = String.fromCharCode(0xfeff);
-		expect(normalize(bom + 'hello')).toBe('hello');
+		expect(normalize(`${bom}hello`)).toBe('hello');
 	});
 
 	it('removes directional marks', () => {

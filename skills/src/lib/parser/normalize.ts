@@ -16,6 +16,15 @@ export function normalize(content: string): string {
 
 	result = result.replace(/\u060c/g, ',');
 
+	result = result.replace(/[\uff10-\uff19]/g, (ch) => String.fromCharCode(0x0030 + ch.charCodeAt(0) - 0xff10));
+	result = result.replace(/\uff0f/g, '/');
+	result = result.replace(/\uff0c/g, ',');
+	result = result.replace(/\uff0d/g, '-');
+	result = result.replace(/\uff1a/g, ':');
+	result = result.replace(/\u3000/g, ' ');
+
+	result = translateDigits(result);
+
 	return result;
 }
 
@@ -32,8 +41,10 @@ export function translateDigits(text: string): string {
 
 	result = result.replace(/\u0628\.\u0638/g, 'PM');
 	result = result.replace(/\u0642\.\u0638/g, 'AM');
-	result = result.replace(/\u0635/g, 'AM');
-	result = result.replace(/\u0645/g, 'PM');
+	result = result.replace(/(?:^|[\s,\[\(])[\u0635\u0645](?=[\s,\]\-\.]|$)/g, (match) => {
+		const marker = match[match.length - 1];
+		return match.slice(0, -1) + (marker === '\u0635' ? 'AM' : 'PM');
+	});
 
 	result = result.replace(/\u4e0a\u5348/g, 'AM');
 	result = result.replace(/\u4e0b\u5348/g, 'PM');

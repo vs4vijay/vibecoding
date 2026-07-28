@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parseString, detectCapWarning, generateDedupHash } from '../index';
+import { describe, expect, it } from 'vitest';
+import { detectCapWarning, generateDedupHash, parseString } from '../index';
 
 describe('parseString', () => {
 	it('parses iOS bracketed format correctly', () => {
@@ -17,7 +17,7 @@ describe('parseString', () => {
 			"[2024/07/09, 08:01:49] Alice: Hello\n[2024/07/09, 08:02:00] John joined using this group's invite link",
 		);
 		expect(result.messages[1].type).toBe('system');
-		expect(result.messages[1].sender).toBe('');
+		expect(result.messages[1].sender).toBe('system');
 	});
 
 	it('handles multi-line continuation as single message', () => {
@@ -109,6 +109,117 @@ describe('parseString', () => {
 		const r2 = parseString(input);
 		expect(r1.messages[0].dedupHash).toBe(r2.messages[0].dedupHash);
 	});
+});
+
+it('parses ISO AM/PM bracketed format', () => {
+	const result = parseString('[2026-03-02, 6:39:22 PM] Alice: Hello\n[2026-03-02, 7:00:00 PM] Bob: World');
+	expect(result.messages).toHaveLength(2);
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('parses ISO numeric bracketed format (24h)', () => {
+	const result = parseString('[2026-03-02, 14:30:00] Alice: Hello');
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('parses CJK year-first kanji format', () => {
+	const result = parseString('[2024\u5e747\u67089\u65e5, 08:01:49] Alice: Hello');
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('parses CJK AM/PM prefix format (after normalize)', () => {
+	const result = parseString('[\u0031\u0035/\u0033/\u0032\u0034 \u4e0b\u5348 2:30:45] Alice: Hello');
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('parses slash AM/PM bracketed format', () => {
+	const result = parseString('[3/15/24, 2:30 PM] Alice: Hello');
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('parses slash numeric bracketed format (24h)', () => {
+	const result = parseString('[15/03/2024, 14:30] Alice: Hello');
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('parses ISO AM/PM dash-separated format', () => {
+	const result = parseString('2026-03-02, 6:39 PM - Alice: Hello');
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('parses ISO numeric dash-separated format (24h)', () => {
+	const result = parseString('2026-03-02, 14:30 - Alice: Hello');
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('parses slash numeric dash-separated format (24h)', () => {
+	const result = parseString('15/03/2024, 14:30 - Alice: Hello');
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('parses European dotted with AM/PM format', () => {
+	const result = parseString('15.03.2024, 2:30 PM - Alice: Hello');
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('parses year-first dot bracketed format', () => {
+	const result = parseString('[2024.07.09, 08:01:49] Alice: Hello');
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('parses DD-MM-YYYY bracketed format', () => {
+	const result = parseString('[09-07-2024, 08:01:49] Alice: Hello');
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('handles preamble text before first timestamp', () => {
+	const result = parseString('This is a preamble line before the first message\n[2024/07/09, 08:01:49] Alice: Hello');
+	expect(result.messages).toHaveLength(2);
+	expect(result.messages[0].type).toBe('system');
+	expect(result.messages[1].sender).toBe('Alice');
+});
+
+it('handles extremely long single-line messages without crash', () => {
+	const longText = 'A'.repeat(2500);
+	const result = parseString(`[2024/07/09, 08:01:49] Alice: ${longText}`);
+	expect(result.messages).toHaveLength(1);
+	expect(result.messages[0].text.length).toBe(2500);
+});
+
+it('handles whitespace-only input', () => {
+	const result = parseString('   \n  \n  ');
+	expect(result.messages).toHaveLength(0);
+});
+
+it('handles single-line input without newline', () => {
+	const result = parseString('[2024/07/09, 08:01:49] Alice: Hello');
+	expect(result.messages).toHaveLength(1);
+});
+
+it('handles input with fullwidth characters after normalize', () => {
+	const input = '[\uff12\uff10\uff12\uff14\uff0f\uff10\uff17\uff0f\uff10\uff19, 08:01:49] Alice: Hello';
+	const result = parseString(input);
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
+});
+
+it('handles input with Persian digits after translate', () => {
+	const input = '[\u06f2\u06f0\u06f2\u06f4/\u06f0\u06f7/\u06f0\u06f9, 08:01:49] Alice: Hello';
+	const result = parseString(input);
+	expect(result.messages[0].sender).toBe('Alice');
+	expect(result.messages[0].timestamp).toBeGreaterThan(0);
 });
 
 describe('detectCapWarning', () => {

@@ -1,0 +1,412 @@
+{
+  "benchmark": "WhatsApp export parser compatibility benchmark",
+  "version": "2026.07",
+  "published": "2026-07-13",
+  "data_policy": "Synthetic fixtures only. No customer or private chat data.",
+  "cases": [
+    {
+      "id": "timestamp-ios-yyyy-slash",
+      "category": "timestamp",
+      "locale": "iOS YYYY/MM/DD",
+      "input": "[2024/07/09, 08:01:49] Researcher: Morning",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Morning",
+        "year": 2024,
+        "month": 7,
+        "day": 9,
+        "hour": 8,
+        "minute": 1,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-ios-iso-ampm",
+      "category": "timestamp",
+      "locale": "iOS ISO with AM/PM",
+      "input": "[2026-03-02, 6:39:22 PM] Researcher: Evening",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Evening",
+        "year": 2026,
+        "month": 3,
+        "day": 2,
+        "hour": 18,
+        "minute": 39,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-cjk-marker",
+      "category": "timestamp",
+      "locale": "CJK AM/PM before time",
+      "input": "[15/3/24 下午 2:30:45] Researcher: 你好",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "你好",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-ios-slash",
+      "category": "timestamp",
+      "locale": "iOS slash date",
+      "input": "[3/15/24, 2:30:45 PM] Researcher: Hello",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Hello",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-android-slash",
+      "category": "timestamp",
+      "locale": "Android slash date",
+      "input": "3/15/24, 2:30 PM - Researcher: Hello",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Hello",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-european-dotted",
+      "category": "timestamp",
+      "locale": "European dotted",
+      "input": "15.03.2024, 14:30 - Researcher: Guten Tag",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Guten Tag",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-european-bracketed",
+      "category": "timestamp",
+      "locale": "European dotted bracketed",
+      "input": "[15.11.2013, 06:59:19] Researcher: Hallo",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Hallo",
+        "year": 2013,
+        "month": 11,
+        "day": 15,
+        "hour": 6,
+        "minute": 59,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-european-short-year",
+      "category": "timestamp",
+      "locale": "European dotted short year",
+      "input": "15.11.13, 06:59 - Researcher: Hallo",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Hallo",
+        "year": 2013,
+        "month": 11,
+        "day": 15,
+        "hour": 6,
+        "minute": 59,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-brazilian",
+      "category": "timestamp",
+      "locale": "Brazilian DD/MM/YYYY",
+      "input": "15/03/2024 14:30 - Researcher: Olá",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Olá",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-dutch",
+      "category": "timestamp",
+      "locale": "Dutch DD-MM-YYYY",
+      "input": "15-03-2024 14:30 - Researcher: Hoi",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Hoi",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-dutch-bracketed",
+      "category": "timestamp",
+      "locale": "Dutch bracketed",
+      "input": "[15-03-2024, 14:30:01] Researcher: Hoi",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Hoi",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-spanish-short-year",
+      "category": "timestamp",
+      "locale": "Spanish short year",
+      "input": "[24-03-15, 2:30:01 PM] Researcher: Hola",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Hola",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-iso-dashed",
+      "category": "timestamp",
+      "locale": "ISO dashed",
+      "input": "2026-01-13, 12:22 PM - Researcher: Hello",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Hello",
+        "year": 2026,
+        "month": 1,
+        "day": 13,
+        "hour": 12,
+        "minute": 22,
+        "type": "text"
+      }
+    },
+    {
+      "id": "timestamp-android-yyyy-slash",
+      "category": "timestamp",
+      "locale": "Android YYYY/MM/DD",
+      "input": "2025/12/14, 11:06 - Researcher: Hello",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "Hello",
+        "year": 2025,
+        "month": 12,
+        "day": 14,
+        "hour": 11,
+        "minute": 6,
+        "type": "text"
+      }
+    },
+    {
+      "id": "digits-arabic-indic",
+      "category": "normalization",
+      "locale": "Arabic-Indic digits",
+      "input": "١٥/٠٣/٢٤, ١٤:٣٠ - Researcher: مرحبا",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "مرحبا",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "digits-persian",
+      "category": "normalization",
+      "locale": "Persian digits",
+      "input": "۱۵/۰۳/۲۴, ۱۴:۳۰ - Researcher: سلام",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "سلام",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "digits-devanagari",
+      "category": "normalization",
+      "locale": "Devanagari digits",
+      "input": "१५/०३/२४, १४:३० - Researcher: नमस्ते",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "नमस्ते",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "digits-thai",
+      "category": "normalization",
+      "locale": "Thai digits",
+      "input": "๑๕/๐๓/๒๔, ๑๔:๓๐ - Researcher: สวัสดี",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Researcher",
+        "text": "สวัสดี",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "behavior-multiline",
+      "category": "behavior",
+      "locale": "Multiline message",
+      "input": "3/15/24, 2:30 PM - Alice: first line\nsecond line",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Alice",
+        "text": "first line\nsecond line",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "text"
+      }
+    },
+    {
+      "id": "behavior-system",
+      "category": "behavior",
+      "locale": "System message",
+      "input": "3/15/24, 2:30 PM - Messages and calls are end-to-end encrypted.",
+      "expected": {
+        "messageCount": 1,
+        "sender": "system",
+        "text": "Messages and calls are end-to-end encrypted.",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "system"
+      }
+    },
+    {
+      "id": "behavior-media",
+      "category": "behavior",
+      "locale": "Media marker",
+      "input": "3/15/24, 2:30 PM - Alice: IMG-20240315-WA0001.jpg (file attached)",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Alice",
+        "text": "IMG-20240315-WA0001.jpg (file attached)",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "media"
+      }
+    },
+    {
+      "id": "behavior-deleted",
+      "category": "behavior",
+      "locale": "Deleted message",
+      "input": "3/15/24, 2:30 PM - Alice: This message was deleted",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Alice",
+        "text": "This message was deleted",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "deleted"
+      }
+    },
+    {
+      "id": "behavior-call",
+      "category": "behavior",
+      "locale": "Call marker",
+      "input": "3/15/24, 2:30 PM - Alice: Missed voice call",
+      "expected": {
+        "messageCount": 1,
+        "sender": "Alice",
+        "text": "Missed voice call",
+        "year": 2024,
+        "month": 3,
+        "day": 15,
+        "hour": 14,
+        "minute": 30,
+        "type": "call"
+      }
+    },
+    {
+      "id": "behavior-participants",
+      "category": "behavior",
+      "locale": "Participant extraction",
+      "input": "3/15/24, 2:30 PM - Alice: One\n3/15/24, 2:31 PM - Bob: Two",
+      "expected": {
+        "messageCount": 2,
+        "participants": [
+          "Alice",
+          "Bob"
+        ]
+      }
+    }
+  ]
+}

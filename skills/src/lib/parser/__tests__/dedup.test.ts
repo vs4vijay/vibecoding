@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { generateDedupHash, hashMessage } from '../index';
 import type { Message } from '../types';
 

@@ -1,4 +1,4 @@
-import type { MessageType, MediaType } from './types';
+import type { MediaType, MessageType } from './types';
 
 export function classifyMessage(
 	text: string,
