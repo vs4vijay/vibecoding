@@ -129,6 +129,27 @@ codex mcp add deepwiki --url https://mcp.deepwiki.com/mcp
 ## Experiments
 
 ```
+herdr
+
+GSD
+
+BMAD
+
+OpenSpec
+https://github.com/Fission-AI/OpenSpec
+
+Superpowers
+
+https://github.com/Priivacy-ai/spec-kitty
+
+Mnemosyne
+
+https://github.com/thedotmack/claude-mem
+
+https://github.com/rohitg00/agentmemory
+
+https://github.com/MemPalace/mempalace
+
 uv tool install -U batrachian-toad
 
 OmniRoute
@@ -140,6 +161,8 @@ codewhale
 https://github.com/Fission-AI/OpenSpec
 
 uvx --python 3.11 open-webui@latest serve
+
+https://github.com/agent-of-empires/agent-of-empires
 
 ```
 
