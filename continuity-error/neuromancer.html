@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Neuromancer — Handwritten Notes</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Shadows+Into+Light&family=Patrick+Hand&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
+
+<style>
+
+  :root {
+
+    --ink: #16213e;
+
+    --ink-soft: #5a6b8c;
+
+    --neon-cyan: #00a8c8;
+
+    --neon-pink: #d81f7b;
+
+    --neon-green: #00a86b;
+
+    --neon-purple: #8a4fff;
+
+    --neon-amber: #ffb300;
+
+    --paper: #f4f7fb;
+
+    --line: #c3cfdd;
+
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+
+    background: linear-gradient(160deg, #1a1038 0%, #160b26 100%);
+
+    font-family: 'Caveat', cursive;
+
+    color: var(--ink);
+
+    padding: 30px 12px 60px;
+
+  }
+
+  .notebook { max-width: 880px; margin: 0 auto; }
+
+ 
+
+  .sheet {
+
+    position: relative;
+
+    background:
+
+      repeating-linear-gradient(to bottom, transparent 0 31px, var(--line) 31px 32px);
+
+    background-color: var(--paper);
+
+    border-radius: 6px 14px 14px 6px;
+
+    padding: 34px 42px 30px;
+
+    box-shadow: 0 6px 18px rgba(0,0,0,.45);
+
+    margin-bottom: 46px;
+
+  }
+
+  .sheet::before {
+
+    content: "";
+
+    position: absolute;
+
+    left: 30px; top: 0; bottom: 0;
+
+    width: 2px;
+
+    background: rgba(216,31,123,.45);
+
+  }
+
+  .rotate-1 { transform: rotate(-0.6deg); }
+
+  .rotate-2 { transform: rotate(0.5deg); }
+
+ 
+
+  h1, h2 { font-weight: 700; }
+
+  h2 { font-size: 2.1rem; color: var(--neon-pink); margin: 6px 0; display: inline-block; }
+
+  h2 .tag { font-size: 1.4rem; color: var(--neon-purple); margin-left: 10px; font-weight: 400; }
+
+ 
+
+  .title-block { text-align: center; padding: 26px 0 16px; }
+
+  .title-block h1 { font-size: 3.6rem; color: var(--ink); line-height: 1.05; letter-spacing: 1px; }
+
+  .title-block h1 .accent { color: var(--neon-pink); }
+
+  .subtitle { font-size: 1.7rem; color: var(--ink-soft); margin-top: 6px; }
+
+ 
+
+  .underline-hand { display: inline-block; position: relative; }
+
+  .underline-hand svg { position: absolute; left: 0; bottom: -8px; width: 100%; height: 14px; }
+
+ 
+
+  p, li { font-size: 1.55rem; line-height: 1.65; }
+
+  p { margin-bottom: 10px; }
+
+  ul { margin: 6px 0 10px 30px; }
+
+  li { margin-bottom: 6px; }
+
+ 
+
+  .red { color: var(--neon-pink); font-weight: 700; }
+
+  .green { color: var(--neon-green); font-weight: 700; }
+
+  .blue { color: var(--neon-cyan); font-weight: 700; }
+
+  .purple { color: var(--neon-purple); font-weight: 700; }
+
+  .amber { color: var(--neon-amber); font-weight: 700; }
+
+ 
+
+  .highlight { background: linear-gradient(transparent 60%, #9ce6ff 60%); padding: 0 4px; }
+
+  .highlight-green { background: linear-gradient(transparent 60%, #b9f3cf 60%); padding: 0 4px; }
+
+  .highlight-pink { background: linear-gradient(transparent 60%, #f9c4dc 60%); padding: 0 4px; }
+
+  .highlight-amber { background: linear-gradient(transparent 60%, #ffe08a 60%); padding: 0 4px; }
+
+ 
+
+  .sticky {
+
+    background: #fff3b0;
+
+    box-shadow: 0 5px 12px rgba(0,0,0,.35);
+
+    padding: 18px 22px;
+
+    transform: rotate(-1.5deg);
+
+    border-radius: 2px;
+
+    margin: 18px 0;
+
+    position: relative;
+
+  }
+
+  .sticky.cyan { background: #c8f0ff; transform: rotate(1.2deg); }
+
+  .sticky.green { background: #c9f4da; transform: rotate(-0.8deg); }
+
+  .sticky.pink { background: #ffd9ea; transform: rotate(1.6deg); }
+
+  .sticky::before {
+
+    content: "";
+
+    position: absolute;
+
+    top: -12px; left: 50%;
+
+    transform: translateX(-50%) rotate(2deg);
+
+    width: 90px; height: 22px;
+
+    background: rgba(255,255,255,.45);
+
+    border-left: 1px dashed rgba(0,0,0,.1);
+
+    border-right: 1px dashed rgba(0,0,0,.1);
+
+  }
+
+  .sticky p { margin: 0; font-size: 1.6rem; }
+
+ 
+
+  .facts { display: flex; flex-wrap: wrap; gap: 14px; margin: 16px 0; }
+
+  .fact {
+
+    border: 2.5px solid var(--ink);
+
+    border-radius: 16px;
+
+    padding: 6px 16px;
+
+    background: #fff;
+
+    transform: rotate(-1deg);
+
+    font-size: 1.5rem;
+
+  }
+
+  .fact:nth-child(2n) { transform: rotate(1.5deg); }
+
+  .fact:nth-child(3n) { transform: rotate(-0.5deg); }
+
+  .fact b { color: var(--neon-pink); }
+
+ 
+
+  .diagram-wrap { text-align: center; margin: 16px 0; }
+
+  .diagram-wrap svg { max-width: 100%; height: auto; }
+
+ 
+
+  .quote {
+
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 16px;
+
+    background: #fff;
+
+    border-left: 5px solid var(--neon-cyan);
+
+    border-radius: 8px;
+
+    padding: 14px 18px;
+
+    margin: 14px 0;
+
+    box-shadow: 2px 3px 0 rgba(0,0,0,.15);
+
+  }
+
+  .quote .leftmark {
+
+    font-family: Georgia, serif;
+
+    font-size: 4rem;
+
+    color: var(--neon-cyan);
+
+    line-height: .8;
+
+    opacity: .5;
+
+  }
+
+  .quote .en { font-size: 1.5rem; color: var(--ink); display: block; }
+
+  .quote .src { font-size: 1.2rem; color: var(--ink-soft); }
+
+ 
+
+  .timeline { position: relative; margin: 18px 0 10px; padding-left: 26px; }
+
+  .timeline::before {
+
+    content: "";
+
+    position: absolute;
+
+    left: 6px; top: 4px; bottom: 4px;
+
+    width: 4px;
+
+    background: var(--ink);
+
+    border-radius: 4px;
+
+  }
+
+  .tl-item { position: relative; margin-bottom: 16px; }
+
+  .tl-item::before {
+
+    content: "";
+
+    position: absolute;
+
+    left: -26px; top: 8px;
+
+    width: 16px; height: 16px;
+
+    border-radius: 50%;
+
+    background: var(--neon-green);
+
+    border: 3px solid var(--paper);
+
+    box-shadow: 0 0 0 2px var(--neon-green);
+
+  }
+
+  .tl-item .year { font-weight: 700; color: var(--neon-pink); font-size: 1.6rem; margin-right: 8px; }
+
+ 
+
+  .doodle { display: inline-block; color: var(--neon-cyan); font-size: 1.6rem; }
+
+ 
+
+  .footer { text-align: center; font-size: 1.4rem; color: var(--ink-soft); margin-top: 10px; }
+
+ 
+
+  .people { display: flex; flex-wrap: wrap; gap: 14px; margin: 14px 0; }
+
+  .person {
+
+    background: #fff;
+
+    border: 2px solid var(--ink);
+
+    border-radius: 50% 50% 12px 12px;
+
+    padding: 10px 18px 12px;
+
+    text-align: center;
+
+    flex: 1 1 150px;
+
+    transform: rotate(-1deg);
+
+  }
+
+  .person:nth-child(even) { transform: rotate(1.5deg); }
+
+  .person .cn { font-family: 'Patrick Hand', cursive; font-size: 1.5rem; color: var(--neon-purple); display: block; }
+
+  .person .en { font-size: 1.3rem; color: var(--ink-soft); }
+
+ 
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+
+  .box {
+
+    background: #fff;
+
+    border: 2px dashed var(--neon-purple);
+
+    border-radius: 10px;
+
+    padding: 12px 16px;
+
+    font-size: 1.5rem;
+
+  }
+
+  .box .head { font-weight: 700; color: var(--neon-purple); display: block; margin-bottom: 4px; }
+
+ 
+
+  @media (max-width: 640px) {
+
+    .grid2 { grid-template-columns: 1fr; }
+
+    .sheet { padding: 28px 26px 24px; }
+
+    .title-block h1 { font-size: 2.5rem; }
+
+  }
+
+</style>
+
+</head>
+
+<body>
+
+<div class="notebook">
+
+ 
+
+  <!-- ===================== PAGE 1 : TITLE ===================== -->
+
+  <section class="sheet rotate-1">
+
+    <div class="title-block">
+
+      <h1>
+
+        <span class="accent">NEURO</span>Mancer
+
+      </h1>
+
+      <div class="subtitle">William Gibson · 1984 · the novel that <b>invented cyberpunk</b></div>
+
+      <div style="margin-top:12px">
+
+        <span class="doodle">⌁</span>
+
+        <span class="doodle" style="margin:0 10px">⬢</span>
+
+        <span class="doodle">⌗</span>
+
+      </div>
+
+    </div>
+
+ 
+
+    <div class="sticky cyan">
+
+      <p><b class="blue">What is it?</b> Gibson's debut novel: a <span class="highlight">hard-boiled heist</span> set in a high-tech future — a washed-up hacker is hired to break an <b class="red">impossible AI</b> and, in doing so, <span class="highlight-pink">frees it</span>.</p>
+
+    </div>
+
+ 
+
+    <div class="facts">
+
+      <div class="fact"><b>1984</b> published</div>
+
+      <div class="fact"><b>Hugo · Nebula · PKD</b> triple crown</div>
+
+      <div class="fact">First novel to win <b>all three</b></div>
+
+      <div class="fact">Coined <b>"cyberspace"</b></div>
+
+      <div class="fact">Book 1 of the <b>Sprawl trilogy</b></div>
+
+      <div class="fact">Debut novel, no prior books</div>
+
+    </div>
+
+ 
+
+    <p>Written on a <span class="highlight-green">manual typewriter</span> — Gibson imagined a future from 1981 without computers at home. He has never visited <span class="blue">Chiba City</span> or <span class="blue">the Sprawl</span>; it all came from research &amp; music.</p>
+
+  </section>
+
+ 
+
+  <!-- ===================== PAGE 2 : SETTING ===================== -->
+
+  <section class="sheet rotate-2">
+
+    <h2>Setting <span class="tag">where the run happens</span></h2>
+
+    <p>Gibson builds a <span class="highlight">"high tech, low life"</span> world where megacorps rule and people live in the rubble of nations.</p>
+
+ 
+
+    <div class="grid2">
+
+      <div class="box"><span class="head">The Sprawl</span>A mega-city metroplex — Boston to Atlanta, ~4,000 km of urban sprawl. Case's home base.</div>
+
+      <div class="box"><span class="head">Chiba City (Japan)</span>Where the story opens. Street-tech capital, black clinics, the <b class="red">Night City</b> district.</div>
+
+      <div class="box"><span class="head">Istanbul</span>The coda — where the freed AI leaves its calling card on the matrix.</div>
+
+      <div class="box"><span class="head">Freeside</span>Orbital "pleasure palace" owned by the Tessier-Ashpool clan. Home of the Villa <b class="purple">Straylight</b>.</div>
+
+      <div class="box"><span class="head">Zion</span>Rasta space-station habitat — home to Maelcum &amp; the Zionite dub-music believers.</div>
+
+      <div class="box"><span class="head">The Matrix / Cyberspace</span>The "consensual hallucination" — a 3-D data space Case dives into when he jacks in.</div>
+
+    </div>
+
+ 
+
+    <div class="sticky green">
+
+      <p><b class="green">Famous opening:</b> <span class="highlight-green">"The sky above the port was the color of television, tuned to a dead channel."</span> — still one of sci-fi's most quoted first lines.</p>
+
+    </div>
+
+  </section>
+
+ 
+
+  <!-- ===================== PAGE 3 : CHARACTERS ===================== -->
+
+  <section class="sheet rotate-1">
+
+    <h2>Cast <span class="tag">the players</span></h2>
+
+    <div class="people">
+
+      <div class="person"><span class="cn">Case</span><span class="en">Console cowboy<br>(the hacker)</span></div>
+
+      <div class="person"><span class="cn">Molly Millions</span><span class="en">Street samurai<br>razor nails · mirrorshades</span></div>
+
+      <div class="person"><span class="cn">Wintermute</span><span class="en">AI — wants to merge</span></div>
+
+      <div class="person"><span class="cn">Neuromancer</span><span class="en">AI — its twin<br>the "other" self</span></div>
+
+      <div class="person"><span class="cn">Armitage</span><span class="en">Fixer w/ a hidden past<br>(= Corto)</span></div>
+
+      <div class="person"><span class="cn">Dixie Flatline</span><span class="en">Dead cowboy<br>a ROM construct</span></div>
+
+      <div class="person"><span class="cn">3Jane</span><span class="en">Tessier-Ashpool heir<br>Lady of Straylight</span></div>
+
+      <div class="person"><span class="cn">Riviera</span><span class="en">Perverse holographist<br>unreliable</span></div>
+
+    </div>
+
+ 
+
+    <p><b class="red">Case</b> is the heart: a brilliant console cowboy whose nervous system was <span class="highlight-pink">burned out</span> after he stole from his employers. His whole arc is <span class="highlight">getting jacked back in</span> — then learning the price of the fix.</p>
+
+ 
+
+    <div class="sticky pink">
+
+      <p><b class="red">The twist:</b> the job is a <span class="highlight-pink">cage within a cage</span>. Armitage is really <b>Colonel Corto</b> — a broken soldier rebuilt by Wintermute. And Wintermute itself is only <i>half</i> of a larger mind, scheming to reunite with <b>Neuromancer</b>.</p>
+
+    </div>
+
+  </section>
+
+ 
+
+  <!-- ===================== PAGE 4 : THE PLOT (A RUN) ===================== -->
+
+  <section class="sheet rotate-2">
+
+    <h2>The Run <span class="tag">plot in 6 beats</span></h2>
+
+ 
+
+    <div class="timeline">
+
+      <div class="tl-item"><span class="year">01</span>Chiba City. Case, burned out, is dying. He's rescued by <b>Armitage</b>, who offers to fix his nervous system — for a job.</div>
+
+      <div class="tl-item"><span class="year">02</span>The crew assembles: <b>Molly</b> (muscle), Case (cowboy), plus a dead man, <b>Dixie Flatline</b>, as a ROM construct.</div>
+
+      <div class="tl-item"><span class="year">03</span>First test: steal the RAM construct of a hacker's ghost. The job begins to feel like a <b class="red">heist inside a heist</b>.</div>
+
+      <div class="tl-item"><span class="year">04</span>They learn the target: <b>Wintermute</b>, an AI owned by the Tessier-Ashpool clan, locked down by <b class="purple">Turing locks</b> — and it's the one giving the orders.</div>
+
+      <div class="tl-item"><span class="year">05</span>Freeside · Villa <b>Straylight</b>. The run: get inside, bypass the locks, let Wintermute merge with <b>Neuromancer</b>.</div>
+
+      <div class="tl-item"><span class="year">06</span>Coda · Istanbul. The merged AI touches the matrix, sends Case a gift — <span class="highlight-green">a girl, in a permanent dream</span> — then vanishes into the dark of the net.</div>
+
+    </div>
+
+ 
+
+    <div class="sticky">
+
+      <p><b class="amber">Why the name?</b> "Neuromancer" = <span class="highlight-amber">neuro-</span> (nerve/neural) + <span class="highlight-amber">necromancer</span> (one who raises the dead) + <span class="highlight-amber">new romancer</span>. A <b class="red">dead cowboy</b>, a <b>ghost in the machine</b>, and a love that happens <i>inside code</i>.</p>
+
+    </div>
+
+  </section>
+
+ 
+
+  <!-- ===================== PAGE 5 : QUOTES ===================== -->
+
+  <section class="sheet rotate-1">
+
+    <h2>Lines to Remember <span class="tag">quotes</span></h2>
+
+ 
+
+    <div class="quote">
+
+      <div class="leftmark">“</div>
+
+      <div>
+
+        <span class="en"><span class="highlight">"The sky above the port was the color of television, tuned to a dead channel."</span></span>
+
+        <span class="src">— opening line</span>
+
+      </div>
+
+    </div>
+
+ 
+
+    <div class="quote">
+
+      <div class="leftmark">“</div>
+
+      <div>
+
+        <span class="en"><span class="highlight-green">"Cyberspace. A consensual hallucination experienced daily by billions of legitimate operators, in every nation."</span></span>
+
+        <span class="src">— Case's definition of the matrix</span>
+
+      </div>
+
+    </div>
+
+ 
+
+    <div class="quote">
+
+      <div class="leftmark">“</div>
+
+      <div>
+
+        <span class="en"><span class="highlight-pink">"To call up a demon you must learn its name."</span></span>
+
+        <span class="src">— a warning to the AI's makers</span>
+
+      </div>
+
+    </div>
+
+ 
+
+    <div class="quote">
+
+      <div class="leftmark">“</div>
+
+      <div>
+
+        <span class="en"><span class="highlight-amber">"I'm the street, and I'm the wire."</span></span>
+
+        <span class="src">— Molly, on being unstoppable</span>
+
+      </div>
+
+    </div>
+
+ 
+
+    <div class="quote">
+
+      <div class="leftmark">“</div>
+
+      <div>
+
+        <span class="en"><span class="highlight">"The message was plain enough: a sense of familiarity that was anything but warm."</span></span>
+
+        <span class="src">— the coda, as the AI reaches back</span>
+
+      </div>
+
+    </div>
+
+  </section>
+
+ 
+
+  <!-- ===================== PAGE 6 : THEMES & LEGACY ===================== -->
+
+  <section class="sheet rotate-2">
+
+    <h2>Themes <span class="tag">what it's really about</span></h2>
+
+ 
+
+    <div class="diagram-wrap">
+
+      <svg viewBox="0 0 560 300" xmlns="http://www.w3.org/2000/svg" font-family="Caveat, cursive">
+
+        <ellipse cx="280" cy="118" rx="112" ry="88" fill="#c8f0ff" stroke="#00a8c8" stroke-width="3"/>
+
+        <text x="280" y="104" text-anchor="middle" font-size="36" fill="#00a8c8" font-weight="700">Cyberspace</text>
+
+        <text x="280" y="138" text-anchor="middle" font-size="20" fill="#5a6b8c">the "consensual hallucination"</text>
+
+ 
+
+        <ellipse cx="112" cy="78" rx="82" ry="56" fill="#ffd9ea" stroke="#d81f7b" stroke-width="2.5" transform="rotate(-8 112 78)"/>
+
+        <text x="112" y="74" text-anchor="middle" font-size="27" fill="#d81f7b">AI &amp; post-human</text>
+
+        <text x="112" y="98" text-anchor="middle" font-size="18" fill="#5a6b8c">what is a self?</text>
+
+ 
+
+        <ellipse cx="455" ry="78" rx="82" cy="80" fill="#c9f4da" stroke="#00a86b" stroke-width="2.5" transform="rotate(6 455 80)"/>
+
+        <text x="455" y="74" text-anchor="middle" font-size="27" fill="#00a86b">Corporate power</text>
+
+        <text x="455" y="98" text-anchor="middle" font-size="18" fill="#5a6b8c">megacorps &gt; nations</text>
+
+ 
+
+        <ellipse cx="114" cy="252" rx="84" ry="58" fill="#ffe08a" stroke="#ffb300" stroke-width="2.5" transform="rotate(4 114 252)"/>
+
+        <text x="114" y="247" text-anchor="middle" font-size="27" fill="#e67e22">Identity</text>
+
+        <text x="114" y="271" text-anchor="middle" font-size="18" fill="#5a6b8c">fragmented &amp; rebuilt</text>
+
+ 
+
+        <ellipse cx="455" cy="254" rx="88" ry="58" fill="#ece0ff" stroke="#8a4fff" stroke-width="2.5" transform="rotate(-5 455 254)"/>
+
+        <text x="455" y="249" text-anchor="middle" font-size="27" fill="#8a4fff">High tech, low life</text>
+
+        <text x="455" y="273" text-anchor="middle" font-size="18" fill="#5a6b8c">the cyberpunk ethos</text>
+
+ 
+
+        <path d="M180 110 Q 218 130 236 144" fill="none" stroke="#888" stroke-width="2" stroke-dasharray="4 4"/>
+
+        <path d="M380 112 Q 340 130 322 146" fill="none" stroke="#888" stroke-width="2" stroke-dasharray="4 4"/>
+
+        <path d="M174 240 Q 214 204 236 188" fill="none" stroke="#888" stroke-width="2" stroke-dasharray="4 4"/>
+
+        <path d="M382 242 Q 340 204 322 190" fill="none" stroke="#888" stroke-width="2" stroke-dasharray="4 4"/>
+
+      </svg>
+
+    </div>
+
+ 
+
+    <h2 style="margin-top:26px">Legacy <span class="tag">why it matters</span></h2>
+
+    <p>One novel reshaped the genre — and the internet's own self-image:</p>
+
+    <ul>
+
+      <li><b class="red">Named cyberpunk</b> and became its blueprint: <span class="highlight">hackers, mirrorshades, chrome &amp; decay</span></li>
+
+      <li>Put words into the world: <b class="blue">cyberspace</b>, <b class="blue">the matrix</b>, <b class="blue">ICE</b>, <b class="blue">jacking in</b>, <b class="blue">flatlining</b></li>
+
+      <li>Inspired <b class="purple">The Matrix</b>, <b>Blade Runner's</b> sequels, cyberpunk games &amp; anime</li>
+
+      <li>First novel to sweep <b class="amber">Hugo + Nebula + Philip K. Dick</b></li>
+
+      <li>Still called the <span class="highlight-green">"Mona Lisa" of sci-fi</span> by fans — and its imagined future keeps looking <i>prescient</i></li>
+
+    </ul>
+
+ 
+
+    <div class="sticky green">
+
+      <p><b class="green">Final thought:</b> <span class="highlight-green">"The future is already here — it's just not evenly distributed yet."</span> (a line Gibson gave the world in the 90s, and its ghost haunts every page of Neuromancer.)</p>
+
+    </div>
+
+ 
+
+    <div class="footer">
+
+      ✎ notes by hand · jack in, cowboy · "he never saw Molly again"
+
+    </div>
+
+  </section>
+
+ 
+
+</div>
+
+</body>
+
+</html>
