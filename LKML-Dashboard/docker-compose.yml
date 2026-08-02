@@ -1,0 +1,24 @@
+# Optional local PostgreSQL for DB_BACKEND=postgres
+# Usage:
+#   docker compose up -d
+#   export DB_BACKEND=postgres
+#   export DATABASE_URL=postgres://lkml:lkml@localhost:5432/lkml
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lkml
+      POSTGRES_PASSWORD: lkml
+      POSTGRES_DB: lkml
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lkml -d lkml"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

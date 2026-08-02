@@ -1,0 +1,40 @@
+{
+  "name": "lkml-pr-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "web"
+  ],
+  "scripts": {
+    "dev": "bun run src/dev.ts",
+    "dev:api": "bun run --watch src/index.ts",
+    "dev:worker": "bun run --watch src/worker.ts",
+    "dev:web": "bun run --cwd web dev",
+    "build:web": "bun run --cwd web build",
+    "preview:web": "bun run --cwd web preview",
+    "start": "bun run src/index.ts",
+    "worker": "bun run src/worker.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun run src/db/migrate.ts",
+    "db:seed": "bun run src/db/seed.ts",
+    "db:reset": "bun run src/db/reset.ts",
+    "ingest": "bun run src/scripts/ingest-once.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.33",
+    "pg": "^8.22.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/pg": "^8.20.3",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^7.0.2"
+  }
+}
