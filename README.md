@@ -164,6 +164,12 @@ uvx --python 3.11 open-webui@latest serve
 
 https://github.com/agent-of-empires/agent-of-empires
 
+https://github.com/Gitlawb/openclaude
+
+https://github.com/1jehuang/jcode
+
+https://github.com/virgiliojr94/book-to-skill
+
 ```
 
 ## Prompts
