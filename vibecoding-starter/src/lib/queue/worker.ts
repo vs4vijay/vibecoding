@@ -1,4 +1,4 @@
-import { IWorker, TaskHandler, WorkerOptions, Job, JobPayload } from './types';
+import { IWorker, TaskHandler, WorkerOptions, Job } from './types';
 import { queue, PostgresQueue } from './postgres-queue';
 
 export class Worker implements IWorker {
@@ -49,7 +49,7 @@ export class Worker implements IWorker {
         console.log(`📬 Received notification for job: ${jobId}`);
         this.processNextJob();
       });
-    } catch (e) {
+    } catch {
       console.warn('⚠️  Could not subscribe to notifications, polling will be used instead');
     }
 
@@ -73,7 +73,7 @@ export class Worker implements IWorker {
     if (this.stopRequested) return;
 
     try {
-      const job = await this.postgresQueue.getNextJob();
+      const job = await this.postgresQueue.claimJob(this.workerId);
 
       if (!job) return;
 
@@ -103,11 +103,12 @@ export class Worker implements IWorker {
       await task(job.payload, job);
       await this.postgresQueue.completeJob(job.id);
       console.log(`✅ Job completed: ${job.id}`);
-    } catch (error: any) {
-      console.error(`❌ Job failed: ${job.id}`, error.message || error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`❌ Job failed: ${job.id}`, message);
 
       if (job.attempts >= job.maxAttempts) {
-        await this.postgresQueue.failJob(job.id, error.message || String(error));
+        await this.postgresQueue.failJob(job.id, message);
       } else {
         await this.postgresQueue.releaseJob(job.id);
       }

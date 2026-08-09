@@ -8,7 +8,7 @@ This starter embraces simplicity by using PostgreSQL for all persistence needs:
 - **Data storage**: Your application data
 - **Job queue**: Background jobs via PostgreSQL LISTEN/NOTIFY + SKIP LOCKED
 - **Caching**: Query results and materialized views (optional)
-- **Local development**: PGlite runs in-process, no Docker needed
+- **Local development**: one PGlite socket process serves web and worker, no Docker needed
 
 ## Tech Stack
 
@@ -20,7 +20,7 @@ This starter embraces simplicity by using PostgreSQL for all persistence needs:
 
 ### Backend
 - **Next.js API Routes** - Serverless API endpoints
-- **Prisma ORM** - Type-safe database access
+- **Raw SQL via `pg`** - One query path for local PGlite and production PostgreSQL
 - **PostgreSQL** - Production database
 - **PGlite** - In-process Postgres for local development
 - **Postgres Queue** - Custom job queue using LISTEN/NOTIFY + SKIP LOCKED
@@ -35,7 +35,7 @@ This starter embraces simplicity by using PostgreSQL for all persistence needs:
 
 ### Database Abstraction
 - Single codebase works with both PGlite (local) and PostgreSQL (production)
-- Prisma provides seamless abstraction layer
+- `executeQuery()` provides the single raw-SQL abstraction layer
 - No environment-specific code needed
 
 ### Background Jobs
@@ -53,17 +53,14 @@ This starter embraces simplicity by using PostgreSQL for all persistence needs:
 
 ### Developer Experience
 - Single command starts everything: `bun run dev`
-- PGlite runs in-process - no Docker setup
+- A single PGlite owner safely serves both web and worker over the Postgres wire protocol
 - Hot reload for both frontend and backend
 - Type-safe database queries with Prisma
 
 ## Getting Started
 
-> **📝 Important**: This starter supports two development modes:
-> - **Quick Mode** (PGlite) - Frontend + API only, no background worker [Default]
-> - **Full Stack Mode** (PostgreSQL) - Complete system with background worker
->
-> See [DEV_MODES.md](DEV_MODES.md) for detailed comparison.
+> Local development is full-stack: the web app and worker share one PGlite
+> instance through its PostgreSQL-compatible socket. Production uses standard PostgreSQL.
 
 ### Quick Start (Recommended)
 
@@ -73,18 +70,16 @@ bun install
 bun run db:generate
 bun run db:init
 
-# Start development (API + Frontend only)
-bun run dev:next
+# Start PGlite socket + API + frontend + worker
+bun run dev
 ```
 
-Visit http://localhost:7070 - Everything works except background job processing.
-
-**Need background jobs?** See [DEV_MODES.md](DEV_MODES.md) for Full Stack Mode with PostgreSQL.
+Visit http://localhost:7070. Background jobs are processed locally by the worker.
 
 ### Prerequisites
 - **Bun** (v1.0+) - [Install Bun](https://bun.sh)
 - **PGlite** - Included (no installation needed)
-- **PostgreSQL** - Optional (only for background jobs)
+- **PostgreSQL** - Required only for production
 
 ### Detailed Setup Steps
 
@@ -111,10 +106,7 @@ bun run db:init
 
 5. Start development:
 ```bash
-# Option A: Quick Mode (No background worker)
-bun run dev:next
-
-# Option B: Full Stack Mode (Requires PostgreSQL - see DEV_MODES.md)
+# Starts the complete local stack
 bun run dev
 ```
 
@@ -139,7 +131,8 @@ vibecoding-starter/
 │   ├── components/            # React components
 │   │   └── jobs/              # Job dashboard components
 │   ├── lib/                   # Shared utilities
-│   │   ├── db.ts             # Prisma client (PGlite/Postgres)
+│   │   ├── db.ts             # Shared PostgreSQL-wire query client
+│   │   ├── schema.ts         # Shared local schema SQL
 │   │   ├── worker.ts         # Queue wrapper
 │   │   └── queue/            # Queue implementation
 │   │       ├── types.ts      # Queue interfaces
@@ -155,7 +148,8 @@ vibecoding-starter/
 │   ├── migrations/            # Migration history
 │   └── seed.ts               # Seed data
 ├── scripts/
-│   └── dev.ts                # Development runner
+│   ├── dev.ts                # Development process runner
+│   └── dev-db.ts             # Single PGlite socket owner
 ├── .env.example
 │   ├── .env.local
 │   ├── package.json
@@ -292,13 +286,16 @@ bun run db:studio
 ## Development Scripts
 
 ```bash
-# Start full development environment (Next.js + Worker)
+# Start PGlite socket + Next.js + Worker
 bun run dev
+
+# Start only the local database socket
+bun run dev:db
 
 # Start only Next.js
 bun run dev:next
 
-# Start only Worker (requires PostgreSQL)
+# Start only Worker (requires DATABASE_URL and a running database)
 bun run dev:worker
 
 # Build for production
@@ -353,7 +350,7 @@ pm2 start "bun run dev:worker" --name worker
 ### Required
 
 - `DATABASE_URL` - Database connection string
-  - Local: `file:./dev.db` (PGlite)
+  - Local socket: `postgresql://postgres@127.0.0.1:5433/postgres`
   - Production: `postgresql://user:password@host:5432/database`
 
 ### Optional
@@ -372,9 +369,9 @@ pm2 start "bun run dev:worker" --name worker
 
 ### Why PGlite for Local Development?
 
-1. **No Installation** - Runs in-process, no Docker needed
+1. **No Installation** - Runs as a managed local Bun process, no Docker needed
 2. **Fast** - SQLite-like performance for development
-3. **Compatible** - Prisma works identically with both
+3. **Compatible** - Web and worker use the same PostgreSQL wire client as production
 4. **Portable** - Single file database (`dev.db`)
 
 ### Why Postgres LISTEN/NOTIFY + SKIP LOCKED?

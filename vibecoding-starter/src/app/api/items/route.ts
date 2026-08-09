@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeQuery, getPGliteInstance } from '@/lib/db';
+import { executeQuery } from '@/lib/db';
 import { enqueueJob } from '@/lib/worker';
 import { z } from 'zod';
 
-// Force Node.js runtime for PGlite compatibility
+// The PostgreSQL client requires the Node.js runtime.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 

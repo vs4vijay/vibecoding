@@ -1,107 +1,65 @@
 #!/usr/bin/env bun
 
-/**
- * Development runner
- * Starts both Next.js dev server and Graphile Worker concurrently
- */
+import { spawn, type ChildProcess } from 'node:child_process';
+import { connect } from 'node:net';
 
-import { spawn } from 'child_process';
+const host = process.env.PGLITE_HOST || '127.0.0.1';
+const port = Number(process.env.PGLITE_PORT || 5433);
+const databaseUrl = `postgresql://postgres@${host}:${port}/postgres`;
+const children: ChildProcess[] = [];
+let shuttingDown = false;
 
-const processes: any[] = [];
-
-// Color codes for console output
-const colors = {
-  reset: '\x1b[0m',
-  bright: '\x1b[1m',
-  blue: '\x1b[34m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  red: '\x1b[31m',
-};
-
-function log(prefix: string, color: string, message: string) {
-  console.log(`${color}${colors.bright}[${prefix}]${colors.reset} ${message}`);
-}
-
-// Start Next.js dev server
-function startNextJS() {
-  log('NEXT', colors.blue, 'Starting Next.js dev server...');
-
-  const next = spawn('bun', ['next', 'dev'], {
-    stdio: 'pipe',
-    shell: true,
-  });
-
-  next.stdout.on('data', (data) => {
-    const message = data.toString().trim();
-    if (message) log('NEXT', colors.blue, message);
-  });
-
-  next.stderr.on('data', (data) => {
-    const message = data.toString().trim();
-    if (message) log('NEXT', colors.blue, message);
-  });
-
-  next.on('close', (code) => {
-    log('NEXT', colors.red, `Process exited with code ${code}`);
-    cleanup();
-  });
-
-  processes.push(next);
-}
-
-// Start Graphile Worker
-function startWorker() {
-  log('WORKER', colors.green, 'Starting Graphile Worker...');
-
-  const worker = spawn('bun', ['run', 'src/lib/worker.ts'], {
-    stdio: 'pipe',
-    shell: true,
-  });
-
-  worker.stdout.on('data', (data) => {
-    const message = data.toString().trim();
-    if (message) log('WORKER', colors.green, message);
-  });
-
-  worker.stderr.on('data', (data) => {
-    const message = data.toString().trim();
-    if (message) log('WORKER', colors.green, message);
-  });
-
-  worker.on('close', (code) => {
-    log('WORKER', colors.red, `Process exited with code ${code}`);
-    cleanup();
-  });
-
-  processes.push(worker);
-}
-
-// Cleanup on exit
-function cleanup() {
-  log('DEV', colors.yellow, 'Shutting down...');
-
-  processes.forEach((proc) => {
-    if (proc && !proc.killed) {
-      proc.kill();
+function start(label: string, command: string, args: string[], env = process.env) {
+  const child = spawn(command, args, { stdio: ['inherit', 'pipe', 'pipe'], env });
+  child.stdout?.on('data', (data) => process.stdout.write(`[${label}] ${data}`));
+  child.stderr?.on('data', (data) => process.stderr.write(`[${label}] ${data}`));
+  child.on('exit', (code, signal) => {
+    if (!shuttingDown) {
+      console.error(`[${label}] exited (${signal || code})`);
+      void shutdown(code || 1);
     }
   });
-
-  process.exit(0);
+  children.push(child);
+  return child;
 }
 
-// Handle graceful shutdown
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
+async function waitForPort(timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const ready = await new Promise<boolean>((resolve) => {
+      const socket = connect({ host, port });
+      socket.once('connect', () => { socket.destroy(); resolve(true); });
+      socket.once('error', () => resolve(false));
+    });
+    if (ready) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`PGlite socket did not become ready on ${host}:${port}`);
+}
 
-// Start all processes
-log('DEV', colors.yellow, 'Starting development environment...');
-startNextJS();
+async function shutdown(exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  for (const child of children) child.kill('SIGTERM');
+  setTimeout(() => {
+    for (const child of children) if (!child.killed) child.kill('SIGKILL');
+    process.exit(exitCode);
+  }, 5_000).unref();
+  await Promise.all(children.map((child) => {
+    if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+    return new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  }));
+  process.exit(exitCode);
+}
 
-// Give Next.js a moment to start, then start worker
-// setTimeout(() => {
-//   startWorker();
-// }, 2000);
+process.on('SIGINT', () => void shutdown());
+process.on('SIGTERM', () => void shutdown());
 
-// Keep the process running
-process.stdin.resume();
+console.log('[DEV] Starting the local PGlite owner...');
+start('DB', 'bun', ['run', 'scripts/dev-db.ts'], { ...process.env, NODE_ENV: 'development' });
+await waitForPort();
+
+const appEnv = { ...process.env, DATABASE_URL: databaseUrl };
+console.log(`[DEV] Database ready; starting web and worker against ${databaseUrl}`);
+start('NEXT', 'bun', ['next', 'dev'], appEnv);
+start('WORKER', 'bun', ['run', 'src/lib/worker.ts'], appEnv);

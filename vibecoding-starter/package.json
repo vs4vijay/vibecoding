@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "PORT=7070 bun run scripts/dev.ts",
+    "dev:db": "bun run scripts/dev-db.ts",
     "dev:next": "next dev",
     "dev:worker": "bun run src/lib/worker.ts",
     "build": "next build",
@@ -17,17 +18,20 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.4.5",
+    "@electric-sql/pglite": "^0.5.4",
     "@prisma/client": "6",
     "next": "16.2.4",
+    "pg": "^8.23.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zod": "^4.4.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite-socket": "^0.2.7",
     "@prisma/adapter-pg": "6",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.21.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

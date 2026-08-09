@@ -1,4 +1,5 @@
-import { executeQuery, getPGliteInstance } from '../db';
+import { Client } from 'pg';
+import { executeQuery, getDatabaseUrl } from '../db';
 import { IQueue, Job, JobOptions, JobPayload } from './types';
 
 const CHANNEL_NAME = 'job_queue';
@@ -9,23 +10,23 @@ function generateId(): string {
   return `job_${timestamp}${randomStr}`;
 }
 
-function rowToJob(row: any): Job {
+function rowToJob(row: Record<string, unknown>): Job {
   return {
-    id: row.id,
-    taskIdentifier: row.task_identifier,
-    payload: typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload,
-    status: row.status,
-    priority: row.priority,
-    runAt: new Date(row.run_at),
-    attempts: row.attempts,
-    maxAttempts: row.max_attempts,
-    lastError: row.last_error,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-    lockedAt: row.locked_at ? new Date(row.locked_at) : null,
-    lockedBy: row.locked_by,
-    completedAt: row.completed_at ? new Date(row.completed_at) : null,
-    queue: row.queue,
+    id: row.id as string,
+    taskIdentifier: row.task_identifier as string,
+    payload: (typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload) as JobPayload,
+    status: row.status as Job['status'],
+    priority: row.priority as number,
+    runAt: new Date(row.run_at as string),
+    attempts: row.attempts as number,
+    maxAttempts: row.max_attempts as number,
+    lastError: row.last_error as string | null,
+    createdAt: new Date(row.created_at as string),
+    updatedAt: new Date(row.updated_at as string),
+    lockedAt: row.locked_at ? new Date(row.locked_at as string) : null,
+    lockedBy: row.locked_by as string | null,
+    completedAt: row.completed_at ? new Date(row.completed_at as string) : null,
+    queue: row.queue as string | null,
   };
 }
 
@@ -72,10 +73,10 @@ export class PostgresQueue implements IQueue {
 
     const job = rowToJob(result[0]);
 
-    await executeQuery(
-      `NOTIFY ${CHANNEL_NAME}, $1`,
-      [JSON.stringify({ jobId: job.id })]
-    );
+    await executeQuery(`SELECT pg_notify($1, $2)`, [
+      CHANNEL_NAME,
+      JSON.stringify({ jobId: job.id }),
+    ]);
 
     return job;
   }
@@ -98,7 +99,7 @@ export class PostgresQueue implements IQueue {
     const offset = filters?.offset || 0;
 
     let query = 'SELECT * FROM jobs WHERE 1=1';
-    const params: any[] = [];
+    const params: unknown[] = [];
     let paramIndex = 1;
 
     if (filters?.status) {
@@ -185,31 +186,29 @@ export class PostgresQueue implements IQueue {
   }
 
   async subscribe(callback: (jobId: string) => void): Promise<() => void> {
-    const pglite = await getPGliteInstance();
-
-    if (!pglite) {
-      console.warn('⚠️  LISTEN/NOTIFY not available (using PGlite without notify support)');
-      return () => {};
-    }
-
+    const client = new Client({ connectionString: getDatabaseUrl() });
     try {
-      await (pglite as any).query(`LISTEN ${CHANNEL_NAME}`);
-
-      (pglite as any).onNotification = (notification: any) => {
+      await client.connect();
+      await client.query(`LISTEN ${CHANNEL_NAME}`);
+      client.on('notification', (notification) => {
         if (notification.channel === CHANNEL_NAME) {
           try {
-            const data = JSON.parse(notification.payload);
+            const data = JSON.parse(notification.payload || '{}');
             callback(data.jobId);
           } catch (e) {
             console.error('Failed to parse notification:', e);
           }
         }
-      };
+      });
     } catch (e) {
+      await client.end().catch(() => undefined);
       console.warn('⚠️  Could not subscribe to notifications:', e);
+      return () => {};
     }
 
-    return () => {};
+    return () => {
+      void client.end();
+    };
   }
 }
 

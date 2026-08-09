@@ -2,8 +2,7 @@
 
 Get your Postgres-for-Everything stack running in 60 seconds.
 
-> **💡 Note**: This quick start uses PGlite (API + Frontend only).
-> For background jobs, see [DEV_MODES.md](DEV_MODES.md).
+> This quick start runs the complete stack, including background jobs, on PGlite.
 
 ## Prerequisites
 
@@ -24,22 +23,22 @@ bun run db:generate
 # 3. Initialize database (creates schema + seed data)
 bun run db:init
 
-# 4. Start development server (Next.js only)
-bun run dev:next
+# 4. Start PGlite socket, Next.js, and the worker
+bun run dev
 ```
 
 ## Verify Installation
 
-1. **Homepage**: http://localhost:3000
-2. **Job Dashboard**: http://localhost:3000/jobs
-3. **Items API**: http://localhost:3000/api/items
+1. **Homepage**: http://localhost:7070
+2. **Job Dashboard**: http://localhost:7070/jobs
+3. **Items API**: http://localhost:7070/api/items
 
 ## Test the System
 
 Create an item and watch the background job process it:
 
 ```bash
-curl -X POST http://localhost:3000/api/items \
+curl -X POST http://localhost:7070/api/items \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Test Item",
@@ -53,9 +52,9 @@ Then check the job dashboard to see the job execute in real-time!
 ## What's Running?
 
 When you run `bun run dev`:
-- **Next.js dev server** on port 3000
-- **Graphile Worker** processing jobs in the background
-- **PGlite database** at `./dev.db`
+- **PGlite socket owner** on port 5433, with persistent data at `./dev.db`
+- **Next.js dev server** on port 7070
+- **Worker** processing jobs through the same database socket
 
 All running locally, no Docker or external services needed.
 
