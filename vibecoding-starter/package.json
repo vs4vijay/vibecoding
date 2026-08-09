@@ -3,18 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "PORT=7070 bun run scripts/dev.ts",
-    "dev:db": "bun run scripts/dev-db.ts",
-    "dev:next": "next dev",
+    "dev": "PORT=7070 bun run scripts/start-development.ts",
+    "dev:db": "bun run scripts/start-database.ts",
+    "dev:app": "next dev",
     "dev:worker": "bun run src/lib/worker.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
-    "db:init": "bun run scripts/init-db.ts",
+    "db:init": "bun run scripts/initialize-database.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "bun run prisma/seed.ts",
+    "db:seed": "bun run scripts/seed-database.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {

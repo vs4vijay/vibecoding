@@ -9,6 +9,7 @@ difference between development and production is which server owns that endpoint
 bun install
 bun run db:generate
 bun run db:init
+bun run db:seed
 bun run dev
 ```
 
@@ -27,12 +28,12 @@ To run pieces separately:
 
 ```bash
 bun run dev:db
-DATABASE_URL=postgresql://postgres@127.0.0.1:5433/postgres bun run dev:next
+DATABASE_URL=postgresql://postgres@127.0.0.1:5433/postgres bun run dev:app
 DATABASE_URL=postgresql://postgres@127.0.0.1:5433/postgres bun run dev:worker
 ```
 
-Do not run `db:init` while `dev-db` owns the database file. Stop the development
-stack first.
+Do not run `db:init` or `db:seed` while `dev:db` owns the database file. Stop
+the development stack first.
 
 ## Production PostgreSQL
 
@@ -46,8 +47,8 @@ DATABASE_URL=postgresql://user:password@host:5432/database bun run dev:worker
 ```
 
 The API, worker, queue, and `executeQuery()` use the same `pg` client path in both
-modes. PGlite-specific code exists only in `scripts/dev-db.ts` and
-`scripts/init-db.ts`.
+modes. PGlite-specific code exists only in `scripts/start-database.ts`,
+`scripts/initialize-database.ts`, and `scripts/seed-database.ts`.
 
 ## Configuration
 

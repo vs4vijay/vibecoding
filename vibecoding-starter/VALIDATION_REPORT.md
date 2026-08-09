@@ -96,7 +96,7 @@
 
 **Option A: Next.js Only (Current Default)**
 ```bash
-bun run dev:next
+bun run dev:app
 ```
 - ✅ Frontend works
 - ✅ API routes work

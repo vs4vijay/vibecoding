@@ -69,6 +69,7 @@ This starter embraces simplicity by using PostgreSQL for all persistence needs:
 bun install
 bun run db:generate
 bun run db:init
+bun run db:seed
 
 # Start PGlite socket + API + frontend + worker
 bun run dev
@@ -99,9 +100,10 @@ bun install
 bun run db:generate
 ```
 
-4. Initialize database (creates PGlite database with schema + seed data):
+4. Initialize and seed the local database:
 ```bash
 bun run db:init
+bun run db:seed
 ```
 
 5. Start development:
@@ -144,12 +146,12 @@ vibecoding-starter/
 │           ├── process-item.ts
 │           └── send-notification.ts
 ├── prisma/
-│   ├── schema.prisma          # Database schema
-│   ├── migrations/            # Migration history
-│   └── seed.ts               # Seed data
+│   └── schema.prisma          # Database schema documentation
 ├── scripts/
-│   ├── dev.ts                # Development process runner
-│   └── dev-db.ts             # Single PGlite socket owner
+│   ├── initialize-database.ts # Initialize the local schema
+│   ├── seed-database.ts       # Reset and insert local sample data
+│   ├── start-database.ts      # Single PGlite socket owner
+│   └── start-development.ts   # Full development process runner
 ├── .env.example
 │   ├── .env.local
 │   ├── package.json
@@ -293,7 +295,7 @@ bun run dev
 bun run dev:db
 
 # Start only Next.js
-bun run dev:next
+bun run dev:app
 
 # Start only Worker (requires DATABASE_URL and a running database)
 bun run dev:worker
@@ -307,6 +309,10 @@ bun run start
 # Run linter
 bun run lint
 ```
+
+`db:init` creates missing local tables without changing existing rows. `db:seed`
+resets the local `items` table and inserts the sample records. Stop `dev` or
+`dev:db` before running either command so only one process owns the PGlite data.
 
 ## Production Deployment
 

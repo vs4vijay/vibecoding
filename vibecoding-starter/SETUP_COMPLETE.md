@@ -86,7 +86,8 @@ vibecoding-starter/
 │   └── seed.ts             # Seed data script
 ├── scripts/
 │   ├── dev.ts              # Development runner
-│   └── init-db.ts          # Database initialization
+│   ├── initialize-database.ts # Database initialization
+│   └── seed-database.ts       # Local sample data
 └── dev.db                  # PGlite database (local only)
 ```
 
@@ -94,7 +95,7 @@ vibecoding-starter/
 
 ### Add a New Database Model
 1. Update `prisma/schema.prisma`
-2. Add CREATE TABLE in `scripts/init-db.ts`
+2. Add CREATE TABLE SQL in `src/lib/schema.ts`
 3. Recreate database: `rm dev.db && bun run db:init`
 4. Create API routes in `src/app/api/[model]/`
 
@@ -115,7 +116,7 @@ const items = await executeQuery('SELECT * FROM items WHERE id = $1', [id]);
 
 ```bash
 bun run dev         # Start Next.js + Worker
-bun run dev:next    # Start only Next.js
+bun run dev:app     # Start only Next.js
 bun run dev:worker  # Start only Worker
 bun run build       # Build for production
 bun run start       # Start production server

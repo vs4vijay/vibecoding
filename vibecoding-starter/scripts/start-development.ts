@@ -56,7 +56,7 @@ process.on('SIGINT', () => void shutdown());
 process.on('SIGTERM', () => void shutdown());
 
 console.log('[DEV] Starting the local PGlite owner...');
-start('DB', 'bun', ['run', 'scripts/dev-db.ts'], { ...process.env, NODE_ENV: 'development' });
+start('DB', 'bun', ['run', 'scripts/start-database.ts'], { ...process.env, NODE_ENV: 'development' });
 await waitForPort();
 
 const appEnv = { ...process.env, DATABASE_URL: databaseUrl };

@@ -80,7 +80,7 @@ Cause: PGlite connection interface incompatible with Graphile Worker
 
 **Quick Mode (Default)** - PGlite
 ```bash
-bun run dev:next
+bun run dev:app
 ```
 - Perfect for: API development, frontend work
 - Works: Everything except background jobs

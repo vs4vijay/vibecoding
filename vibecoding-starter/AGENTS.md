@@ -42,10 +42,9 @@ This is a **Postgres-for-Everything** full-stack starter that uses PostgreSQL fo
   - Worker runs as separate process
 
 ### Database Initialization
-- `scripts/init-db.ts` - Creates schema in PGlite
-  - Creates items table
-  - Creates jobs table (custom queue)
-  - Seeds sample data
+- `scripts/initialize-database.ts` - Creates the schema in PGlite
+- `scripts/seed-database.ts` - Resets and inserts local sample data
+- `src/lib/schema.ts` - Shared schema SQL used by initialization and the local database server
 
 ### API Routes
 - `src/app/api/items/route.ts` - Item CRUD endpoints
@@ -73,7 +72,7 @@ const items = await prisma.item.findMany(); // This won't work with PGlite
 
 ### Adding New Database Tables
 1. Update `prisma/schema.prisma` (for schema documentation)
-2. Add CREATE TABLE in `scripts/init-db.ts`
+2. Add CREATE TABLE SQL in `src/lib/schema.ts`
 3. Run `bun run db:generate` and `bun run db:init`
 4. Use `executeQuery()` to interact with new table
 
@@ -128,12 +127,13 @@ bun run db:generate
 
 # Initialize PGlite database
 bun run db:init
+bun run db:seed
 
 # Start dev server (Next.js only - no worker in PGlite mode)
 bun run dev
 
 # Start only Next.js
-bun run dev:next
+bun run dev:app
 
 # Start only Worker (requires PostgreSQL)
 bun run dev:worker
@@ -143,7 +143,7 @@ bun run dev:worker
 
 ### Adding a New Model
 1. Add to `prisma/schema.prisma`
-2. Add CREATE TABLE to `scripts/init-db.ts`
+2. Add CREATE TABLE SQL to `src/lib/schema.ts`
 3. Create API routes in `src/app/api/[model]/`
 4. Use `executeQuery()` for all operations
 
@@ -160,8 +160,8 @@ bun run dev:worker
 
 ### Modifying Database Schema
 1. Update `prisma/schema.prisma`
-2. Update `scripts/init-db.ts` with new CREATE/ALTER statements
-3. Run `bun run db:init` (or delete dev.db and re-init)
+2. Update `src/lib/schema.ts` with new CREATE/ALTER statements
+3. Run `bun run db:init` (or delete dev.db and re-initialize)
 
 ## Critical Rules
 
@@ -227,7 +227,7 @@ CREATE TABLE jobs (
 - Solution: Replace with `executeQuery()` and raw SQL
 
 **Error: Migration failed**
-- Solution: PGlite doesn't support Prisma migrations. Use `scripts/init-db.ts`
+- Solution: PGlite doesn't support Prisma migrations. Update `src/lib/schema.ts`, then run `bun run db:init`
 
 **Error: Worker not processing jobs**
 - Solution: Ensure task is registered in `src/workers/tasks/index.ts`

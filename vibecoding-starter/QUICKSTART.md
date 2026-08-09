@@ -20,8 +20,9 @@ bun install
 # 2. Generate Prisma client
 bun run db:generate
 
-# 3. Initialize database (creates schema + seed data)
+# 3. Initialize and seed the database
 bun run db:init
+bun run db:seed
 
 # 4. Start PGlite socket, Next.js, and the worker
 bun run dev
