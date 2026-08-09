@@ -15,6 +15,8 @@ https://github.com/anomalyco/opencode
 The open source AI coding agent. A powerful terminal-based AI assistant for developers, providing intelligent coding assistance directly in your terminal. Supports multiple AI providers including OpenAI, Anthropic Claude, Google Gemini, and more.
 
 ```bash
+bun add -g opencode-ai
+
 OPENCODE_SERVER_USERNAME=viz OPENCODE_SERVER_PASSWORD=VerySecurePasswordHere opencode web --hostname 0.0.0.0 --port 3030 --mdns --mdns-domain vizcode.local
 ```
 
@@ -65,16 +67,19 @@ bun install -g @oh-my-pi/pi-coding-agent
 - agent-browser
 - superpowers Skills - https://github.com/obra/superpowers
 ```bash
+# List Skills
+bun x skills ls -g
+
 bun x skills add https://github.com/vercel-labs/skills --skill find-skills
 bun x skills add vercel-labs/agent-skills --skill skill-creator
 bun x skills add anthropics/skills --skill skill-creator
 
 
 # Playwright
-- bun add -g @playwright/cli@latest
-- playwright-cli install --skills
-- # OR
-- bun x skills add -g https://github.com/microsoft/playwright-cli --skill playwright-cli
+bun add -g @playwright/cli@latest
+playwright-cli install --skills
+# OR
+bun x skills add -g https://github.com/microsoft/playwright-cli --skill playwright-cli
 
 bun x skills add https://github.com/browser-use/browser-use --skill browser-use
 bun x skills add vercel-labs/agent-browser
@@ -88,6 +93,7 @@ bun x skills add remotion/agent-skills
 bun x skills add heygen-com/hyperframes
 
 
+bun x skills add juliusbrussee/caveman@caveman
 claude skill add juliusbrussee/caveman:caveman
 
 
@@ -99,10 +105,6 @@ android skills add --skill base
 
 # OLD
 bun x skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
-
-
-# List Skills
-bun x skills ls -g
 ```
 
 ## MCP used
@@ -129,6 +131,8 @@ codex mcp add deepwiki --url https://mcp.deepwiki.com/mcp
 ## Experiments
 
 ```
+alias vcodex="CODEX_HOME=~/.codex-vijay codex"
+
 herdr
 
 GSD
