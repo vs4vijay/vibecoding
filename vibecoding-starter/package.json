@@ -7,6 +7,7 @@
     "dev:db": "bun run scripts/start-database.ts",
     "dev:app": "next dev",
     "dev:worker": "bun run src/lib/worker.ts",
+    "start:worker": "bun run src/lib/worker.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

@@ -117,7 +117,7 @@ const items = await executeQuery('SELECT * FROM items WHERE id = $1', [id]);
 ```bash
 bun run dev         # Start Next.js + Worker
 bun run dev:app     # Start only Next.js
-bun run dev:worker  # Start only Worker
+bun run dev:worker  # Start only Worker (development)
 bun run build       # Build for production
 bun run start       # Start production server
 bun run db:init     # Initialize/reset database
@@ -172,7 +172,7 @@ When ready for production:
 
 4. **Run worker separately**
    ```bash
-   bun run dev:worker
+   bun run start:worker
    ```
 
 ## Next Steps

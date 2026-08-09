@@ -43,8 +43,14 @@ processes. Never run `dev:db` in production; it refuses to start when
 
 ```bash
 DATABASE_URL=postgresql://user:password@host:5432/database bun run start
-DATABASE_URL=postgresql://user:password@host:5432/database bun run dev:worker
+DATABASE_URL=postgresql://user:password@host:5432/database bun run start:worker
 ```
+
+The production worker entrypoint is `src/lib/worker.ts`, exposed as
+`bun run start:worker` in `package.json`. It registers every task from
+`src/workers/tasks/index.ts`, polls the `jobs` table, and also listens for
+PostgreSQL notifications. Set `DATABASE_URL` on the worker process; it does not
+need the PGlite socket or a Next.js server.
 
 The API, worker, queue, and `executeQuery()` use the same `pg` client path in both
 modes. PGlite-specific code exists only in `scripts/start-database.ts`,

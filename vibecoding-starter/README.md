@@ -340,16 +340,25 @@ This starter can be deployed to:
 
 ### Worker Deployment
 
-For production, run the worker as a separate process:
+For production, run the worker as a separate process. The worker connects to
+the same PostgreSQL database as the web app through `DATABASE_URL`:
 
 ```bash
-bun run dev:worker
+DATABASE_URL=postgresql://user:password@host:5432/database \
+  NODE_ENV=production bun run start:worker
 ```
 
 Or use a process manager like PM2:
 ```bash
-pm2 start "bun run dev:worker" --name worker
+pm2 start "bun run start:worker" --name worker \
+  --update-env
 ```
+
+Run the web app separately with `DATABASE_URL=... NODE_ENV=production bun run
+start`. Deploying the web app does not start the worker automatically; provision
+the worker as its own service or process. You can run multiple worker replicas
+against the same database because jobs are claimed atomically with
+`FOR UPDATE SKIP LOCKED`.
 
 ## Environment Variables
 
