@@ -16,11 +16,13 @@ The open source AI coding agent. A powerful terminal-based AI assistant for deve
 
 ```bash
 bun add -g opencode-ai
+# for opencode v2
+bun add -g --trust @opencode-ai/cli@next 
 
 OPENCODE_SERVER_USERNAME=viz OPENCODE_SERVER_PASSWORD=VerySecurePasswordHere opencode web --hostname 0.0.0.0 --port 3030 --mdns --mdns-domain vizcode.local
 ```
 
-### Oh My OpenCode
+### Oh My OpenAgent
 
 https://github.com/code-yeongyu/oh-my-opencode
 https://github.com/code-yeongyu/oh-my-openagent
@@ -32,6 +34,7 @@ The best agent harness - a plugin that transforms OpenCode into a powerful multi
 
 ```bash
 bun add -g @earendil-works/pi-coding-agent
+bun add -g --ignore-scripts @earendil-works/pi-coding-agent
 
 pi install npm:pi-llama-cpp
 pi install npm:pi-web-access
@@ -50,11 +53,21 @@ bun install -g @oh-my-pi/pi-coding-agent
 
 # export AZURE_OPENAI_BASE_URL="..../v1"
 # export AZURE_OPENAI_API_KEY="YOUR_AZURE_OPENAI_API_KEY"
+
+# ~/.omp/agent/models.yml
+providers:
+  viz-router:
+    baseUrl: http://localhost:11111
+    apiKey: sk
+    api: openai-completions
+    auth: apiKey
+    discovery:
+      type: openai-models-list
 ```
 
 ### Tools used
 
-- rtk-ai
+- rtk-ai - `brew install rtk-ai/tap/rtk`
 - gnhf - `bun add -g gnhf`
 - gsd - `bun x @opengsd/gsd-core@latest` https://github.com/open-gsd/gsd-core
 - omniroute - `bun add -g omniroute`
@@ -88,10 +101,8 @@ agent-browser install
 
 bun x skills add manaflow-ai/cmux -g -y
 
-
 bun x skills add remotion/agent-skills
 bun x skills add heygen-com/hyperframes
-
 
 bun x skills add juliusbrussee/caveman@caveman
 claude skill add juliusbrussee/caveman:caveman
@@ -102,6 +113,8 @@ bun x skills@latest add mattpocock/skills --full-depth
 
 android init
 android skills add --skill base
+
+bun install -g @openai/codex
 
 # OLD
 bun x skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
@@ -134,6 +147,7 @@ codex mcp add deepwiki --url https://mcp.deepwiki.com/mcp
 alias vcodex="CODEX_HOME=~/.codex-vijay codex"
 
 herdr
+curl -fsSL https://herdr.dev/install.sh | sh
 
 GSD
 
@@ -173,6 +187,29 @@ https://github.com/Gitlawb/openclaude
 https://github.com/1jehuang/jcode
 
 https://github.com/virgiliojr94/book-to-skill
+
+curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh
+
+https://github.com/cloudflare/computer
+
+https://crabbox.sh/
+
+https://github.com/mksglu/context-mode
+
+
+
+bun x skills@latest update
+bun x skills@latest add addyosmani/agent-skills --list 
+bun x skills@latest add mattpocock/skills
+bun x skills@latest add anthropics/claude-code --skill frontend-design
+bun x skills@latest add obra/superpowers
+
+bun x  skills add https://github.com/nextlevelbuilder/ui-ux-pro-max-skill --skill ui-ux-pro-max
+
+
+pi install git:github.com/obra/superpowers
+
+Gauntlet Loop
 
 ```
 
