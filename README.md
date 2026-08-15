@@ -198,13 +198,13 @@ https://github.com/mksglu/context-mode
 
 
 
-bun x skills@latest update
-bun x skills@latest add addyosmani/agent-skills --list 
-bun x skills@latest add mattpocock/skills
-bun x skills@latest add anthropics/claude-code --skill frontend-design
-bun x skills@latest add obra/superpowers
+bunx skills@latest update
+bunx skills@latest add addyosmani/agent-skills --list 
+bunx skills@latest add mattpocock/skills
+bunx skills@latest add anthropics/claude-code --skill frontend-design
+bunx skills@latest add obra/superpowers
 
-bun x  skills add https://github.com/nextlevelbuilder/ui-ux-pro-max-skill --skill ui-ux-pro-max
+bunx skills add https://github.com/nextlevelbuilder/ui-ux-pro-max-skill --skill ui-ux-pro-max
 
 
 pi install git:github.com/obra/superpowers
