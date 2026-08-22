@@ -40,6 +40,14 @@ import {
 } from "./screens";
 import { initAudio, resumeAudio, startMusic, stopMusic, sfx, suspendAudio, toggleMute, updateEngine } from "./audio";
 import { createJuice } from "./juice";
+import {
+  createGhostPlayer,
+  createGhostRecorder,
+  GHOST_FORMAT_VERSION,
+  loadGhost,
+  storeGhost,
+  type GhostRecording,
+} from "./ghost";
 
 /** High-level game flow (Phase 5): title → countdown → race → results. */
 export type Phase = "title" | "countdown" | "race" | "results";
@@ -296,6 +304,52 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     );
   }
 
+  // --- Ghost Car (Phase 14) -----------------------------------------------------
+  /**
+   * Cosmetic replay of the player's (P1's) best lap per track. Recording and
+   * storage mirror the best-times flow; playback is a translucent mesh that
+   * never enters world.tanks, so collisions/AI/standings ignore it by
+   * construction. In 2P the ghost always follows P1's line — P2 laps are NOT
+   * recorded (one ghost per track keeps the minimap-free HUD clean and the
+   * choice documented here).
+   */
+
+  /** localStorage key for the on/off toggle ("on" | "off"). */
+  const GHOST_TOGGLE_KEY = "tankracer.ghost";
+
+  function loadStoredGhostEnabled(): boolean {
+    try {
+      return localStorage.getItem(GHOST_TOGGLE_KEY) !== "off"; // default ON
+    } catch {
+      return true;
+    }
+  }
+
+  function storeGhostEnabled(on: boolean): void {
+    try {
+      localStorage.setItem(GHOST_TOGGLE_KEY, on ? "on" : "off");
+    } catch {
+      /* private mode etc. — selection just won't persist */
+    }
+  }
+
+  let ghostEnabled = loadStoredGhostEnabled();
+  /** Ghost recording for the currently loaded track (null = none stored). */
+  let ghostData: GhostRecording | null = null;
+
+  const ghostRecorder = createGhostRecorder();
+  const ghostPlayer = createGhostPlayer(scene);
+
+  /** Title-screen G toggle: persists + refreshes the title card pill. */
+  function toggleGhost(): void {
+    if (world.phase !== "title") return;
+    ghostEnabled = !ghostEnabled;
+    storeGhostEnabled(ghostEnabled);
+    screens.setGhost(ghostEnabled);
+    sfx.pickup();
+    if (!ghostEnabled) ghostPlayer.hide();
+  }
+
   let trackIndex = loadStoredTrackIndex();
   let track!: Track; // assigned by loadTrack() below
   let powerups: Powerups; // rebuilt per track (crate spots come from the TrackDef)
@@ -365,6 +419,11 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
     screens.setTrackName(def.name);
     showBestTimesForTrack(def);
+
+    // Phase 14: ghosts are per-track — drop the old circuit's recording,
+    // hide any playing mesh and load the new circuit's stored lap.
+    ghostPlayer.hide();
+    ghostData = loadGhost(def.id);
   }
 
   /** How many human tanks lead world.tanks (1 in 1P, P1+P2 in 2P). */
@@ -488,6 +547,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   screens.showTitle(`${TRACK_DEFS.length} CIRCUITS`);
   setPhase("title"); // hoisted function decl; hides the HUD behind the title card
   selectTank(tankIndex); // applies livery/stats + title-screen stats card
+  screens.setGhost(ghostEnabled); // Phase 14: ghost pill reflects the toggle
   touchInput.attach(); // safe now: world + phase exist for the onEnable callback
 
   // Phase 13: restore the persisted mode. Touch and gamepad devices are
@@ -666,6 +726,14 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     countdownStep = -1;
     goHideTimer = 0;
     screens.hideResults();
+    // Phase 14: fresh recording for this race; ghost (if stored + enabled)
+    // rewinds to the line and starts replaying from GO.
+    ghostRecorder.reset();
+    if (ghostEnabled && ghostData) {
+      ghostPlayer.begin(ghostData);
+    } else {
+      ghostPlayer.hide();
+    }
     // Phase 13: "P1 vs P2" flavor in split-screen mode
     screens.showCountdownTag(
       world.twoPlayer ? "P1 VS P2 — READY" : `${playerTankDef().name} — READY`,
@@ -787,6 +855,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     // Phase 13: every HUMAN finisher is eligible for best times — in 2P both
     // players' best laps and totals are compared against the stored records.
     const best = loadBestTimes(track.def.id);
+    const prevStoredLap = best.lap; // Phase 14: ghost eligibility baseline
     const newBest: NewBest = { lap: false, total: false };
     for (const racer of world.racers) {
       if (!isHumanTank(racer.tank)) continue;
@@ -804,6 +873,24 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       }
     }
     if (newBest.lap || newBest.total) storeBestTimes(track.def.id, best);
+
+    // Phase 14: store P1's recorded lap when it beat what was previously on
+    // disk (P1-only by design — the ghost always replays P1's line, even in
+    // 2P where P2 may hold the actual best-lap record). Reload so the next
+    // race immediately replays the fresh recording.
+    if (
+      ghostRecorder.bestSamples &&
+      ghostRecorder.bestTime !== null &&
+      (prevStoredLap === null || ghostRecorder.bestTime < prevStoredLap)
+    ) {
+      storeGhost(track.def.id, {
+        v: GHOST_FORMAT_VERSION,
+        lap: ghostRecorder.bestTime,
+        samples: ghostRecorder.bestSamples,
+      });
+      ghostData = loadGhost(track.def.id);
+    }
+
     screens.showResults(buildResultRows(), track.def.name, newBest);
   }
 
@@ -855,6 +942,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   /** Lap/gate event side effects: FINAL LAP banner + finish detection. */
   function handleProgressEvent(tank: TankState, racer: Racer, ev: ProgressEvent): void {
     if (ev !== "lap") return;
+    // Phase 14: a P1 lap just completed — keep its recording if it's the
+    // best one driven this race (P2 laps are never recorded; see above).
+    if (tank === player) ghostRecorder.completeLap();
     const prog = racer.progress;
     if (prog.lap > TOTAL_LAPS) {
       if (racer.finishTime === null) racer.finishTime = world.raceTime;
@@ -958,7 +1048,16 @@ export function createGame(canvas: HTMLCanvasElement): Game {
         );
       }
     }
-    if (driving) updateStandings(world);
+    if (driving) {
+      // Phase 14: sample P1's line every ~100ms. Lap-relative timing is the
+      // recorder's own dt accumulator, reset by completeLap() at each lap
+      // event above — immune to progress-reset ordering.
+      ghostRecorder.observe(dt, player.position.x, player.position.z, player.heading);
+      updateStandings(world);
+    }
+    // Phase 14: cosmetic replay — advances only while the sim runs, so pause
+    // freezes it too. No physics interaction: the mesh is never a TankState.
+    ghostPlayer.update(dt);
     updateBoostPads(track, dt);
     // Shell movement/hits + wreck timers → respawn
     weapons.update(world, dt);
@@ -1000,9 +1099,13 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       resetRace();
       return;
     }
-    // Phase 13: C toggles 1P/2P on the title screen
+    // Phase 13/14: C toggles 1P/2P, G toggles the ghost replay (title only)
     if (e.code === "KeyC" && world.phase === "title") {
       toggleMode();
+      return;
+    }
+    if (e.code === "KeyG" && world.phase === "title") {
+      toggleGhost();
       return;
     }
     // Title screen: LEFT/RIGHT cycles circuits (Phase 6), UP/DOWN tanks (Phase 7)

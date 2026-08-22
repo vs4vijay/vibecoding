@@ -440,6 +440,26 @@ body {
   );
 }
 
+/* --- Phase 14: ghost toggle (G) on the title card --------------------------- */
+
+/* Smaller sibling of the mode pill; cyan when the ghost is armed */
+#screen-ghost-select {
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 5px 18px;
+  display: inline-block;
+}
+
+#screen-ghost-select.on {
+  color: #7fe9ff;
+  border-color: rgba(127, 233, 255, 0.7);
+}
+
 /* Per-player control columns on the 2P title card */
 .controls-cols {
   display: flex;

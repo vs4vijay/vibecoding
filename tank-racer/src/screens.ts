@@ -45,6 +45,8 @@ export interface Screens {
   /** Phase 13: title-screen mode display ("1 PLAYER" / "2 PLAYERS") +
    * per-player control hints in 2P. */
   setMode(twoPlayer: boolean): void;
+  /** Phase 14: title-screen ghost toggle display ("GHOST ON" / "GHOST OFF"). */
+  setGhost(on: boolean): void;
   /** Tank name shown under the big countdown text (Phase 7). */
   showCountdownTag(text: string): void;
   showCountdown(text: string): void;
@@ -86,6 +88,7 @@ export function createScreens(rootId = "screens"): Screens {
   let tankNameEl: HTMLDivElement | null = null;
   let statsCardEl: HTMLDivElement | null = null;
   let modeEl: HTMLDivElement | null = null;
+  let ghostEl: HTMLDivElement | null = null;
   let controlsEl: HTMLDivElement | null = null;
   function ensureTitle(): HTMLDivElement {
     if (title) return title;
@@ -152,6 +155,11 @@ export function createScreens(rootId = "screens"): Screens {
     modeEl = document.createElement("div");
     modeEl.id = "screen-mode-select";
     card.appendChild(modeEl);
+
+    // Phase 14: ghost toggle — G flips the replay ghost on/off (persisted)
+    ghostEl = document.createElement("div");
+    ghostEl.id = "screen-ghost-select";
+    card.appendChild(ghostEl);
 
     // Controls listing: rebuilt per mode by renderControls() (setMode)
     controlsEl = document.createElement("div");
@@ -289,6 +297,7 @@ export function createScreens(rootId = "screens"): Screens {
         ["← →", "choose track"],
         ["↑ ↓", "choose tank"],
         ["C", "toggle 2P mode"],
+        ["G", "toggle ghost"],
       ] as const) {
         el.appendChild(controlsRow(key, action));
       }
@@ -317,6 +326,7 @@ export function createScreens(rootId = "screens"): Screens {
       ["← →", "choose track"],
       ["↑ ↓", "choose tank (P1)"],
       ["C", "toggle mode"],
+      ["G", "toggle ghost"],
     ] as const) {
       el.appendChild(controlsRow(key, action));
     }
@@ -355,6 +365,13 @@ export function createScreens(rootId = "screens"): Screens {
         modeEl.classList.toggle("two", twoPlayer);
       }
       renderControls(twoPlayer);
+    },
+    setGhost(on: boolean) {
+      ensureTitle();
+      if (ghostEl) {
+        ghostEl.textContent = on ? "GHOST ON" : "GHOST OFF";
+        ghostEl.classList.toggle("on", on);
+      }
     },
     showCountdownTag(text: string) {
       ensureCountdownTag().textContent = text;
