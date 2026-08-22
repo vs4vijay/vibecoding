@@ -168,6 +168,18 @@ Two human players, one keyboard, split-screen:
 
 ---
 
+# v1.5 PHASES
+
+## Phase 14 — Ghost Car
+Record the player's lap positions during a race; after finishing, if it was their best lap on that track (+tank class irrelevant — keep per-track only), save the recording to localStorage (sampled every ~100ms: t, x, z, heading → a ~30–45s lap is only a few hundred samples). On subsequent races, spawn a translucent ghost tank replaying the saved best lap on loop, no collisions (shells pass through), rendered semi-transparent cyan-white, excluded from standings/minimap or shown as a faint dot. Toggleable on title screen (G key, persisted). HUD shows "GHOST" delta indicator optional — skip if noisy.
+**Done when:** ghost saves/loads/loops correctly per track, no physics/AI interference, toggle works, build clean.
+
+## Phase 15 — Championship Mode
+New mode on title (key V toggles SINGLE RACE / CHAMPIONSHIP): championship = all 4 tracks in fixed order vs 3 AI. After each race, results show RACE result + CHAMPIONSHIP STANDINGS table using points (1st=10, 2nd=7, 3rd=5, 4th=3); press ENTER/R to continue to next track's countdown. After race 4, final PODIUM screen (gold/silver/bronze styling by points, tiebreak by total race time then wins). Player tank choice persists across all races; AI names consistent. Esc during championship interstitial returns to title (championship abandoned). Persist an in-progress championship in localStorage so accidental refresh resumes at current race.
+**Done when:** full 4-race series plays through to podium, points math correct incl. ties, resume-after-refresh works, single-race flow unchanged, build clean.
+
+---
+
 ## Out of scope (v1)
 Multiplayer, mobile/touch controls, multiple tracks, tank selection, persistence,
 championship mode, real 3D assets/audio files.
