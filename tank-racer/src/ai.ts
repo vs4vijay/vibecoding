@@ -13,7 +13,7 @@ import {
   type ClosestTable,
 } from "./spline";
 import { applySpeedBoost, MAX_SPEED, type TankInput, type TankState } from "./tank";
-import type { Track } from "./track";
+import { gripAt, type Track } from "./track";
 import type { World, Racer } from "./game";
 
 // ---------------------------------------------------------------------------
@@ -183,6 +183,9 @@ export function createAIController(
     let steer = Math.abs(err) < STEER_DEADZONE ? 0 : clamp(-err * STEER_GAIN, -1, 1);
 
     // --- Corner speed: sample curvature ahead, brake-curve into it ----------
+    // Phase 11: the lateral grip budget shrinks on low-grip surface (ice),
+    // so each probe's corner speed is scaled by sqrt(grip) — v = √(a/κ) and
+    // a scales with the same lateral-grip multiplier the physics applies.
     let angPrev = headingAt(track.points, t);
     let vLimit = Infinity;
     for (let i = 1; i <= CURV_SAMPLES; i++) {
@@ -190,7 +193,9 @@ export function createAIController(
       const ang = headingAt(track.points, ti);
       const kappa = Math.abs(wrapPi(ang - angPrev)) / CURV_SAMPLE_STEP;
       angPrev = ang;
-      const cornerSpeed = Math.sqrt(pers.cornerGrip / Math.max(kappa, 1e-5));
+      const surfaceGrip = gripAt(track, ti).lateral; // 1 normally, 0.35 on ice
+      const effectiveGrip = pers.cornerGrip * (0.5 + 0.5 * surfaceGrip);
+      const cornerSpeed = Math.sqrt(effectiveGrip / Math.max(kappa, 1e-5));
       const dist = i * CURV_SAMPLE_STEP;
       vLimit = Math.min(vLimit, Math.sqrt(cornerSpeed * cornerSpeed + 2 * BRAKE_DECEL_EST * dist));
     }

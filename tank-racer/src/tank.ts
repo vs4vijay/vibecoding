@@ -209,6 +209,11 @@ export interface TankState {
   accel: number; // u/s² engine acceleration
   maxHp: number;
   fireCooldownMax: number; // seconds between shots
+  // --- Surface grip modifiers (Phase 11 ice patches) -------------------------
+  // Staged per frame by the game loop / sim script from the track under the
+  // tank. Undefined = normal grip, so existing tracks are unaffected.
+  gripLateral?: number; // multiplier on lateral grip rate (ice: 0.35)
+  gripAccel?: number; // multiplier on engine acceleration (ice: 0.6)
 }
 
 export const SHELL_DAMAGE = 25;
@@ -281,12 +286,15 @@ export function updateTankPhysics(tank: TankState, dt: number): void {
     const drop = Math.min((spinning ? SPIN_DRAG : ROLLING_FRICTION * 2) * Math.abs(speedForward), Math.abs(speedForward) / dt);
     accelAlong = -Math.sign(speedForward) * drop;
   } else if (input.throttle > 0) {
-    // Accelerating forward (or braking out of reverse)
+    // Accelerating forward (or braking out of reverse). Surface grip scales
+    // engine accel only — braking is unaffected (ice: gripAccel = 0.6).
+    const surfaceAccel = tank.accel * (tank.gripAccel ?? 1);
     accelAlong =
-      speedForward < -0.5 ? BRAKE_DECEL : tank.accel * (1 - clamp(speedForward / maxSpeed, 0, 1));
+      speedForward < -0.5 ? BRAKE_DECEL : surfaceAccel * (1 - clamp(speedForward / maxSpeed, 0, 1));
   } else if (input.throttle < 0) {
+    const surfaceAccel = tank.accel * (tank.gripAccel ?? 1);
     accelAlong =
-      speedForward > 0.5 ? -BRAKE_DECEL : -tank.accel * (1 - clamp(-speedForward / MAX_REVERSE, 0, 1));
+      speedForward > 0.5 ? -BRAKE_DECEL : -surfaceAccel * (1 - clamp(-speedForward / MAX_REVERSE, 0, 1));
   } else {
     // Rolling friction toward a stop
     accelAlong = -Math.sign(speedForward) * Math.min(ROLLING_FRICTION, Math.abs(speedForward) / dt);
@@ -305,7 +313,9 @@ export function updateTankPhysics(tank: TankState, dt: number): void {
   // --- Grip: bleed off lateral (sideways) velocity for drift feel ----------
   const right = new THREE.Vector3(forward.z, 0, -forward.x);
   const lateralSpeed = tank.velocity.dot(right);
-  const gripFactor = Math.exp(-(wrecked ? LATERAL_GRIP * 2 : LATERAL_GRIP) * dt);
+  const gripRate =
+    (wrecked ? LATERAL_GRIP * 2 : LATERAL_GRIP) * (tank.gripLateral ?? 1);
+  const gripFactor = Math.exp(-gripRate * dt);
   tank.velocity.addScaledVector(right, lateralSpeed * (gripFactor - 1));
 
   // --- Integrate -----------------------------------------------------------

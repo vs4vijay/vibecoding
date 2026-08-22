@@ -1,9 +1,10 @@
-// Phase 4/6 sanity check: run the AI brains against real tank physics on a
+// Phase 4/6/11 sanity check: run the AI brains against real tank physics on a
 // real circuit — no rendering, no shells. Reports lap times, wall contact,
 // and full-race times per AI.
-// Run: bun scripts/sim-ai.ts [dust-bowl|canyon-run]   (default: all tracks)
+// Run: bun scripts/sim-ai.ts [dust-bowl|canyon-run|glacier-loop]  (default: all)
 import { createTankMesh, createTankState, updateTankPhysics } from "../src/tank";
 import {
+  applySurfaceGrip,
   checkBoostPads,
   collideWithWalls,
   createTankProgress,
@@ -37,6 +38,7 @@ for (const def of selectedDefs) {
 
 function simulateTrack(def: (typeof TRACK_DEFS)[number]): void {
   const track = createTrack(def);
+  const wallDist = track.halfWidth - 0.6; // just inside the wall-collision boundary
   const grid = [
     { t: START_T - 0.003, lateral: -3.6 },
     { t: START_T - 0.003, lateral: 3.6 },
@@ -87,10 +89,12 @@ function simulateTrack(def: (typeof TRACK_DEFS)[number]): void {
       const d = controllers[i].think(DT, world);
       tanks[i].input.throttle = d.throttle;
       tanks[i].input.steer = d.steer;
+      // Phase 11: stage surface grip before physics, same as the game loop
+      applySurfaceGrip(track, tanks[i], racers[i].progress.lastT);
       updateTankPhysics(tanks[i], DT);
       collideWithWalls(track, tanks[i]);
       const after = closestOnSpline(track.table, tanks[i].position.x, tanks[i].position.z);
-      if (after.distSq > 6.4 * 6.4) wallHits[i] += 1;
+      if (after.distSq > wallDist * wallDist) wallHits[i] += 1;
       checkBoostPads(track, tanks[i]);
       const ev = updateTankProgress(racers[i].progress, after.t, DT, def.gates);
       if (ev === "lap") {

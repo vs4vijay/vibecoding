@@ -44,6 +44,10 @@ export interface TrackDef {
   /** Scene background/fog tint. */
   skyColor: number;
   groundColor: number;
+  /** Road half-width in u (default ROAD_HALF_WIDTH = 7 → ~14u wide road). */
+  roadHalfWidth?: number;
+  /** Spline t-ranges surfaced with low-grip ice (Phase 11 GLACIER LOOP). */
+  icePatches?: { from: number; to: number }[];
 }
 
 const DUST_BOWL: TrackDef = {
@@ -108,12 +112,52 @@ const CANYON_RUN: TrackDef = {
   groundColor: 0xdfa96a,
 };
 
-/** All selectable circuits (Phase 6) — order = title-screen cycle order. */
-export const TRACK_DEFS: TrackDef[] = [DUST_BOWL, CANYON_RUN];
+const GLACIER_LOOP: TrackDef = {
+  id: "glacier-loop",
+  name: "GLACIER LOOP",
+  points: [
+    { x: -140, z: -190 }, // 0: start/finish, long bottom straight heading +X
+    { x: 60, z: -200 }, // 1: end of the straight, sweeper entry
+    { x: 180, z: -160 }, // 2: long right-hand east sweeper
+    { x: 235, z: -40 }, // 3: east sweeper far point
+    { x: 170, z: 90 }, // 4: sweep out of the east rim toward the top
+    { x: 20, z: 150 }, // 5: top-left sweeper begins
+    { x: -130, z: 185 }, // 6: top-west approach
+    { x: -230, z: 110 }, // 7: big west sweeper entry
+    { x: -255, z: -30 }, // 8: west sweeper far point
+    { x: -210, z: -140 }, // 9: sweeping down onto the start straight
+  ],
+  padTs: [0.04, 0.46, 0.94], // on the three main straights/sweeper exits
+  crateTs: [0.12, 0.4, 0.6, 0.88],
+  gates: [0, 0.25, 0.5, 0.75],
+  dressing: {
+    seed: 9001,
+    rocks: 60, // snow banks (same scatter budget, icy palette)
+    cacti: 0,
+    mesas: 10, // glacial ice mounds
+    rockColor: 0xf0f6ff,
+    cactusColor: 0xf0f6ff, // unused with 0 cacti
+    mesaColor: 0xcfe8f7,
+  },
+  skyColor: 0xbfe0f5, // pale ice-blue sky + fog tint
+  groundColor: 0xeef4fa, // snowfield
+  roadHalfWidth: 8, // ~16u wide road — room to slide
+  icePatches: [
+    // Low-grip sections on the three big sweepers; visualized as lighter
+    // blue overlay strips on the road.
+    { from: 0.22, to: 0.32 },
+    { from: 0.56, to: 0.66 },
+    { from: 0.84, to: 0.94 },
+  ],
+};
 
-export const ROAD_HALF_WIDTH = 7; // road is ~14 units wide
+/** All selectable circuits (Phase 6) — order = title-screen cycle order. */
+export const TRACK_DEFS: TrackDef[] = [DUST_BOWL, CANYON_RUN, GLACIER_LOOP];
+
+export const ROAD_HALF_WIDTH = 7; // road is ~14 units wide (per-track default)
 export const WALL_HEIGHT = 1.2;
-/** Tanks are pushed back inside when their center strays past this offset. */
+/** Legacy default collide offset — runtime value is now per-track
+ * (`track.halfWidth - 0.5`) to support the wider GLACIER LOOP road. */
 export const WALL_COLLIDE_DIST = 6.5;
 
 /** Default checkpoint gates per lap (t values) — tracks may override. */
@@ -234,6 +278,8 @@ export interface Track {
   def: TrackDef;
   points: Vec2[];
   table: ClosestTable;
+  /** Road half-width in u — walls sit just outside, collision clamps inside. */
+  halfWidth: number;
   /** Coarse polyline for the minimap. */
   outline: Vec2[];
   group: THREE.Group;
@@ -243,6 +289,7 @@ export interface Track {
 export function createTrack(def: TrackDef): Track {
   const points = def.points;
   const table = buildClosestTable(points, 1000);
+  const halfWidth = def.roadHalfWidth ?? ROAD_HALF_WIDTH;
 
   // Coarse outline reused by the minimap
   const outline: Vec2[] = [];
@@ -251,21 +298,30 @@ export function createTrack(def: TrackDef): Track {
   const group = new THREE.Group();
 
   const asphaltMat = new THREE.MeshLambertMaterial({ color: 0x3a3a40 });
-  const road = new THREE.Mesh(buildRoadGeometry(points), asphaltMat);
+  const road = new THREE.Mesh(buildRoadGeometry(points, halfWidth), asphaltMat);
   road.receiveShadow = true;
   group.add(road);
 
   group.add(new THREE.Mesh(buildDashGeometry(points), DASH_MATERIAL));
   group.add(new THREE.Mesh(buildStartLine(points), START_LINE_MATERIAL));
-  group.add(new THREE.Mesh(buildWallRibbon(points, 1), WALL_MATERIAL));
-  group.add(new THREE.Mesh(buildWallRibbon(points, -1), WALL_MATERIAL));
+  group.add(new THREE.Mesh(buildWallRibbon(points, 1, halfWidth), WALL_MATERIAL));
+  group.add(new THREE.Mesh(buildWallRibbon(points, -1, halfWidth), WALL_MATERIAL));
+
+  // Phase 11: low-grip ice patches render as lighter blue overlay strips
+  if (def.icePatches && def.icePatches.length > 0) {
+    const ice = new THREE.Mesh(
+      buildIceOverlay(points, halfWidth, def.icePatches),
+      ICE_MATERIAL,
+    );
+    group.add(ice);
+  }
 
   for (const pt of buildDressing(table, def.dressing)) group.add(pt);
 
   const pads = def.padTs.map((t) => createPadMesh(points, t));
   for (const pad of pads) group.add(pad.mesh);
 
-  return { def, points, table, outline, group, pads };
+  return { def, points, table, halfWidth, outline, group, pads };
 }
 
 const DASH_MATERIAL = new THREE.MeshBasicMaterial({ color: 0xe8e8e8 });
@@ -274,9 +330,55 @@ const WALL_MATERIAL = new THREE.MeshLambertMaterial({
   side: THREE.DoubleSide,
 });
 const START_LINE_MATERIAL = new THREE.MeshBasicMaterial({ color: 0xf5f5f5 });
+// Phase 11: translucent light-blue film marking low-grip ice sections
+const ICE_MATERIAL = new THREE.MeshBasicMaterial({
+  color: 0xa8d8f8,
+  transparent: true,
+  opacity: 0.55,
+  depthWrite: false,
+});
+
+/**
+ * Ice-patch overlay: a flat ribbon slightly above the road covering each
+ * flagged t-range, merged into one geometry (one draw call per track).
+ */
+function buildIceOverlay(
+  points: Vec2[],
+  halfWidth: number,
+  patches: { from: number; to: number }[],
+): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const inset = halfWidth - 0.3; // keep the strip inside the edge walls
+  for (const patch of patches) {
+    // ~1u spline resolution → sample count scales with patch length
+    const span = ((patch.to - patch.from) % 1 + 1) % 1;
+    const segs = Math.max(2, Math.ceil(span * 240));
+    const pos: number[] = [];
+    const idx: number[] = [];
+    for (let s = 0; s <= segs; s++) {
+      const t = patch.from + (span * s) / segs;
+      const p = getPoint(points, t);
+      const tan = getTangent(points, t);
+      const len = Math.hypot(tan.x, tan.z) || 1;
+      const nx = tan.z / len;
+      const nz = -tan.x / len;
+      pos.push(p.x - nx * inset, 0.045, p.z - nz * inset);
+      pos.push(p.x + nx * inset, 0.045, p.z + nz * inset);
+      if (s < segs) {
+        const a = s * 2;
+        idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    parts.push(geo);
+  }
+  return mergeGeometries(parts)!;
+}
 
 /** Road surface as a triangle strip between left/right edge offsets. */
-function buildRoadGeometry(points: Vec2[]): THREE.BufferGeometry {
+function buildRoadGeometry(points: Vec2[], halfWidth: number): THREE.BufferGeometry {
   const segs = 240;
   const pos: number[] = [];
   const idx: number[] = [];
@@ -287,8 +389,8 @@ function buildRoadGeometry(points: Vec2[]): THREE.BufferGeometry {
     const len = Math.hypot(tan.x, tan.z) || 1;
     const nx = tan.z / len; // right-hand normal in XZ
     const nz = -tan.x / len;
-    pos.push(p.x - nx * ROAD_HALF_WIDTH, 0.02, p.z - nz * ROAD_HALF_WIDTH);
-    pos.push(p.x + nx * ROAD_HALF_WIDTH, 0.02, p.z + nz * ROAD_HALF_WIDTH);
+    pos.push(p.x - nx * halfWidth, 0.02, p.z - nz * halfWidth);
+    pos.push(p.x + nx * halfWidth, 0.02, p.z + nz * halfWidth);
     if (s < segs) {
       const a = s * 2;
       idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
@@ -338,9 +440,9 @@ function buildStartLine(points: Vec2[]): THREE.BufferGeometry {
 }
 
 /** Vertical ribbon wall standing just off one edge of the road. */
-function buildWallRibbon(points: Vec2[], side: 1 | -1): THREE.BufferGeometry {
+function buildWallRibbon(points: Vec2[], side: 1 | -1, halfWidth: number): THREE.BufferGeometry {
   const segs = 160;
-  const offset = (ROAD_HALF_WIDTH + 0.6) * side;
+  const offset = (halfWidth + 0.6) * side;
   const pos: number[] = [];
   const idx: number[] = [];
   for (let s = 0; s <= segs; s++) {
@@ -555,8 +657,9 @@ export function checkBoostPads(track: Track, tank: TankState): boolean {
  * push it back inside and remove the outward velocity component.
  */
 export function collideWithWalls(track: Track, tank: TankState): void {
+  const collideDist = track.halfWidth - 0.5; // clamp just inside the edge
   const cp = closestOnSpline(track.table, tank.position.x, tank.position.z);
-  if (cp.distSq <= WALL_COLLIDE_DIST * WALL_COLLIDE_DIST) return;
+  if (cp.distSq <= collideDist * collideDist) return;
 
   const center = getPoint(track.points, cp.t);
   let ox = tank.position.x - center.x;
@@ -566,8 +669,8 @@ export function collideWithWalls(track: Track, tank: TankState): void {
   oz /= d;
 
   // Clamp position back to the boundary
-  tank.position.x = center.x + ox * WALL_COLLIDE_DIST;
-  tank.position.z = center.z + oz * WALL_COLLIDE_DIST;
+  tank.position.x = center.x + ox * collideDist;
+  tank.position.z = center.z + oz * collideDist;
 
   // Soft bounce: kill any outward velocity (keeps sliding along the wall)
   const vOut = tank.velocity.x * ox + tank.velocity.z * oz;
@@ -575,6 +678,55 @@ export function collideWithWalls(track: Track, tank: TankState): void {
     tank.velocity.x -= ox * vOut;
     tank.velocity.z -= oz * vOut;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Surface grip (Phase 11 ice patches)
+// ---------------------------------------------------------------------------
+
+/** Grip multipliers consumed by the shared tank physics (see src/tank.ts). */
+export interface SurfaceGrip {
+  /** Multiplier on lateral grip rate (lower = more slide). */
+  lateral: number;
+  /** Multiplier on engine acceleration. */
+  accel: number;
+}
+
+/** Default surface — identical to pre-Phase-11 behavior on every track. */
+export const NORMAL_GRIP: SurfaceGrip = { lateral: 1, accel: 1 };
+const ICE_GRIP: SurfaceGrip = { lateral: 0.35, accel: 0.6 };
+
+/** True if spline parameter t lies inside a patch range (wrap-safe). */
+function inIcePatch(
+  patches: { from: number; to: number }[],
+  t: number,
+): boolean {
+  for (const p of patches) {
+    if (p.from <= p.to) {
+      if (t >= p.from && t <= p.to) return true;
+    } else if (t >= p.from || t <= p.to) {
+      return true; // wraps across the start line
+    }
+  }
+  return false;
+}
+
+/** Surface grip under a tank at spline parameter t. */
+export function gripAt(track: Track, t: number): SurfaceGrip {
+  const patches = track.def.icePatches;
+  if (!patches || patches.length === 0) return NORMAL_GRIP;
+  return inIcePatch(patches, ((t % 1) + 1) % 1) ? ICE_GRIP : NORMAL_GRIP;
+}
+
+/**
+ * Stage this frame's grip multipliers onto the tank before physics runs.
+ * Called once per tank per frame by the game loop and scripts/sim-ai.ts;
+ * neutral on tracks without ice patches.
+ */
+export function applySurfaceGrip(track: Track, tank: TankState, t: number): void {
+  const g = gripAt(track, t);
+  tank.gripLateral = g.lateral;
+  tank.gripAccel = g.accel;
 }
 
 // ---------------------------------------------------------------------------

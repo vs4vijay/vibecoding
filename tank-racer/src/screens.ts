@@ -92,7 +92,7 @@ export function createScreens(rootId = "screens"): Screens {
     h1.textContent = "TANK RACER";
     const sub = document.createElement("p");
     sub.className = "subtitle";
-    sub.textContent = "DESERT CIRCUITS · 3 LAPS · 4 TANKS";
+    sub.textContent = "THREE CIRCUITS · 3 LAPS · 4 TANKS";
     card.appendChild(h1);
     card.appendChild(sub);
 

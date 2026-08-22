@@ -15,6 +15,7 @@ import { TouchInput } from "./touch";
 import { GamepadInput, type GamepadMenuAction } from "./gamepad";
 import { closestOnSpline } from "./spline";
 import {
+  applySurfaceGrip,
   checkBoostPads,
   collideWithWalls,
   createTankProgress,
@@ -689,6 +690,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       } else if (!driving) {
         tank.input = NO_INPUT;
       }
+      // Phase 11: stage surface grip from the tank's last-known spline t
+      // (one-frame-old is fine — patches are ~40u long) before physics runs.
+      applySurfaceGrip(track, tank, racers[i].progress.lastT);
       updateTankPhysics(tank, dt);
       collideWithWalls(track, tank);
       if (checkBoostPads(track, tank) && tank === player) sfx.boost();

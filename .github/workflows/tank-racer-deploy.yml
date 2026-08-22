@@ -1,0 +1,60 @@
+# Tank Racer — GitHub Pages deploy
+#
+# Builds tank-racer/ with bun and publishes dist/ to GitHub Pages whenever a
+# push to main touches anything under tank-racer/. The game lives in a
+# subdirectory of this monorepo, so it builds with BASE_PATH set to its
+# Pages URL prefix and is uploaded from tank-racer/dist.
+
+name: Deploy Tank Racer to Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tank-racer/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        working-directory: tank-racer
+        run: bun install --frozen-lockfile
+
+      - name: Build (subpath-aware)
+        working-directory: tank-racer
+        env:
+          # Must match the path Pages serves the site under.
+          BASE_PATH: /${{ github.event.repository.name }}/tank-racer/
+        run: bun run build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: tank-racer/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
