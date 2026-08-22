@@ -101,6 +101,14 @@ export class ZombiePool {
       this.zombies.push(z);
     }
   }
+  /** Fixed pool size; mesh pools bind one mesh per stable slot index. */
+  slotCount(): number {
+    return this.zombies.length;
+  }
+  /** Every pool slot by index (active or not); stable for mesh binding. */
+  *allSlots(): IterableIterator<Zombie> {
+    for (const z of this.zombies) yield z;
+  }
 
   spawnLurker(type: ZombieType, shoulderX: number, z: number): Zombie | null {
     const spot = this.zombies.find((cand) => !cand.active);

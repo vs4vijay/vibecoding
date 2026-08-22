@@ -1,8 +1,12 @@
 import "./style.css";
+import { Emitter } from "./core/emitter";
+import { InputController } from "./core/input";
+import { CONFIG } from "./config";
+import { Session } from "./game/session";
+import type { GameEvents } from "./game/session";
+import { CameraRig } from "./render/cameraRig";
 import { createGameScene } from "./render/scene";
 import { World } from "./render/world";
-import { CameraRig } from "./render/cameraRig";
-import { CONFIG } from "./config";
 
 export function boot(): void {
   if (typeof document === "undefined") return;
@@ -13,23 +17,41 @@ export function boot(): void {
   const { scene, camera, renderer } = createGameScene(canvas);
   const world = new World(scene);
   const rig = new CameraRig(camera);
+  const emitter = new Emitter<GameEvents>();
+  const input = new InputController(canvas);
+
+  // Session owns the sim and attaches every pooled mesh to the scene.
+  const session = new Session({
+    input,
+    emitter,
+    render: { scene, camera, shake: (i: number) => rig.shake(i) },
+  });
+
+  emitter.on("gameOver", (stats) => {
+    // Restart on any input after a wreck; Escape/P still toggles pause.
+    const retry = () => {
+      offFire();
+      offPause();
+      session.startRun();
+    };
+    const offFire = input.onFire(retry);
+    const offPause = input.onPause(retry);
+    console.log(
+      `game over: ${stats.cause} score=${stats.score} dist=${stats.distanceM} kills=${stats.kills}`,
+    );
+  });
+  emitter.on("levelUp", (level) => console.log(`level ${level}`));
+
+  session.startRun();
 
   let last = performance.now();
-  let frames = 0;
-  let elapsed = 0;
   const tick = (now: number) => {
     const dt = Math.min((now - last) / 1000, CONFIG.sim.maxFrameDt);
     last = now;
-    frames++;
-    elapsed += dt;
-    if (elapsed >= 1) {
-      console.log(`fps: ${frames}`);
-      frames = 0;
-      elapsed = 0;
-    }
-    const carZ = 0; // real car state wires in with the game loop task
+    session.update(dt);
+    const carZ = session.carZValue;
     world.update(carZ);
-    rig.follow(0, carZ, 0.5, dt); // speed01 0.5 mid-fov until real car drives this
+    rig.follow(session.car.x, carZ, session.speed01, dt);
     rig.tick(dt);
     renderer.render(scene, camera);
     requestAnimationFrame(tick);

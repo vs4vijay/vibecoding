@@ -64,6 +64,11 @@ export class ObstaclePool {
   reset(): void {
     for (const o of this.obstacles) o.active = false;
   }
+
+  /** Fixed pool size; mesh pools bind one mesh per stable slot index. */
+  slotCount(): number {
+    return this.obstacles.length;
+  }
 }
 
 export type ObstacleContact = "none" | "graze" | "headOn";
