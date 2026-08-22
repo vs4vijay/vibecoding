@@ -17,11 +17,13 @@ export interface ResultRow {
 
 export interface Screens {
   showTitle(): void;
+  /** Title-screen track picker: updates the displayed circuit name. */
+  setTrackName(name: string): void;
   showCountdown(text: string): void;
   hideCountdown(): void;
   /** Center banner ("FINAL LAP") that auto-fades via CSS animation. */
   flashBanner(text: string): void;
-  showResults(rows: ResultRow[]): void;
+  showResults(rows: ResultRow[], trackName: string): void;
   hideResults(): void;
   /** Small bottom-center notice (mute toggle). Auto-fades. */
   toast(text: string): void;
@@ -44,6 +46,7 @@ export function createScreens(rootId = "screens"): Screens {
 
   // --- Title ---------------------------------------------------------------
   let title: HTMLDivElement | null = null;
+  let trackNameEl: HTMLDivElement | null = null;
   function ensureTitle(): HTMLDivElement {
     if (title) return title;
     title = document.createElement("div");
@@ -56,9 +59,36 @@ export function createScreens(rootId = "screens"): Screens {
     h1.textContent = "TANK RACER";
     const sub = document.createElement("p");
     sub.className = "subtitle";
-    sub.textContent = "DESERT CIRCUIT · 3 LAPS · 4 TANKS";
+    sub.textContent = "DESERT CIRCUITS · 3 LAPS · 4 TANKS";
     card.appendChild(h1);
     card.appendChild(sub);
+
+    // Track selector (Phase 6): LEFT/RIGHT cycles circuits
+    const trackSel = document.createElement("div");
+    trackSel.className = "track-select";
+    const prevArrow = document.createElement("span");
+    prevArrow.className = "track-arrow";
+    prevArrow.textContent = "◀";
+    trackNameEl = document.createElement("div");
+    trackNameEl.id = "screen-track-name";
+    trackNameEl.textContent = "";
+    const nextArrow = document.createElement("span");
+    nextArrow.className = "track-arrow";
+    nextArrow.textContent = "▶";
+    trackSel.appendChild(prevArrow);
+    trackSel.appendChild(trackNameEl);
+    trackSel.appendChild(nextArrow);
+    card.appendChild(trackSel);
+
+    const trackHint = document.createElement("div");
+    trackHint.className = "controls-row";
+    const hintKey = document.createElement("span");
+    hintKey.className = "key";
+    hintKey.textContent = "← →";
+    const hintText = document.createElement("span");
+    hintText.textContent = "choose track";
+    trackHint.appendChild(hintKey);
+    trackHint.appendChild(hintText);
 
     const controls = document.createElement("div");
     controls.className = "controls";
@@ -80,6 +110,7 @@ export function createScreens(rootId = "screens"): Screens {
       row.appendChild(a);
       controls.appendChild(row);
     }
+    controls.appendChild(trackHint);
     card.appendChild(controls);
 
     const press = document.createElement("p");
@@ -143,6 +174,10 @@ export function createScreens(rootId = "screens"): Screens {
       hideCountdownNow();
       ensureTitle().style.display = "";
     },
+    setTrackName(name: string) {
+      ensureTitle(); // build the title card if needed so the element exists
+      if (trackNameEl) trackNameEl.textContent = name;
+    },
     showCountdown(text: string) {
       ensureCountdown().textContent = text;
     },
@@ -165,7 +200,7 @@ export function createScreens(rootId = "screens"): Screens {
       }
       replayAnimation(toastEl, text);
     },
-    showResults(rows: ResultRow[]) {
+    showResults(rows: ResultRow[], trackName: string) {
       const el = ensureResults();
       el.textContent = ""; // rebuild rows each race
 
@@ -175,6 +210,11 @@ export function createScreens(rootId = "screens"): Screens {
       const h2 = document.createElement("h2");
       h2.textContent = "RACE COMPLETE";
       card.appendChild(h2);
+
+      const track = document.createElement("div");
+      track.className = "results-track";
+      track.textContent = trackName;
+      card.appendChild(track);
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];

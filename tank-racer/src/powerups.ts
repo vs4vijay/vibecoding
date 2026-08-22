@@ -7,9 +7,8 @@ import type { World } from "./game";
 // Tuning (spec Phase 3)
 // ---------------------------------------------------------------------------
 
-/** 4 fixed crate spots on straights (t along the spline), spread around the lap. */
-const CRATE_TS = [0.1, 0.33, 0.55, 0.82];
-const CRATE_LATERAL = [-2.5, 2.5, -2.5, 2.5]; // alternate road sides
+/** Crate t-values come from the TrackDef; alternate road sides per crate. */
+const CRATE_LATERALS = [-2.5, 2.5, -2.5, 2.5];
 const RESPAWN_DELAY = 8; // seconds after pickup before the crate returns
 const PICKUP_RADIUS_SQ = 2.4 * 2.4;
 const FLOAT_HEIGHT = 1.6;
@@ -41,6 +40,8 @@ export interface Powerups {
   update(world: World, dt: number): void;
   /** Full reset for race restart: all crates active, bubbles hidden. */
   reset(): void;
+  /** Remove all crate meshes from the scene (track switch). */
+  dispose(): void;
 }
 
 /** Optional audio callback wired up by game.ts (Phase 5). */
@@ -51,16 +52,17 @@ export interface PowerupHooks {
 export function createPowerups(
   scene: THREE.Scene,
   points: Vec2[],
+  crateTs: number[],
   hooks: PowerupHooks = {},
 ): Powerups {
   const crates: Crate[] = [];
-  for (let i = 0; i < CRATE_TS.length; i++) {
-    const p = getPoint(points, CRATE_TS[i]);
-    const tan = getTangent(points, CRATE_TS[i]);
+  for (let i = 0; i < crateTs.length; i++) {
+    const p = getPoint(points, crateTs[i]);
+    const tan = getTangent(points, crateTs[i]);
     const len = Math.hypot(tan.x, tan.z) || 1;
     const nx = tan.z / len; // right-hand normal in XZ
     const nz = -tan.x / len;
-    const off = CRATE_LATERAL[i];
+    const off = CRATE_LATERALS[i % CRATE_LATERALS.length];
     const x = p.x + nx * off;
     const z = p.z + nz * off;
 
@@ -173,5 +175,9 @@ export function createPowerups(
     for (const b of bubbles.values()) b.visible = false;
   }
 
-  return { update, reset };
+  function dispose(): void {
+    for (const crate of crates) scene.remove(crate.mesh);
+  }
+
+  return { update, reset, dispose };
 }

@@ -18,13 +18,15 @@ import {
   createTrack,
   placeTankAtGridSlot,
   TOTAL_LAPS,
+  TRACK_DEFS,
   updateBoostPads,
   updateTankProgress,
   type ProgressEvent,
   type Track,
+  type TrackDef,
 } from "./track";
 import { createWeapons } from "./weapons";
-import { createPowerups } from "./powerups";
+import { createPowerups, type Powerups } from "./powerups";
 import { AI_PERSONALITIES, createAIController, type AIController } from "./ai";
 import { createScreens, formatRaceTime } from "./screens";
 import { initAudio, sfx, toggleMute, updateEngine } from "./audio";
@@ -95,8 +97,8 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x7ec8f0); // bright desert sky
-  scene.fog = new THREE.Fog(0x7ec8f0, 120, 420);
+  scene.background = new THREE.Color(0xffffff); // tinted per track by applyTheme()
+  scene.fog = new THREE.Fog(0xffffff, 120, 420);
 
   // --- Lighting ------------------------------------------------------------
   const hemi = new THREE.HemisphereLight(0xbfe3ff, 0xd8b878, 0.9);
@@ -123,9 +125,112 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // --- Track: road, walls, dashes, dressing, boost pads ---------------------
-  const track = createTrack();
-  scene.add(track.group);
+  // --- Screens overlay (created early: loadTrack updates the title card) -----
+  const screens = createScreens();
+
+  // --- Track selection (Phase 6) ----------------------------------------------
+  /** localStorage key for the last-selected circuit. */
+  const TRACK_STORAGE_KEY = "tankracer.track";
+
+  function loadStoredTrackIndex(): number {
+    try {
+      const raw = localStorage.getItem(TRACK_STORAGE_KEY);
+      const idx = raw === null ? NaN : Number.parseInt(raw, 10);
+      return Number.isInteger(idx) && idx >= 0 && idx < TRACK_DEFS.length ? idx : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  function storeTrackIndex(index: number): void {
+    try {
+      localStorage.setItem(TRACK_STORAGE_KEY, String(index));
+    } catch {
+      /* private mode etc. — selection just won't persist */
+    }
+  }
+
+  let trackIndex = loadStoredTrackIndex();
+  let track!: Track; // assigned by loadTrack() below
+  let powerups: Powerups; // rebuilt per track (crate spots come from the TrackDef)
+
+  function applyTheme(def: TrackDef): void {
+    (scene.background as THREE.Color).setHex(def.skyColor);
+    (scene.fog as THREE.Fog).color.setHex(def.skyColor);
+    (ground.material as THREE.MeshLambertMaterial).color.setHex(def.groundColor);
+  }
+
+  /** Free a track group's GPU resources and remove it from the scene. */
+  function disposeTrackGroup(group: THREE.Group): void {
+    group.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.geometry) mesh.geometry.dispose();
+      const mat = mesh.material as
+        | THREE.Material
+        | THREE.Material[]
+        | undefined;
+      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+      else mat?.dispose();
+    });
+    scene.remove(group);
+  }
+
+  /**
+   * Build the selected circuit and re-seat every tank on its grid.
+   * Safe to call repeatedly on the title screen (LEFT/RIGHT cycling).
+   */
+  function loadTrack(index: number): void {
+    trackIndex =
+      ((index % TRACK_DEFS.length) + TRACK_DEFS.length) % TRACK_DEFS.length;
+    const def = TRACK_DEFS[trackIndex];
+    storeTrackIndex(trackIndex);
+
+    if (track) disposeTrackGroup(track.group);
+    if (powerups) powerups.dispose();
+    weapons.reset(world); // stale shells/puffs from any previous race
+
+    track = createTrack(def);
+    scene.add(track.group);
+    powerups = createPowerups(scene, track.points, def.crateTs, {
+      onPickup: (_tank, kind) => {
+        if (kind === "boost") sfx.boost();
+        else sfx.pickup();
+      },
+    });
+    applyTheme(def);
+
+    // Rebuild progress + AI brains against the new spline, tanks on the grid
+    racers.length = 0;
+    aiControllers.length = 0;
+    for (let i = 0; i < GRID.length && i < world.tanks.length; i++) {
+      placeTankAtGridSlot(world.tanks[i], track, GRID[i].t, GRID[i].lateral);
+      resetTankCombat(world.tanks[i]);
+      racers.push({
+        tank: world.tanks[i],
+        progress: createTankProgress(GRID[i].t),
+        finishTime: null,
+      });
+    }
+    for (let i = 1; i < racers.length; i++) {
+      aiControllers.push(
+        createAIController(AI_PERSONALITIES[i - 1], racers[i], track),
+      );
+    }
+    world.track = track;
+    world.raceTime = 0;
+
+    // Title-orbit centroid follows the new circuit
+    centerX = 0;
+    centerZ = 0;
+    for (const p of track.points) {
+      centerX += p.x;
+      centerZ += p.z;
+    }
+    centerX /= track.points.length;
+    centerZ /= track.points.length;
+
+    screens.setTrackName(def.name);
+  }
 
   /** Display name + swatch color per racer index (player first) — results UI. */
   const roster = [
@@ -138,40 +243,35 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
   // --- Player tank + input --------------------------------------------------
   const player = createTankState(createTankMesh());
-  placeTankAtGridSlot(player, track, GRID[0].t, GRID[0].lateral);
   scene.add(player.mesh.root);
 
   const input = new PlayerInput();
   input.attach();
 
-  const racers: Racer[] = [{ tank: player, progress: createTankProgress(GRID[0].t), finishTime: null }];
+  const racers: Racer[] = [];
+  const aiControllers: AIController[] = [];
+
   const world: World = {
     tanks: [player],
     player,
     racers,
-    standings: racers.slice(),
+    standings: [],
     playerPosition: 1,
-    track,
+    track: null as unknown as Track, // set by loadTrack() immediately below
     phase: "title",
     raceTime: 0,
   };
 
-  // --- AI opponents ----------------------------------------------------------
-  const aiControllers: AIController[] = [];
+  // --- AI opponents (meshes created once; loadTrack() re-seats them) ----------
   for (let i = 1; i < GRID.length && i <= AI_PERSONALITIES.length; i++) {
     const pers = AI_PERSONALITIES[i - 1];
-    const slot = GRID[i];
     const mesh = createTankMesh(pers.hullColor, pers.turretColor);
     const ai = createTankState(mesh);
-    placeTankAtGridSlot(ai, track, slot.t, slot.lateral);
     scene.add(ai.mesh.root);
     world.tanks.push(ai);
-    const racer: Racer = { tank: ai, progress: createTankProgress(slot.t), finishTime: null };
-    racers.push(racer);
-    aiControllers.push(createAIController(pers, racer, track));
   }
 
-  // --- Weapons + power-up systems (audio/juice hooks wired here) --------------
+  // --- Weapons (audio/juice hooks wired here) ---------------------------------
   const weapons = createWeapons(scene, {
     onShot: () => sfx.shot(),
     onHit: (target) => {
@@ -183,15 +283,14 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       if (target === player) shake = PLAYER_WRECK_SHAKE;
     },
   });
-  const powerups = createPowerups(scene, track.points, {
-    onPickup: (_tank, kind) => {
-      if (kind === "boost") sfx.boost();
-      else sfx.pickup();
-    },
-  });
 
-  // --- Screens overlay ---------------------------------------------------------
-  const screens = createScreens();
+  // Title-screen orbit centroid — filled in by loadTrack()
+  let centerX = 0;
+  let centerZ = 0;
+
+  // Build the persisted track, seat all tanks, wire crates + AI brains
+  loadTrack(trackIndex);
+
   screens.showTitle();
   setPhase("title"); // hoisted function decl; hides the HUD behind the title card
 
@@ -210,15 +309,6 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   const CAM_DIST = 14;
   const CAM_HEIGHT = 7;
 
-  // Track centroid for the slow title-screen orbit
-  let centerX = 0;
-  let centerZ = 0;
-  for (const p of track.points) {
-    centerX += p.x;
-    centerZ += p.z;
-  }
-  centerX /= track.points.length;
-  centerZ /= track.points.length;
   let titleAngle = 0;
 
   // Preallocated vectors — the chase camera runs every frame; no allocations.
@@ -326,7 +416,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
   function finishRace(): void {
     setPhase("results");
-    screens.showResults(buildResultRows());
+    screens.showResults(buildResultRows(), track.def.name);
   }
 
   function buildResultRows() {
@@ -397,7 +487,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
         handleProgressEvent(
           tank,
           racers[i],
-          updateTankProgress(racers[i].progress, hit, dt),
+          updateTankProgress(racers[i].progress, hit, dt, track.def.gates),
         );
       }
     }
@@ -413,13 +503,26 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     sun.target.position.copy(player.position);
   }
 
-  // --- Global keys: Enter (start), R (restart), M (mute) -----------------------
+  // --- Global keys: Enter (start), R (restart), M (mute), ←/→ track select -----
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.repeat) return;
     if (e.code === "KeyM") {
       const muted = toggleMute();
       screens.toast(muted ? "SOUND OFF" : "SOUND ON");
       return;
+    }
+    // Title screen: LEFT/RIGHT cycles circuits (Phase 6)
+    if (world.phase === "title") {
+      if (e.code === "ArrowLeft") {
+        sfx.pickup();
+        loadTrack(trackIndex - 1);
+        return;
+      }
+      if (e.code === "ArrowRight") {
+        sfx.pickup();
+        loadTrack(trackIndex + 1);
+        return;
+      }
     }
     if (e.code === "Enter" && world.phase === "title") {
       initAudio(); // first user gesture unlocks WebAudio

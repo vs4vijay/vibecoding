@@ -54,24 +54,34 @@ export function initHud(world: World): void {
   root.appendChild(minimap);
   const ctx = minimap.getContext("2d")!;
 
-  // Precompute spline outline in canvas space
+  // Precompute spline outline in canvas space (rebuilt if the track changes)
   const MARGIN = 12;
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  for (const p of world.track.outline) {
-    minX = Math.min(minX, p.x);
-    maxX = Math.max(maxX, p.x);
-    minZ = Math.min(minZ, p.z);
-    maxZ = Math.max(maxZ, p.z);
+  let minX = 0, maxX = 0, minZ = 0, maxZ = 0;
+  let scale = 1;
+  let outlinePts: [number, number][] = [];
+  let hudTrack = world.track;
+
+  function recomputeMinimap(): void {
+    minX = Infinity; maxX = -Infinity; minZ = Infinity; maxZ = -Infinity;
+    for (const p of world.track.outline) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minZ = Math.min(minZ, p.z);
+      maxZ = Math.max(maxZ, p.z);
+    }
+    scale = Math.min(
+      (minimap.width - MARGIN * 2) / (maxX - minX),
+      (minimap.height - MARGIN * 2) / (maxZ - minZ),
+    );
+    outlinePts = world.track.outline.map(toCanvas);
+    hudTrack = world.track;
   }
-  const scale = Math.min(
-    (minimap.width - MARGIN * 2) / (maxX - minX),
-    (minimap.height - MARGIN * 2) / (maxZ - minZ),
-  );
+
   const toCanvas = (p: { x: number; z: number }): [number, number] => [
     (p.x - minX) * scale + (minimap.width - (maxX - minX) * scale) / 2,
     (p.z - minZ) * scale + (minimap.height - (maxZ - minZ) * scale) / 2,
   ];
-  const outlinePts = world.track.outline.map(toCanvas);
+  recomputeMinimap();
 
   function drawMinimap(): void {
     ctx.clearRect(0, 0, minimap.width, minimap.height);
@@ -123,6 +133,9 @@ export function initHud(world: World): void {
   let shownHealthColor = "";
   let shownPowerText: string | null = null;
   function update() {
+    // Track switched on the title screen → recompute minimap geometry once
+    if (world.track !== hudTrack) recomputeMinimap();
+
     const s = Math.abs(Math.round(world.player.velocity.length() * 3.6)); // fake km/h
     if (s !== shownSpeed) {
       shownSpeed = s;

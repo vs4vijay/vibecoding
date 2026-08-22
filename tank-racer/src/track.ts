@@ -11,29 +11,113 @@ import {
 import { applySpeedBoost, type TankState } from "./tank";
 
 // ---------------------------------------------------------------------------
-// Circuit definition — ~10 control points, two hairpins, fits within ±250.
-// Travel direction: increasing t. Start/finish line is at t = 0 (point 0).
+// Circuit definitions (Phase 6) — a circuit is data; buildTrack/createTrack
+// turns a TrackDef into the runtime Track object the game consumes.
+// ~10 control points per loop, fits within ±250. Travel direction: increasing
+// t. Start/finish line is at t = 0 (control point 0).
 // ---------------------------------------------------------------------------
 
-const TRACK_POINTS: Vec2[] = [
-  { x: -120, z: -180 }, // 0: start/finish, bottom straight heading +X
-  { x: 110, z: -190 }, // 1: end of long bottom straight
-  { x: 195, z: -135 }, // 2: hairpin #1 entry (east)
-  { x: 205, z: -45 }, // 3: hairpin #1 far point
-  { x: 125, z: -5 }, // 4: exit heading back west
-  { x: 20, z: -50 }, // 5: S-curve dip toward center
-  { x: -70, z: 10 }, // 6: rises north-west
-  { x: -190, z: 60 }, // 7: top-west approach
-  { x: -235, z: -30 }, // 8: hairpin #2 far point
-  { x: -165, z: -105 }, // 9: exit heading SE onto start straight
-];
+/** Scatter config for off-track decoration (rocks / cacti / mesas). */
+export interface TrackDressing {
+  /** Deterministic RNG seed — same look every run. */
+  seed: number;
+  rocks: number;
+  cacti: number;
+  /** Flat-topped mesa slabs; 0 disables them. */
+  mesas: number;
+  rockColor: number;
+  cactusColor: number;
+  mesaColor: number;
+}
+
+export interface TrackDef {
+  id: string;
+  name: string;
+  points: Vec2[];
+  /** Boost pad t-values (should sit on straights). */
+  padTs: number[];
+  /** Power-up crate t-values (4 fixed spots on straights). */
+  crateTs: number[];
+  /** Checkpoint gate t-values per lap, crossed in order. */
+  gates: number[];
+  dressing: TrackDressing;
+  /** Scene background/fog tint. */
+  skyColor: number;
+  groundColor: number;
+}
+
+const DUST_BOWL: TrackDef = {
+  id: "dust-bowl",
+  name: "DUST BOWL",
+  points: [
+    { x: -120, z: -180 }, // 0: start/finish, bottom straight heading +X
+    { x: 110, z: -190 }, // 1: end of long bottom straight
+    { x: 195, z: -135 }, // 2: hairpin #1 entry (east)
+    { x: 205, z: -45 }, // 3: hairpin #1 far point
+    { x: 125, z: -5 }, // 4: exit heading back west
+    { x: 20, z: -50 }, // 5: S-curve dip toward center
+    { x: -70, z: 10 }, // 6: rises north-west
+    { x: -190, z: 60 }, // 7: top-west approach
+    { x: -235, z: -30 }, // 8: hairpin #2 far point
+    { x: -165, z: -105 }, // 9: exit heading SE onto start straight
+  ],
+  padTs: [0.04, 0.62, 0.94], // on the three main straights
+  crateTs: [0.1, 0.33, 0.55, 0.82],
+  gates: [0, 0.25, 0.5, 0.75],
+  dressing: {
+    seed: 1337,
+    rocks: 70,
+    cacti: 26, // geometry-piece budget (trunk + arms), matches pre-Phase-6 look
+    mesas: 0,
+    rockColor: 0xb09468,
+    cactusColor: 0x4e7c3a,
+    mesaColor: 0xb08d5e,
+  },
+  skyColor: 0x7ec8f0, // bright desert sky
+  groundColor: 0xd9b56e,
+};
+
+const CANYON_RUN: TrackDef = {
+  id: "canyon-run",
+  name: "CANYON RUN",
+  points: [
+    { x: -150, z: -195 }, // 0: start/finish, long bottom straight heading +X
+    { x: 100, z: -200 }, // 1: end of the straight, sweeper entry
+    { x: 215, z: -140 }, // 2: long right-hand sweeper (east rim)
+    { x: 240, z: -10 }, // 3: sweeper far point
+    { x: 150, z: 80 }, // 4: sweep out of the east rim toward center
+    { x: 40, z: 30 }, // 5: chicane left
+    { x: -40, z: 110 }, // 6: chicane right
+    { x: -170, z: 175 }, // 7: top-west long sweeper
+    { x: -245, z: 55 }, // 8: big west sweeper far point
+    { x: -205, z: -95 }, // 9: sweeping down onto the start straight
+  ],
+  padTs: [0.05, 0.36, 0.78],
+  crateTs: [0.12, 0.44, 0.62, 0.9],
+  gates: [0, 0.25, 0.5, 0.75],
+  dressing: {
+    seed: 4242,
+    rocks: 55,
+    cacti: 110, // denser cholla fields in the canyon
+    mesas: 12,
+    rockColor: 0xa97b52,
+    cactusColor: 0x5d8c3e,
+    mesaColor: 0xb57f4f,
+  },
+  skyColor: 0xf0b478, // warm canyon dusk
+  groundColor: 0xdfa96a,
+};
+
+/** All selectable circuits (Phase 6) — order = title-screen cycle order. */
+export const TRACK_DEFS: TrackDef[] = [DUST_BOWL, CANYON_RUN];
 
 export const ROAD_HALF_WIDTH = 7; // road is ~14 units wide
 export const WALL_HEIGHT = 1.2;
 /** Tanks are pushed back inside when their center strays past this offset. */
 export const WALL_COLLIDE_DIST = 6.5;
 
-export const GATES = [0, 0.25, 0.5, 0.75]; // checkpoint gates per lap (t values)
+/** Default checkpoint gates per lap (t values) — tracks may override. */
+export const DEFAULT_GATES = [0, 0.25, 0.5, 0.75];
 export const TOTAL_LAPS = 3;
 
 // ---------------------------------------------------------------------------
@@ -56,7 +140,6 @@ export interface BoostPad {
   cooldown: number;
 }
 
-const PAD_TS = [0.04, 0.62, 0.94]; // on the three main straights
 const PAD_LEN = 12;
 const PAD_WID = 8;
 const BOOST_MULTIPLIER = 1.5;
@@ -103,11 +186,13 @@ export type ProgressEvent = "none" | "gate" | "lap";
 /**
  * Advance one tank's progress given its current spline parameter.
  * Returns "lap" exactly once per completed lap (all gates in order + start).
+ * `gates` = the track's checkpoint gate t-values, crossed in order.
  */
 export function updateTankProgress(
   prog: TankProgress,
   t: number,
   dt: number,
+  gates: number[] = DEFAULT_GATES,
 ): ProgressEvent {
   const prev = prog.lastT;
   let delta = t - prev;
@@ -121,7 +206,7 @@ export function updateTankProgress(
   if (delta <= 0) return "none"; // only forward motion crosses gates
 
   // Did we cross prog.nextGate moving forward this frame?
-  const gate = GATES[prog.nextGate];
+  const gate = gates[prog.nextGate];
   const traveled = ((gate - prev + 1) % 1 + 1) % 1;
   if (traveled > delta || traveled === 0) return "none";
 
@@ -136,7 +221,7 @@ export function updateTankProgress(
     return "lap";
   }
   prog.lastCheckpointT = gate;
-  prog.nextGate = (prog.nextGate + 1) % GATES.length;
+  prog.nextGate = (prog.nextGate + 1) % gates.length;
   return "gate";
 }
 
@@ -145,6 +230,8 @@ export function updateTankProgress(
 // ---------------------------------------------------------------------------
 
 export interface Track {
+  /** The data definition this track was built from. */
+  def: TrackDef;
   points: Vec2[];
   table: ClosestTable;
   /** Coarse polyline for the minimap. */
@@ -153,8 +240,8 @@ export interface Track {
   pads: BoostPad[];
 }
 
-export function createTrack(): Track {
-  const points = TRACK_POINTS;
+export function createTrack(def: TrackDef): Track {
+  const points = def.points;
   const table = buildClosestTable(points, 1000);
 
   // Coarse outline reused by the minimap
@@ -173,12 +260,12 @@ export function createTrack(): Track {
   group.add(new THREE.Mesh(buildWallRibbon(points, 1), WALL_MATERIAL));
   group.add(new THREE.Mesh(buildWallRibbon(points, -1), WALL_MATERIAL));
 
-  for (const pt of buildDressing(table)) group.add(pt);
+  for (const pt of buildDressing(table, def.dressing)) group.add(pt);
 
-  const pads = PAD_TS.map((t) => createPadMesh(points, t));
+  const pads = def.padTs.map((t) => createPadMesh(points, t));
   for (const pad of pads) group.add(pad.mesh);
 
-  return { points, table, outline, group, pads };
+  return { def, points, table, outline, group, pads };
 }
 
 const DASH_MATERIAL = new THREE.MeshBasicMaterial({ color: 0xe8e8e8 });
@@ -289,9 +376,9 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-/** Scatter rocks + cacti off-track, merged to keep draw calls low. */
-function buildDressing(table: ClosestTable): THREE.Mesh[] {
-  const rng = mulberry32(1337);
+/** Scatter rocks + cacti (+ optional mesas) off-track, merged to keep draw calls low. */
+function buildDressing(table: ClosestTable, dressing: TrackDressing): THREE.Mesh[] {
+  const rng = mulberry32(dressing.seed);
   const minDistSq = 18 * 18;
   const maxRadius = 340;
 
@@ -306,8 +393,9 @@ function buildDressing(table: ClosestTable): THREE.Mesh[] {
 
   const rockGeos: THREE.BufferGeometry[] = [];
   const cactusGeos: THREE.BufferGeometry[] = [];
+  const mesaGeos: THREE.BufferGeometry[] = [];
 
-  for (let i = 0; i < 220 && rockGeos.length < 70; i++) {
+  for (let i = 0; i < 220 && rockGeos.length < dressing.rocks; i++) {
     const x = (rng() * 2 - 1) * maxRadius;
     const z = (rng() * 2 - 1) * maxRadius;
     if (!clearOfTrack(x, z)) continue;
@@ -319,7 +407,7 @@ function buildDressing(table: ClosestTable): THREE.Mesh[] {
     rockGeos.push(rock);
   }
 
-  for (let i = 0; i < 140 && cactusGeos.length < 26; i++) {
+  for (let i = 0; i < 240 && cactusGeos.length < dressing.cacti; i++) {
     const x = (rng() * 2 - 1) * maxRadius;
     const z = (rng() * 2 - 1) * maxRadius;
     if (!clearOfTrack(x, z)) continue;
@@ -338,12 +426,25 @@ function buildDressing(table: ClosestTable): THREE.Mesh[] {
     }
   }
 
+  // Mesa slabs: big flat-topped mesas for canyon-style circuits
+  for (let i = 0; i < 80 && mesaGeos.length < dressing.mesas; i++) {
+    const x = (rng() * 2 - 1) * maxRadius;
+    const z = (rng() * 2 - 1) * maxRadius;
+    if (!clearOfTrack(x, z)) continue;
+    const r = 8 + rng() * 16;
+    const h = 10 + rng() * 18;
+    const mesa = new THREE.CylinderGeometry(r * (0.75 + rng() * 0.25), r, h, 7, 1);
+    mesa.rotateY(rng() * Math.PI * 2);
+    mesa.translate(x, h / 2, z);
+    mesaGeos.push(mesa);
+  }
+
   const meshes: THREE.Mesh[] = [];
   if (rockGeos.length > 0) {
     meshes.push(
       new THREE.Mesh(
         mergeGeometries(rockGeos)!,
-        new THREE.MeshLambertMaterial({ color: 0xb09468 }),
+        new THREE.MeshLambertMaterial({ color: dressing.rockColor }),
       ),
     );
   }
@@ -351,7 +452,15 @@ function buildDressing(table: ClosestTable): THREE.Mesh[] {
     meshes.push(
       new THREE.Mesh(
         mergeGeometries(cactusGeos)!,
-        new THREE.MeshLambertMaterial({ color: 0x4e7c3a }),
+        new THREE.MeshLambertMaterial({ color: dressing.cactusColor }),
+      ),
+    );
+  }
+  if (mesaGeos.length > 0) {
+    meshes.push(
+      new THREE.Mesh(
+        mergeGeometries(mesaGeos)!,
+        new THREE.MeshLambertMaterial({ color: dressing.mesaColor }),
       ),
     );
   }

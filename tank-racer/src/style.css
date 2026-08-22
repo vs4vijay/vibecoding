@@ -145,6 +145,35 @@ body {
   opacity: 0.85;
 }
 
+/* Phase 6: title-screen track selector */
+.track-select {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 20px;
+}
+
+#screen-track-name {
+  font-size: 34px;
+  font-weight: bold;
+  letter-spacing: 6px;
+  color: #ff8c00;
+  min-width: 340px;
+}
+
+.track-arrow {
+  font-size: 24px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.results-track {
+  margin-top: 4px;
+  font-size: 15px;
+  letter-spacing: 5px;
+  color: #ff8c00;
+}
+
 .controls {
   display: inline-block;
   margin: 26px auto 8px;
