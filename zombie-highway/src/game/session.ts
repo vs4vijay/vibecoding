@@ -154,6 +154,11 @@ export class Session {
   /** Debug/test weight injected on top of attached clingers. */
   private bonusWeight = { left: 0, right: 0 };
   private fireCd = { left: 0, right: 0 };
+  /** Per-obstacle graze cooldown keyed by pooled obstacle object. */
+  private grazeCd = new Map<
+    { x: number },
+    number
+  >();
   private pendingShots: ZombieSide[] = [];
 
   // Preallocated per-step contexts: zero steady-state allocation.
@@ -254,6 +259,7 @@ export class Session {
       this.fireCd[side] = 0;
     }
     this.pendingShots.length = 0;
+    this.grazeCd.clear();
     this.bonusWeight.left = 0;
     this.bonusWeight.right = 0;
     this.carZ = 0;
@@ -421,6 +427,11 @@ export class Session {
   private applyGraze(o: {
     x: number;
   }): void {
+    // One scrape tick per obstacle per scrapeTickS — same cadence as car.ts
+    // rail scrapes — so a long lateral grind multi-ticks instead of firing
+    // every single step.
+    if (this.simTime < (this.grazeCd.get(o) ?? 0)) return;
+    this.grazeCd.set(o, this.simTime + CONFIG.car.scrapeTickS);
     const side: CarSide = o.x < this.car.x ? "left" : "right";
     this.car.speed = Math.max(
       MIN_SPEED_AFTER_SCRAPE,
@@ -511,7 +522,7 @@ export class Session {
       cause,
     });
     this.render?.shake?.(0.5);
-    this.view?.fx.burst(this.car.x, 0.8, this.carZ, FX_RED, 24);
+    this.view?.fx.burst(this.car.x, 0.8, this.carZ, FX_RED, 10);
   }
 
   // --- rendering -----------------------------------------------------------
