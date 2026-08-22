@@ -28,15 +28,22 @@ export type ZombieUpdateCtx = {
   carVx: number;
   carZ: number;
   accuracy: number;
+  /** Live forward speed m/s; leap prediction falls back to cruise baseline when absent. */
+  carSpeed?: number;
 };
 
 // Pure simulation constants (mesh binding arrives in Task 9).
 const GRAVITY = -22; // m/s^2, per brief
 const TELEGRAPH_S = 0.35; // crouch windup before a leap
-const DEATH_TUMBLE_S = 1; // ragdoll time before deactivation
 const CAR_SPEED_FACTOR = 0.9; // brief's closing model: car barrels at cruise * 0.9
-const ASSUMED_CAR_SPEED = 28; // cruise baseline used by leap prediction
-const CLOSING_SPEED = ASSUMED_CAR_SPEED * CAR_SPEED_FACTOR; // 25.2 m/s car-relative closure
+const ASSUMED_CAR_SPEED = 28; // fallback when ctx.carSpeed is not supplied
+
+/** Car-relative closure rate m/s given live car speed (cruise fallback). */
+function closingSpeed(carSpeed?: number): number {
+  return (carSpeed ?? ASSUMED_CAR_SPEED) * CAR_SPEED_FACTOR;
+}
+
+const DEATH_TUMBLE_S = 1; // ragdoll time before deactivation
 const CLING_X_OFFSET = 0.45; // hang-off distance from the car hull
 const MAX_SLOT = 2; // deepest cling slot along the car flank
 
@@ -55,7 +62,7 @@ export function predictLanding(
   speed: number,
   accuracy: number,
 ): number {
-  const flightS = dz / (speed + CLOSING_SPEED);
+  const flightS = dz / (speed + closingSpeed());
   const aim = accuracy * (carX + carVx * flightS);
   const limit = CONFIG.road.halfWidth - CONFIG.car.halfWidth;
   return Math.min(limit, Math.max(-limit, aim));
@@ -159,6 +166,11 @@ export class ZombiePool {
     return true;
   }
 
+  /** True while the recent-leap damage doubling window is open for this zombie. */
+  isRecentLeap(z: Zombie): boolean {
+    return this.now < z.recentLeapUntil;
+  }
+
   /** Road rash against one flank; returns the clingers it killed. */
   scrapeSide(side: ZombieSide): Zombie[] {
     const killed: Zombie[] = [];
@@ -207,12 +219,14 @@ export class ZombiePool {
 
   private stepLurking(z: Zombie, dt: number, ctx: ZombieUpdateCtx): void {
     const spec = CONFIG.zombies[z.type];
+    const closing = closingSpeed(ctx.carSpeed);
     // Gap to the car closes at run speed plus oncoming car speed.
-    z.z -= (spec.speed + CLOSING_SPEED) * dt;
+    z.z -= (spec.speed + closing) * dt;
     if (z.z - ctx.carZ <= spec.leapRange) {
       z.state = "telegraphing";
       z.telegraphT = 0;
     }
+
   }
 
   private stepTelegraphing(z: Zombie, dt: number, ctx: ZombieUpdateCtx): void {
@@ -224,7 +238,8 @@ export class ZombiePool {
   private launchLeap(z: Zombie, ctx: ZombieUpdateCtx): void {
     const spec = CONFIG.zombies[z.type];
     const gap = Math.max(z.z - ctx.carZ, 0.5);
-    const flightS = gap / (spec.speed + CLOSING_SPEED);
+    const closing = closingSpeed(ctx.carSpeed);
+    const flightS = gap / (spec.speed + closing);
     const aim = predictLanding(ctx.carX, ctx.carVx, gap, spec.speed, ctx.accuracy);
     z.vx = (aim - z.x) / flightS;
     z.vz = -gap / flightS;
