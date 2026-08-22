@@ -12,6 +12,7 @@ import {
 } from "./tank";
 import { PlayerInput } from "./player";
 import { TouchInput } from "./touch";
+import { GamepadInput, type GamepadMenuAction } from "./gamepad";
 import { closestOnSpline } from "./spline";
 import {
   checkBoostPads,
@@ -369,6 +370,14 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     onEnable: updateTouchControlsVisibility,
   });
 
+  // Phase 10: gamepad — same TankInput merge shape; menus via drained actions.
+  // attach() only registers listeners/probes, so it's safe before `world`.
+  const gamepadInput = new GamepadInput({
+    onConnect: () => screens.toast("🎮 CONNECTED"),
+    onDisconnect: () => screens.toast("🎮 DISCONNECTED"),
+  });
+  gamepadInput.attach();
+
   const racers: Racer[] = [];
   const aiControllers: AIController[] = [];
 
@@ -448,6 +457,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       // Drop anything pressed during the freeze so no stale shot/steer leaks in
       input.consumeFire();
       touchInput.consumeFire();
+      gamepadInput.consumeFire();
     }
     updateTouchControlsVisibility();
   }
@@ -642,16 +652,18 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   }
 
   /**
-   * Merge keyboard + touch into one TankInput — the exact shape the AI brains
-   * produce, so physics/weapons need no special cases. Auto-throttle wins over
-   * "no key held"; steering sums so a stuck touch can't outvote the keys.
+   * Merge keyboard + touch + gamepad into one TankInput — the exact shape the
+   * AI brains produce, so physics/weapons need no special cases. Auto-throttle
+   * wins over "no key held"; steering sums so a stuck touch can't outvote the
+   * keys, clamped to ±1 so an analog stick can never exceed full lock.
    */
   function readPlayerInput(): TankInput {
     const kb = input.read();
     const tc = touchInput.read();
+    const gp = gamepadInput.read();
     return {
-      throttle: Math.max(kb.throttle, tc.throttle),
-      steer: kb.steer + tc.steer,
+      throttle: Math.max(kb.throttle, tc.throttle, gp.throttle),
+      steer: Math.max(-1, Math.min(1, kb.steer + tc.steer + gp.steer)),
     };
   }
 
@@ -663,7 +675,8 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     player.input = driving ? readPlayerInput() : NO_INPUT;
     const kbFire = input.consumeFire(); // always drain queued shots
     const touchFire = touchInput.consumeFire();
-    if (driving && (kbFire || touchFire)) weapons.tryFire(player);
+    const padFire = gamepadInput.consumeFire();
+    if (driving && (kbFire || touchFire || padFire)) weapons.tryFire(player);
 
     for (let i = 0; i < world.tanks.length; i++) {
       const tank = world.tanks[i];
@@ -770,6 +783,52 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   };
   window.addEventListener("keydown", onKeyDown);
 
+  // --- Phase 10: gamepad menus -------------------------------------------------
+  /**
+   * Route drained gamepad menu actions through the exact same code paths the
+   * keyboard uses (loadTrack/selectTank/beginCountdown/resetRace/setPaused),
+   * so gamepad menu behavior can't drift from keyboard behavior. Start toggles
+   * pause only during a race — identical gating to the P/Esc branch above.
+   */
+  function handleGamepadMenuAction(action: GamepadMenuAction): void {
+    if (action === "pause") {
+      if (world.phase === "race") setPaused(!paused); // also resumes while paused
+      return;
+    }
+    if (world.phase === "title") {
+      if (action === "left") {
+        sfx.pickup();
+        loadTrack(trackIndex - 1);
+      } else if (action === "right") {
+        sfx.pickup();
+        loadTrack(trackIndex + 1);
+      } else if (action === "up") {
+        sfx.pickup();
+        selectTank(tankIndex - 1);
+      } else if (action === "down") {
+        sfx.pickup();
+        selectTank(tankIndex + 1);
+      } else if (!paused) {
+        // A = Enter equivalent. Not while paused: pause only exists mid-race,
+        // so this is just belt-and-braces against future phase changes.
+        initAudio(); // first user gesture unlocks WebAudio
+        beginCountdown();
+      }
+    } else if (world.phase === "results" && action === "confirm") {
+      initAudio();
+      resetRace(); // A = R equivalent on results
+    }
+  }
+
+  /** Per-frame gamepad poll — runs even while paused so Start can resume. */
+  function pollGamepad(dt: number): void {
+    gamepadInput.update(dt);
+    for (const action of gamepadInput.drainMenuActions()) {
+      handleGamepadMenuAction(action);
+    }
+  }
+
+
   // Phase 8: tap anywhere = Enter/R equivalent on title/results (touch mode
   // only, so the desktop click flow is untouched). Countdown has no keyboard
   // skip either — a mid-countdown tap is intentionally ignored.
@@ -790,6 +849,8 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   return {
     world,
     update(dt: number) {
+      // Phase 10: gamepad poll runs even while frozen so Start can resume.
+      pollGamepad(dt);
       // Phase 9: frozen sim — nothing advances (physics, timers, lap logic,
       // AI, shells, crate respawn clocks, music). The RAF loop keeps ticking
       // and main.ts keeps refreshing its `last` timestamp, so the first dt
@@ -862,6 +923,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       window.removeEventListener("pointerdown", onPointerDown);
       input.detach();
       touchInput.dispose();
+      gamepadInput.dispose();
       stopMusic(0.1);
       renderer.dispose();
     },
