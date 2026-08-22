@@ -151,6 +151,23 @@ Gamepad API integration: poll navigator.getGamepads() each frame; first connecte
 
 ---
 
+# v1.4 PHASES
+
+## Phase 12 — Fourth Track: METRO RUSH
+Night city circuit: dark asphalt, neon-lit dressing (glowing window-box buildings from primitives off-track, streetlight glows via emissive materials only — no dynamic lights), deep navy sky/fog. Layout: tighter technical track (short straights, quick direction changes) than existing three. Standard TrackDef data (pads/crates/gates/ice=null). Verify AI clean laps via sim script; tune control points if needed.
+**Done when:** METRO RUSH sims clean vs AI; night look reads clearly; build clean.
+
+## Phase 13 — Local 2-Player Split-Screen
+Two human players, one keyboard, split-screen:
+- **Mode select** on title: new toggle "1P / 2P" cycled with a key (e.g. TAB or C), persisted in localStorage. In 2P: P1 = WASD + Space fire; P2 = arrow keys + Enter (or Right Shift) fire. Arrows must be REMOVED from P1 mapping in 2P mode (they're P2 steering today).
+- **Rendering:** renderer.setViewport/setScissor — P1 left half, P2 right half, each with own chase camera following their tank. Aspect-correct cameras updated on resize.
+- **HUD:** duplicate compact HUD panels per half (lap, pos, speed, health, power-up). One minimap centered between halves showing all tanks (both players highlighted distinctly).
+- **Race logic:** standings include both players; results screen lists finishing order highlighting BOTH players' rows + their times/best laps; best-times storage unchanged (record only... record each human player's result as eligible for best times). Countdown/results/restart work in both modes; AI count stays 3 (4-tank grid becomes player1, player2, then 2 AI in 2P to keep grid at 4).
+- Touch/gamepad modes force 1P (or map gamepad to P1); document this.
+**Done when:** full race works in 2P split-screen end-to-end incl. menus/results/restart; 1P unchanged; build clean.
+
+---
+
 ## Out of scope (v1)
 Multiplayer, mobile/touch controls, multiple tracks, tank selection, persistence,
 championship mode, real 3D assets/audio files.
