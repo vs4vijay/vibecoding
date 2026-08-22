@@ -74,7 +74,7 @@ export class World {
       skylineMat,
       SKY_COUNT,
     );
-    this.skyline.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    this.skyline.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     for (let i = 0; i < SKY_COUNT; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       this.skyH[i] = 8 + Math.random() * 22;

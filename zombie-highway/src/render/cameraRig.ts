@@ -17,8 +17,9 @@ export class CameraRig {
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
-    // Start settled at the car so the first frames don't swoop in from origin.
-    this.camera.position.set(0, C.offset.y, C.offset.z);
+    // Start settled at the car so the first frames don't swoop in from origin;
+    // same mirrored-z convention as follow() (behind the car, looking forward).
+    this.camera.position.set(0, C.offset.y, -C.offset.z);
     this.camera.lookAt(C.lookAt.x, C.lookAt.y, -C.lookAt.z);
   }
 
