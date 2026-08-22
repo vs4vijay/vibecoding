@@ -124,6 +124,20 @@ Three selectable tanks with real stat differences (same physics code, different 
 
 ---
 
+# v1.2 PHASES
+
+## Phase 8 — Touch Controls + Responsive HUD
+Detect touch devices (`pointer: coarse` media query / first touchstart). On touch: auto-throttle ON (tank always accelerates; braking only via reverse button), left/right steer zones or buttons on the lower-left, FIRE button lower-right. Buttons are DOM overlays with pointer events (multi-touch safe: steer + fire simultaneously). HUD scales responsively (minimap smaller, fonts clamp()). Title/results screens tappable (tap = Enter equivalent). Desktop keyboard flow completely unchanged.
+**Done when:** game fully playable on a phone-sized viewport via devtools touch emulation; desktop unaffected; build clean.
+
+## Phase 9 — Music, Pause, Juice
+- **Music:** simple procedural WebAudio loop (oscillator bass line + hat blips, ~4-bar pattern, low volume under SFX), starts at race start, stops/ducks at results; respects M mute toggle.
+- **Pause:** P or Esc during race freezes sim (physics/timers/AI), shows PAUSED overlay, resume same key; R in pause restarts. Audio suspends while paused.
+- **Juice (cheap):** dust puff particles when drifting/hard turns, bigger explosion burst on wreck, shell impact spark, slight camera FOV widen during boost (exists — ensure it also fires for pickup boost).
+**Done when:** music loops cleanly without clicks, pause/resume has no state leaks (timers/lap logic verified by reasoning trace), juice effects don't tank fps; `bun run build` clean.
+
+---
+
 ## Out of scope (v1)
 Multiplayer, mobile/touch controls, multiple tracks, tank selection, persistence,
 championship mode, real 3D assets/audio files.
