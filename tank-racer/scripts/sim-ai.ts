@@ -1,0 +1,108 @@
+// Phase 4 sanity check: run the AI brains against real tank physics on the
+// real circuit — no rendering, no shells. Reports lap times, wall contact,
+// and full-race times per AI. Run: bun scripts/sim-ai.ts
+import { createTankMesh, createTankState, updateTankPhysics } from "../src/tank";
+import {
+  checkBoostPads,
+  collideWithWalls,
+  createTankProgress,
+  createTrack,
+  placeTankAtGridSlot,
+  updateTankProgress,
+  TOTAL_LAPS,
+} from "../src/track";
+import { closestOnSpline } from "../src/spline";
+import { AI_PERSONALITIES, createAIController } from "../src/ai";
+import type { World } from "../src/game";
+import type { TankState } from "../src/tank";
+
+const START_T = 0.005;
+const DT = 1 / 60;
+const MAX_SIM_TIME = 480; // s
+
+const track = createTrack();
+const grid = [
+  { t: START_T - 0.003, lateral: -3.6 },
+  { t: START_T - 0.003, lateral: 3.6 },
+  { t: START_T - 0.006, lateral: 0 },
+];
+
+const tanks: TankState[] = [];
+const controllers = [];
+const finishes: (number | null)[] = AI_PERSONALITIES.map(() => null);
+const lapStarts = AI_PERSONALITIES.map(() => 0);
+const wallHits = new Array(AI_PERSONALITIES.length).fill(0);
+const lapTimes: number[][] = AI_PERSONALITIES.map(() => []);
+
+// "Player" for rubber-banding purposes = first AI (neutral rubber for it).
+let playerTank: TankState | null = null;
+
+for (let i = 0; i < AI_PERSONALITIES.length; i++) {
+  const pers = AI_PERSONALITIES[i];
+  const tank = createTankState(createTankMesh(pers.hullColor, pers.turretColor));
+  placeTankAtGridSlot(tank, track, grid[i].t, grid[i].lateral);
+  tanks.push(tank);
+  if (!playerTank) playerTank = tank;
+}
+
+const racers = tanks.map((tk, i) => ({
+  tank: tk,
+  progress: createTankProgress(grid[i].t),
+}));
+
+const world = {
+  tanks,
+  player: playerTank!,
+  racers,
+  standings: racers.slice(),
+  playerPosition: 1,
+  track,
+  phase: "idle",
+} as unknown as World;
+
+for (let i = 0; i < AI_PERSONALITIES.length; i++) {
+  controllers.push(createAIController(AI_PERSONALITIES[i], racers[i], track));
+}
+
+let simTime = 0;
+let lastLap = racers.map((r) => r.progress.lap);
+while (simTime < MAX_SIM_TIME && finishes.some((f) => f === null)) {
+  simTime += DT;
+  for (let i = 0; i < tanks.length; i++) {
+    const d = controllers[i].think(DT, world);
+    tanks[i].input.throttle = d.throttle;
+    tanks[i].input.steer = d.steer;
+    updateTankPhysics(tanks[i], DT);
+    const before = closestOnSpline(track.table, tanks[i].position.x, tanks[i].position.z);
+    collideWithWalls(track, tanks[i]);
+    const after = closestOnSpline(track.table, tanks[i].position.x, tanks[i].position.z);
+    if (after.distSq > 6.4 * 6.4) wallHits[i] += 1;
+    void before;
+    checkBoostPads(track, tanks[i]);
+    const ev = updateTankProgress(racers[i].progress, after.t, DT);
+    if (ev === "lap") {
+      lapTimes[i].push(simTime - lapStarts[i]);
+      lapStarts[i] = simTime;
+      if (racers[i].progress.lap > TOTAL_LAPS && finishes[i] === null) {
+        finishes[i] = simTime;
+      }
+    }
+  }
+}
+
+console.log(`\n=== Tank Racer Phase 4 headless sim (${TOTAL_LAPS} laps, dt=${DT.toFixed(3)}) ===`);
+for (let i = 0; i < AI_PERSONALITIES.length; i++) {
+  const name = AI_PERSONALITIES[i].name;
+  const f = finishes[i];
+  const laps = lapTimes[i].map((t) => t.toFixed(1)).join(", ");
+  console.log(
+    `${name.padEnd(7)} finish: ${f !== null ? format(f) : "DNF"} | laps: ${laps || "-"} | wall-frames: ${wallHits[i]} (${((wallHits[i] * DT) / Math.max(simTime, 1) * 100).toFixed(1)}% of race)`,
+  );
+}
+console.log(`sim wall-clock length: ${format(simTime)}\n`);
+
+function format(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toFixed(1).padStart(4, "0")}`;
+}
