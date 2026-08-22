@@ -1,6 +1,5 @@
 import type { World } from "./game";
 import { TOTAL_LAPS } from "./track";
-import { MAX_HP } from "./tank";
 
 /** Boost pads use ×1.5; pickup boost is ×1.4 — used to distinguish the slot text. */
 const PICKUP_BOOST_MULT = 1.4;
@@ -164,7 +163,11 @@ export function initHud(world: World): void {
     }
 
     // --- Health bar: only touch the DOM when the integer % changes -----------
-    const hpPct = Math.max(0, Math.round((world.player.hp / MAX_HP) * 100));
+    // Phase 7: normalized against the selected tank's max HP
+    const hpPct = Math.max(
+      0,
+      Math.round((world.player.hp / world.player.maxHp) * 100),
+    );
     if (hpPct !== shownHealthPct) {
       shownHealthPct = hpPct;
       healthFill.style.width = `${hpPct}%`;

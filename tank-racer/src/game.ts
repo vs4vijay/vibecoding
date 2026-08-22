@@ -2,10 +2,11 @@ import * as THREE from "three";
 import {
   createTankMesh,
   createTankState,
-  HULL_COLOR,
   MAX_SPEED,
-  MAX_HP,
+  TANK_DEFS,
   updateTankPhysics,
+  applyTankLivery,
+  type TankDef,
   type TankInput,
   type TankState,
 } from "./tank";
@@ -28,7 +29,12 @@ import {
 import { createWeapons } from "./weapons";
 import { createPowerups, type Powerups } from "./powerups";
 import { AI_PERSONALITIES, createAIController, type AIController } from "./ai";
-import { createScreens, formatRaceTime } from "./screens";
+import {
+  createScreens,
+  formatRaceTime,
+  type NewBest,
+  type TankStatsView,
+} from "./screens";
 import { initAudio, sfx, toggleMute, updateEngine } from "./audio";
 
 /** High-level game flow (Phase 5): title → countdown → race → results. */
@@ -150,6 +156,109 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     }
   }
 
+  // --- Tank selection (Phase 7) -----------------------------------------------
+  /** localStorage key for the last-selected tank. */
+  const TANK_STORAGE_KEY = "tankracer.tank";
+
+  function loadStoredTankIndex(): number {
+    try {
+      const raw = localStorage.getItem(TANK_STORAGE_KEY);
+      const idx = raw === null ? NaN : Number.parseInt(raw, 10);
+      return Number.isInteger(idx) && idx >= 0 && idx < TANK_DEFS.length
+        ? idx
+        : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  function storeTankIndex(index: number): void {
+    try {
+      localStorage.setItem(TANK_STORAGE_KEY, String(index));
+    } catch {
+      /* private mode etc. — selection just won't persist */
+    }
+  }
+
+  let tankIndex = loadStoredTankIndex();
+
+  /** Definition of the tank the player will race (title-screen selection). */
+  function playerTankDef(): TankDef {
+    return TANK_DEFS[tankIndex];
+  }
+
+  function hexColor(n: number): string {
+    return `#${n.toString(16).padStart(6, "0")}`;
+  }
+
+  /** Normalized stat bars (0..1) for the title-screen stats card. */
+  function tankStatsView(def: TankDef): TankStatsView {
+    return {
+      name: def.name,
+      blurb: def.blurb,
+      color: hexColor(def.hullColor),
+      speed: def.maxSpeed / 52,
+      armor: def.maxHp / 160,
+      fire: 1 / def.fireCooldown / 1.7,
+    };
+  }
+
+  /**
+   * Select + persist a tank on the title screen: restyles the player mesh,
+   * applies per-tank physics stats and refreshes the stats card.
+   * Safe to call repeatedly while cycling with UP/DOWN.
+   */
+  function selectTank(index: number): void {
+    const n = TANK_DEFS.length;
+    tankIndex = ((index % n) + n) % n;
+    storeTankIndex(tankIndex);
+    applyTankLivery(player.mesh, playerTankDef());
+    resetTankCombat(player); // picks up maxHp/fireCooldownMax + full HP
+    screens.setTankCard(tankStatsView(playerTankDef()));
+  }
+
+  // --- Best times (Phase 7) -----------------------------------------------------
+  /** Per-track records persisted in localStorage. */
+  interface BestTimes {
+    lap: number | null;
+    total: number | null;
+  }
+
+  function bestKey(trackId: string): string {
+    return `tankracer.best.${trackId}`;
+  }
+
+  function loadBestTimes(trackId: string): BestTimes {
+    try {
+      const raw = localStorage.getItem(bestKey(trackId));
+      if (!raw) return { lap: null, total: null };
+      const parsed = JSON.parse(raw) as Partial<BestTimes>;
+      return {
+        lap: typeof parsed.lap === "number" ? parsed.lap : null,
+        total: typeof parsed.total === "number" ? parsed.total : null,
+      };
+    } catch {
+      return { lap: null, total: null };
+    }
+  }
+
+  function storeBestTimes(trackId: string, best: BestTimes): void {
+    try {
+      localStorage.setItem(bestKey(trackId), JSON.stringify(best));
+    } catch {
+      /* private mode etc. — records just won't persist */
+    }
+  }
+
+  /** Refresh the title-screen best-time readout for this circuit. */
+  function showBestTimesForTrack(def: TrackDef): void {
+    const best = loadBestTimes(def.id);
+    screens.setBestTimes(
+      best.lap !== null ? formatRaceTime(best.lap) : null,
+      best.total !== null ? formatRaceTime(best.total) : null,
+    );
+  }
+
   let trackIndex = loadStoredTrackIndex();
   let track!: Track; // assigned by loadTrack() below
   let powerups: Powerups; // rebuilt per track (crate spots come from the TrackDef)
@@ -230,11 +339,13 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     centerZ /= track.points.length;
 
     screens.setTrackName(def.name);
+    showBestTimesForTrack(def);
   }
 
-  /** Display name + swatch color per racer index (player first) — results UI. */
-  const roster = [
-    { name: "YOU", color: `#${HULL_COLOR.toString(16).padStart(6, "0")}` },
+  /** Display name + swatch color per racer index (player first) — results UI.
+   * Player color is resolved at row-build time so it tracks the selected tank. */
+  const roster: { name: string; color: string }[] = [
+    { name: "YOU", color: "" },
     ...AI_PERSONALITIES.map((p) => ({
       name: p.name,
       color: `#${p.hullColor.toString(16).padStart(6, "0")}`,
@@ -242,7 +353,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   ];
 
   // --- Player tank + input --------------------------------------------------
-  const player = createTankState(createTankMesh());
+  const player = createTankState(createTankMesh(), playerTankDef());
   scene.add(player.mesh.root);
 
   const input = new PlayerInput();
@@ -293,6 +404,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
   screens.showTitle();
   setPhase("title"); // hoisted function decl; hides the HUD behind the title card
+  selectTank(tankIndex); // applies livery/stats + title-screen stats card
 
   // --- Cameras -----------------------------------------------------------------
   let shake = 0;
@@ -378,6 +490,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     countdownStep = -1;
     goHideTimer = 0;
     screens.hideResults();
+    screens.showCountdownTag(`${playerTankDef().name} — READY`); // Phase 7
     setPhase("countdown");
     snapChaseCamera(); // spec: snap straight to the chase cam on Enter
   }
@@ -399,7 +512,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   }
 
   function resetTankCombat(tank: TankState): void {
-    tank.hp = MAX_HP;
+    tank.hp = tank.maxHp; // Phase 7: per-tank max HP
     tank.fireCooldown = 0;
     tank.spinTimer = 0;
     tank.spinDir = 1;
@@ -416,7 +529,23 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
   function finishRace(): void {
     setPhase("results");
-    screens.showResults(buildResultRows(), track.def.name);
+    const racer = world.racers[0]; // the player
+    const best = loadBestTimes(track.def.id);
+    const newBest: NewBest = { lap: false, total: false };
+    const bestLap = racer.progress.bestLap;
+    if (bestLap !== null && (best.lap === null || bestLap < best.lap)) {
+      best.lap = bestLap;
+      newBest.lap = true;
+    }
+    if (
+      racer.finishTime !== null &&
+      (best.total === null || racer.finishTime < best.total)
+    ) {
+      best.total = racer.finishTime;
+      newBest.total = true;
+    }
+    if (newBest.lap || newBest.total) storeBestTimes(track.def.id, best);
+    screens.showResults(buildResultRows(), track.def.name, newBest);
   }
 
   function buildResultRows() {
@@ -431,9 +560,13 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     });
     return order.map((racer) => {
       const idx = world.racers.indexOf(racer);
+      const entry = roster[idx] ?? { name: "???", color: "#888888" };
       return {
-        name: roster[idx]?.name ?? "???",
-        color: roster[idx]?.color ?? "#888888",
+        name: entry.name,
+        color:
+          racer.tank === player
+            ? hexColor(playerTankDef().hullColor) // tracks the selected tank
+            : entry.color,
         isPlayer: racer.tank === player,
         time:
           racer.finishTime !== null ? formatRaceTime(racer.finishTime) : "—",
@@ -511,7 +644,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       screens.toast(muted ? "SOUND OFF" : "SOUND ON");
       return;
     }
-    // Title screen: LEFT/RIGHT cycles circuits (Phase 6)
+    // Title screen: LEFT/RIGHT cycles circuits (Phase 6), UP/DOWN tanks (Phase 7)
     if (world.phase === "title") {
       if (e.code === "ArrowLeft") {
         sfx.pickup();
@@ -521,6 +654,16 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       if (e.code === "ArrowRight") {
         sfx.pickup();
         loadTrack(trackIndex + 1);
+        return;
+      }
+      if (e.code === "ArrowUp") {
+        sfx.pickup();
+        selectTank(tankIndex - 1);
+        return;
+      }
+      if (e.code === "ArrowDown") {
+        sfx.pickup();
+        selectTank(tankIndex + 1);
         return;
       }
     }
@@ -553,6 +696,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
               screens.showCountdown(COUNTDOWN_LABELS[step]);
               if (step === COUNTDOWN_LABELS.length - 1) {
                 sfx.go();
+                screens.showCountdownTag(
+                  `${playerTankDef().name} — GO!`,
+                ); // Phase 7
                 setPhase("race"); // timer starts exactly at GO
                 goHideTimer = 0.8; // let "GO!" linger briefly
               } else {

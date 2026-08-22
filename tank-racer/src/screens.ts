@@ -15,15 +15,42 @@ export interface ResultRow {
   best: string;
 }
 
+/** Which stored records the player beat this race (Phase 7). */
+export interface NewBest {
+  lap: boolean;
+  total: boolean;
+}
+
+/** Title-screen stat card contents for one selectable tank (Phase 7). */
+export interface TankStatsView {
+  name: string;
+  blurb: string;
+  color: string;
+  /** Bar fills, all normalized 0..1. */
+  speed: number;
+  armor: number;
+  fire: number;
+}
+
 export interface Screens {
   showTitle(): void;
   /** Title-screen track picker: updates the displayed circuit name. */
   setTrackName(name: string): void;
+  /** Title-screen best times for the displayed circuit (null = no record). */
+  setBestTimes(lap: string | null, total: string | null): void;
+  /** Title-screen tank picker: name, blurb and stat bars (Phase 7). */
+  setTankCard(stats: TankStatsView): void;
+  /** Tank name shown under the big countdown text (Phase 7). */
+  showCountdownTag(text: string): void;
   showCountdown(text: string): void;
   hideCountdown(): void;
   /** Center banner ("FINAL LAP") that auto-fades via CSS animation. */
   flashBanner(text: string): void;
-  showResults(rows: ResultRow[], trackName: string): void;
+  showResults(
+    rows: ResultRow[],
+    trackName: string,
+    newBest?: NewBest,
+  ): void;
   hideResults(): void;
   /** Small bottom-center notice (mute toggle). Auto-fades. */
   toast(text: string): void;
@@ -47,6 +74,9 @@ export function createScreens(rootId = "screens"): Screens {
   // --- Title ---------------------------------------------------------------
   let title: HTMLDivElement | null = null;
   let trackNameEl: HTMLDivElement | null = null;
+  let bestTimesEl: HTMLDivElement | null = null;
+  let tankNameEl: HTMLDivElement | null = null;
+  let statsCardEl: HTMLDivElement | null = null;
   function ensureTitle(): HTMLDivElement {
     if (title) return title;
     title = document.createElement("div");
@@ -80,6 +110,34 @@ export function createScreens(rootId = "screens"): Screens {
     trackSel.appendChild(nextArrow);
     card.appendChild(trackSel);
 
+    // Best times for the displayed circuit (Phase 7)
+    bestTimesEl = document.createElement("div");
+    bestTimesEl.id = "screen-best-times";
+    bestTimesEl.textContent = "";
+    card.appendChild(bestTimesEl);
+
+    // Tank selector (Phase 7): UP/DOWN cycles tanks
+    const tankSel = document.createElement("div");
+    tankSel.className = "track-select";
+    const upArrow = document.createElement("span");
+    upArrow.className = "track-arrow";
+    upArrow.textContent = "▲";
+    tankNameEl = document.createElement("div");
+    tankNameEl.id = "screen-tank-name";
+    tankNameEl.textContent = "";
+    const downArrow = document.createElement("span");
+    downArrow.className = "track-arrow";
+    downArrow.textContent = "▼";
+    tankSel.appendChild(upArrow);
+    tankSel.appendChild(tankNameEl);
+    tankSel.appendChild(downArrow);
+    card.appendChild(tankSel);
+
+    // Stat bars for the selected tank (Phase 7)
+    statsCardEl = document.createElement("div");
+    statsCardEl.id = "screen-tank-stats";
+    card.appendChild(statsCardEl);
+
     const trackHint = document.createElement("div");
     trackHint.className = "controls-row";
     const hintKey = document.createElement("span");
@@ -89,6 +147,16 @@ export function createScreens(rootId = "screens"): Screens {
     hintText.textContent = "choose track";
     trackHint.appendChild(hintKey);
     trackHint.appendChild(hintText);
+
+    const tankHint = document.createElement("div");
+    tankHint.className = "controls-row";
+    const tankHintKey = document.createElement("span");
+    tankHintKey.className = "key";
+    tankHintKey.textContent = "↑ ↓";
+    const tankHintText = document.createElement("span");
+    tankHintText.textContent = "choose tank";
+    tankHint.appendChild(tankHintKey);
+    tankHint.appendChild(tankHintText);
 
     const controls = document.createElement("div");
     controls.className = "controls";
@@ -111,6 +179,7 @@ export function createScreens(rootId = "screens"): Screens {
       controls.appendChild(row);
     }
     controls.appendChild(trackHint);
+    controls.appendChild(tankHint);
     card.appendChild(controls);
 
     const press = document.createElement("p");
@@ -132,6 +201,17 @@ export function createScreens(rootId = "screens"): Screens {
       root.appendChild(countdown);
     }
     return countdown;
+  }
+
+  /** Tank name under the countdown numbers (Phase 7). */
+  let countdownTag: HTMLDivElement | null = null;
+  function ensureCountdownTag(): HTMLDivElement {
+    if (!countdownTag) {
+      countdownTag = document.createElement("div");
+      countdownTag.id = "screen-countdown-tag";
+      root.appendChild(countdownTag);
+    }
+    return countdownTag;
   }
 
   // --- Banner + toast share one fading element style --------------------------
@@ -166,6 +246,38 @@ export function createScreens(rootId = "screens"): Screens {
   }
   function hideCountdownNow(): void {
     if (countdown) countdown.textContent = "";
+    if (countdownTag) countdownTag.textContent = "";
+  }
+
+  /** Rebuild the stat-bar card for one tank definition view. */
+  function renderStatsCard(stats: TankStatsView): void {
+    const el = statsCardEl!;
+    el.textContent = "";
+    for (const [label, fill] of [
+      ["SPEED", stats.speed],
+      ["ARMOR", stats.armor],
+      ["FIRE", stats.fire],
+    ] as const) {
+      const row = document.createElement("div");
+      row.className = "stat-row";
+      const name = document.createElement("span");
+      name.className = "stat-label";
+      name.textContent = label;
+      const bar = document.createElement("span");
+      bar.className = "stat-bar";
+      const barFill = document.createElement("span");
+      barFill.className = "stat-fill";
+      barFill.style.width = `${Math.round(Math.max(0, Math.min(1, fill)) * 100)}%`;
+      barFill.style.background = stats.color;
+      bar.appendChild(barFill);
+      row.appendChild(name);
+      row.appendChild(bar);
+      el.appendChild(row);
+    }
+    const blurb = document.createElement("div");
+    blurb.id = "screen-tank-blurb";
+    blurb.textContent = stats.blurb;
+    el.appendChild(blurb);
   }
 
   return {
@@ -177,6 +289,20 @@ export function createScreens(rootId = "screens"): Screens {
     setTrackName(name: string) {
       ensureTitle(); // build the title card if needed so the element exists
       if (trackNameEl) trackNameEl.textContent = name;
+    },
+    setBestTimes(lap, total) {
+      ensureTitle();
+      if (!bestTimesEl) return;
+      const fmt = (v: string | null) => v ?? "--:--.-";
+      bestTimesEl.textContent = `BEST LAP ${fmt(lap)} · BEST TOTAL ${fmt(total)}`;
+    },
+    setTankCard(stats: TankStatsView) {
+      ensureTitle();
+      if (tankNameEl) tankNameEl.textContent = stats.name;
+      if (statsCardEl) renderStatsCard(stats);
+    },
+    showCountdownTag(text: string) {
+      ensureCountdownTag().textContent = text;
     },
     showCountdown(text: string) {
       ensureCountdown().textContent = text;
@@ -200,7 +326,11 @@ export function createScreens(rootId = "screens"): Screens {
       }
       replayAnimation(toastEl, text);
     },
-    showResults(rows: ResultRow[], trackName: string) {
+    showResults(
+      rows: ResultRow[],
+      trackName: string,
+      newBest?: NewBest,
+    ) {
       const el = ensureResults();
       el.textContent = ""; // rebuild rows each race
 
@@ -215,6 +345,17 @@ export function createScreens(rootId = "screens"): Screens {
       track.className = "results-track";
       track.textContent = trackName;
       card.appendChild(track);
+
+      // Phase 7: highlight records broken this race
+      if (newBest?.lap || newBest?.total) {
+        const badge = document.createElement("div");
+        badge.id = "screen-new-best";
+        const parts: string[] = [];
+        if (newBest.lap) parts.push("NEW BEST LAP!");
+        if (newBest.total) parts.push("NEW BEST TOTAL!");
+        badge.textContent = parts.join(" · ");
+        card.appendChild(badge);
+      }
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];

@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import {
-  MAX_HP,
   SHELL_DAMAGE,
   type TankState,
 } from "./tank";
@@ -11,7 +10,6 @@ import type { World } from "./game";
 // Tuning (spec Phase 3)
 // ---------------------------------------------------------------------------
 
-const FIRE_COOLDOWN = 0.8; // seconds between shots per tank
 const SHELL_SPEED = 80; // u/s
 const SHELL_LIFETIME = 2; // seconds
 const SHELL_RADIUS = 0.35;
@@ -99,7 +97,7 @@ export function createWeapons(scene: THREE.Scene, hooks: WeaponsHooks = {}): Wea
 
   function tryFire(tank: TankState): void {
     if (tank.wreckTimer > 0 || tank.fireCooldown > 0) return;
-    tank.fireCooldown = FIRE_COOLDOWN;
+    tank.fireCooldown = tank.fireCooldownMax; // Phase 7: per-tank cadence
     hooks.onShot?.(tank);
     if (tank.tripleShots > 0) {
       tank.tripleShots -= 1;
@@ -166,7 +164,7 @@ export function createWeapons(scene: THREE.Scene, hooks: WeaponsHooks = {}): Wea
     const racer = world.racers.find((r) => r.tank === tank);
     const t = racer ? racer.progress.lastCheckpointT : 0.005;
     placeTankAtProgress(tank, world.track, t);
-    tank.hp = MAX_HP;
+    tank.hp = tank.maxHp; // Phase 7: per-tank max HP
     tank.spinTimer = 0;
     tank.invulnTimer = RESPAWN_INVULN;
     restoreVisuals(tank);

@@ -167,11 +167,78 @@ body {
   color: rgba(255, 255, 255, 0.6);
 }
 
+/* Phase 7: title-screen best times + tank selector */
+#screen-best-times {
+  margin-top: 10px;
+  font-size: 15px;
+  letter-spacing: 2px;
+  color: #41d9ff;
+  font-variant-numeric: tabular-nums;
+}
+
+#screen-tank-name {
+  font-size: 30px;
+  font-weight: bold;
+  letter-spacing: 6px;
+  color: #ffe9b0;
+  min-width: 280px;
+}
+
+#screen-tank-stats {
+  margin-top: 12px;
+  display: inline-block;
+  text-align: left;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1.7;
+}
+
+.stat-label {
+  width: 70px;
+  font-size: 14px;
+  letter-spacing: 2px;
+  opacity: 0.85;
+}
+
+.stat-bar {
+  width: 170px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.stat-fill {
+  display: block;
+  height: 100%;
+}
+
+#screen-tank-blurb {
+  margin-top: 6px;
+  font-size: 13px;
+  letter-spacing: 3px;
+  opacity: 0.75;
+}
+
 .results-track {
   margin-top: 4px;
   font-size: 15px;
   letter-spacing: 5px;
   color: #ff8c00;
+}
+
+/* Phase 7: record broken this race */
+#screen-new-best {
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  color: #ffd23d;
+  animation: blink 0.9s steps(2, start) infinite;
 }
 
 .controls {
@@ -217,6 +284,20 @@ body {
   letter-spacing: 8px;
   color: #ffe9b0;
   text-shadow: 4px 4px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* Phase 7: selected tank name under the countdown */
+#screen-countdown-tag {
+  position: absolute;
+  top: calc(50% + 95px);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 30px;
+  font-weight: bold;
+  letter-spacing: 6px;
+  color: #41d9ff;
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6);
 }
 
 #screen-banner {

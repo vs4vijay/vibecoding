@@ -20,10 +20,103 @@ const TRACK_COLOR = 0x2b2b2b;
 const TURRET_COLOR = 0x5c9450;
 const BARREL_COLOR = 0x3a3a3a;
 
+// --- Tuning constants (spec Phase 1; per-tank overrides live in TankDef) ---
+export const ACCEL = 28; // u/s^2 engine acceleration
+export const MAX_SPEED = 40; // u/s forward
+const MAX_REVERSE = 20; // u/s reverse
+const BRAKE_DECEL = 48; // u/s^2 when throttling against motion
+const ROLLING_FRICTION = 10; // u/s^2 passive slowdown when no throttle
+const LATERAL_GRIP = 5.5; // 1/s — how fast sideways slip is killed (lower = drifty)
+const MAX_TURN_RATE = 1.8; // rad/s at full steering authority
+const TURN_SPEED_FALLOFF = 14; // u/s to reach full turn authority
+export const FIRE_COOLDOWN = 0.8; // s between shots (default tank)
+export const MAX_HP = 100; // default tank max HP
+
+// ---------------------------------------------------------------------------
+// Selectable tank definitions (Phase 7) — same physics code, different params
+// ---------------------------------------------------------------------------
+
+export interface TankDef {
+  id: string;
+  name: string;
+  hullColor: number;
+  turretColor: number;
+  /** u/s forward top speed (before boosts). */
+  maxSpeed: number;
+  /** u/s² engine acceleration. */
+  accel: number;
+  maxHp: number;
+  /** Seconds between shots. */
+  fireCooldown: number;
+  /** Mesh silhouette multipliers (x = width, y = height, z = length). */
+  proportions: { w: number; h: number; l: number };
+  blurb: string;
+}
+
+/** Baseline stats — spec Phase 1 defaults. */
+export const BALANCED: TankDef = {
+  id: "balanced",
+  name: "BALANCED",
+  hullColor: HULL_COLOR,
+  turretColor: TURRET_COLOR,
+  maxSpeed: MAX_SPEED,
+  accel: ACCEL,
+  maxHp: MAX_HP,
+  fireCooldown: FIRE_COOLDOWN,
+  proportions: { w: 1, h: 1, l: 1 },
+  blurb: "ALL-ROUNDER",
+};
+
+/** +20% top speed, ~-20% acceleration, -25 HP. Sleeker / lower hull. */
+export const SPRINTER: TankDef = {
+  id: "sprinter",
+  name: "SPRINTER",
+  hullColor: 0x2f8fb0,
+  turretColor: 0x45aecf,
+  maxSpeed: Math.round(MAX_SPEED * 1.2),
+  accel: Math.round(ACCEL * 0.8 * 10) / 10,
+  maxHp: MAX_HP - 25,
+  fireCooldown: FIRE_COOLDOWN,
+  proportions: { w: 0.9, h: 0.85, l: 1.08 },
+  blurb: "FAST · FRAGILE",
+};
+
+/** -15% top speed, ~+25% acceleration, +50 HP, 0.6s fire cooldown. Bulkier hull. */
+export const BRUISER: TankDef = {
+  id: "bruiser",
+  name: "BRUISER",
+  hullColor: 0x6b4fa0,
+  turretColor: 0x8465bd,
+  maxSpeed: Math.round(MAX_SPEED * 0.85),
+  accel: Math.round(ACCEL * 1.25 * 10) / 10,
+  maxHp: MAX_HP + 50,
+  fireCooldown: 0.6,
+  proportions: { w: 1.18, h: 1.15, l: 1.05 },
+  blurb: "ARMORED · RAPID FIRE",
+};
+
+/** All selectable tanks (Phase 7) — order = title-screen UP/DOWN cycle order. */
+export const TANK_DEFS: TankDef[] = [BALANCED, SPRINTER, BRUISER];
+
+/**
+ * Recolor + rescale an existing tank mesh to match a tank definition.
+ * Used on the title screen so UP/DOWN cycling restyles the player's tank
+ * without rebuilding GPU resources.
+ */
+export function applyTankLivery(mesh: TankMesh, def: TankDef): void {
+  // bodyMaterials order: [track, hull, turret, barrel]
+  mesh.bodyMaterials[1].color.setHex(def.hullColor);
+  mesh.bodyMaterials[2].color.setHex(def.turretColor);
+  mesh.bodyColors[1] = def.hullColor; // wreck-restore must bring these back
+  mesh.bodyColors[2] = def.turretColor;
+  mesh.root.scale.set(def.proportions.w, def.proportions.h, def.proportions.l);
+}
+
 /** Hull/turret colors are parameterizable so AI racers get distinct liveries. */
 export function createTankMesh(
   hullColor: number = HULL_COLOR,
   turretColor: number = TURRET_COLOR,
+  proportions?: { w: number; h: number; l: number },
 ): TankMesh {
   const root = new THREE.Group();
 
@@ -71,11 +164,16 @@ export function createTankMesh(
 
   root.add(turret);
 
+  if (proportions) {
+    root.scale.set(proportions.w, proportions.h, proportions.l);
+  }
+
   return {
     root,
     turret,
     bodyMaterials: [trackMat, hullMat, turretMat, barrelMat],
-    bodyColors: [TRACK_COLOR, HULL_COLOR, TURRET_COLOR, BARREL_COLOR],
+    // Actual colors (not constants) so wreck-restore keeps custom liveries
+    bodyColors: [TRACK_COLOR, hullColor, turretColor, BARREL_COLOR],
   };
 }
 
@@ -106,14 +204,21 @@ export interface TankState {
   invulnTimer: number; // >0 = can't take damage (post-respawn grace)
   shield: boolean; // absorbs the next shell hit
   tripleShots: number; // remaining trigger pulls that fire a 3-shell spread
+  // --- Per-tank tuning (Phase 7 selectable tanks; AI uses defaults) ---------
+  maxSpeed: number; // u/s forward top speed (before boosts)
+  accel: number; // u/s² engine acceleration
+  maxHp: number;
+  fireCooldownMax: number; // seconds between shots
 }
 
-export const MAX_HP = 100;
 export const SHELL_DAMAGE = 25;
 const SPIN_RATE = 9; // rad/s while spun out
 const SPIN_DRAG = 3.2; // 1/s extra velocity decay during a spin-out
 
-export function createTankState(mesh?: TankMesh): TankState {
+export function createTankState(
+  mesh?: TankMesh,
+  def: TankDef = TANK_DEFS[0],
+): TankState {
   return {
     mesh: mesh ?? createTankMesh(),
     position: new THREE.Vector3(),
@@ -122,7 +227,7 @@ export function createTankState(mesh?: TankMesh): TankState {
     input: { throttle: 0, steer: 0 },
     boostTimer: 0,
     boostMultiplier: 1,
-    hp: MAX_HP,
+    hp: def.maxHp,
     fireCooldown: 0,
     spinTimer: 0,
     spinDir: 1,
@@ -130,18 +235,15 @@ export function createTankState(mesh?: TankMesh): TankState {
     invulnTimer: 0,
     shield: false,
     tripleShots: 0,
+    maxSpeed: def.maxSpeed,
+    accel: def.accel,
+    maxHp: def.maxHp,
+    fireCooldownMax: def.fireCooldown,
   };
 }
 
-// Tuning constants (spec Phase 1)
-const ACCEL = 28; // u/s^2 engine acceleration
-export const MAX_SPEED = 40; // u/s forward
-const MAX_REVERSE = 20; // u/s reverse
-const BRAKE_DECEL = 48; // u/s^2 when throttling against motion
-const ROLLING_FRICTION = 10; // u/s^2 passive slowdown when no throttle
-const LATERAL_GRIP = 5.5; // 1/s — how fast sideways slip is killed (lower = drifty)
-const MAX_TURN_RATE = 1.8; // rad/s at full steering authority
-const TURN_SPEED_FALLOFF = 14; // u/s to reach full turn authority
+// Tuning constants moved above TANK_DEFS (Phase 7): per-tank stats derive
+// from the same baseline numbers via TankDef.
 
 export function applySpeedBoost(tank: TankState, multiplier: number, duration: number): void {
   tank.boostTimer = Math.max(tank.boostTimer, duration);
@@ -165,7 +267,7 @@ export function updateTankPhysics(tank: TankState, dt: number): void {
   // Boost timer counts down regardless of throttle
   if (tank.boostTimer > 0) tank.boostTimer = Math.max(0, tank.boostTimer - dt);
   const boost = tank.boostTimer > 0 && !wrecked ? tank.boostMultiplier : 1;
-  const maxSpeed = MAX_SPEED * boost;
+  const maxSpeed = tank.maxSpeed * boost;
 
   // Forward direction on the XZ plane from heading (0 = +Z).
   const forward = new THREE.Vector3(Math.sin(tank.heading), 0, Math.cos(tank.heading));
@@ -181,10 +283,10 @@ export function updateTankPhysics(tank: TankState, dt: number): void {
   } else if (input.throttle > 0) {
     // Accelerating forward (or braking out of reverse)
     accelAlong =
-      speedForward < -0.5 ? BRAKE_DECEL : ACCEL * (1 - clamp(speedForward / maxSpeed, 0, 1));
+      speedForward < -0.5 ? BRAKE_DECEL : tank.accel * (1 - clamp(speedForward / maxSpeed, 0, 1));
   } else if (input.throttle < 0) {
     accelAlong =
-      speedForward > 0.5 ? -BRAKE_DECEL : -ACCEL * (1 - clamp(-speedForward / MAX_REVERSE, 0, 1));
+      speedForward > 0.5 ? -BRAKE_DECEL : -tank.accel * (1 - clamp(-speedForward / MAX_REVERSE, 0, 1));
   } else {
     // Rolling friction toward a stop
     accelAlong = -Math.sign(speedForward) * Math.min(ROLLING_FRICTION, Math.abs(speedForward) / dt);
