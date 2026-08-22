@@ -35,11 +35,23 @@ import { AI_PERSONALITIES, createAIController, type AIController } from "./ai";
 import {
   createScreens,
   formatRaceTime,
+  type ChampPodiumView,
+  type ChampResultsView,
   type NewBest,
   type TankStatsView,
 } from "./screens";
 import { initAudio, resumeAudio, startMusic, stopMusic, sfx, suspendAudio, toggleMute, updateEngine } from "./audio";
 import { createJuice } from "./juice";
+import {
+  CHAMP_POINTS,
+  clearChamp,
+  loadChamp,
+  sortStandings,
+  storeChamp,
+  totalTimeOf,
+  type ChampEntrant,
+  type ChampState,
+} from "./championship";
 import {
   createGhostPlayer,
   createGhostRecorder,
@@ -49,8 +61,9 @@ import {
   type GhostRecording,
 } from "./ghost";
 
-/** High-level game flow (Phase 5): title → countdown → race → results. */
-export type Phase = "title" | "countdown" | "race" | "results";
+/** High-level game flow (Phase 5): title → countdown → race → results.
+ * Phase 15 adds "podium" — the final championship standings screen. */
+export type Phase = "title" | "countdown" | "race" | "results" | "podium";
 
 /** Shared game state — systems read/write this object. */
 export interface World {
@@ -85,6 +98,8 @@ export interface Racer {
 
 export interface Game {
   world: World;
+  /** Dev/debug handle for headless smoke tests. */
+  worldRef: World;
   update(dt: number): void;
   render(): void;
   onResize(): void;
@@ -156,6 +171,22 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   ground.receiveShadow = true;
   scene.add(ground);
 
+  // --- Cameras (created early: the boot-time mode/championship restore can
+  // call applyMode() → updateCameraAspects(), which reads these) --------------
+  const camera = new THREE.PerspectiveCamera(
+    BASE_FOV,
+    window.innerWidth / window.innerHeight,
+    0.5,
+    1000,
+  );
+  // Phase 13: second chase camera for P2's half of the split screen.
+  const camera2 = new THREE.PerspectiveCamera(
+    BASE_FOV,
+    window.innerWidth / window.innerHeight,
+    0.5,
+    1000,
+  );
+
   // --- Screens overlay (created early: loadTrack updates the title card) -----
   const screens = createScreens();
 
@@ -224,6 +255,251 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       localStorage.setItem(MODE_STORAGE_KEY, twoPlayer ? "2p" : "1p");
     } catch {
       /* private mode etc. — selection just won't persist */
+    }
+  }
+
+  // --- Championship Mode (Phase 15): all 4 circuits in fixed order -------------
+  /**
+   * Two pieces of state:
+   *  - `champMode` — the title-screen V toggle (persisted). While on, the
+   *    track picker is disabled and ENTER races the series in TRACK_DEFS order.
+   *  - `champ` — an in-progress series (persisted after every race under
+   *    "tankracer.champ"), so a refresh resumes at the right race. Cleared on
+   *    completion or abandonment.
+   */
+  const SERIES_STORAGE_KEY = "tankracer.series";
+
+  /** Title-screen toggle state; declared before loadTrack() (persist guard). */
+  let champMode = false;
+  /** In-progress series, or null when none is running. */
+  let champ: ChampState | null = null;
+
+  function loadStoredChampMode(): boolean {
+    try {
+      return localStorage.getItem(SERIES_STORAGE_KEY) === "champ";
+    } catch {
+      return false;
+    }
+  }
+
+  function storeChampMode(on: boolean): void {
+    try {
+      localStorage.setItem(SERIES_STORAGE_KEY, on ? "champ" : "single");
+    } catch {
+      /* private mode etc. — selection just won't persist */
+    }
+  }
+
+  /** Grid slot → stable championship entrant id ("p1"/"p2"/"ai{n}"). */
+  function entrantIdForSlot(slot: number): string {
+    const humans = world.twoPlayer ? 2 : 1;
+    if (slot === 0) return "p1";
+    if (slot === 1 && world.twoPlayer) return "p2";
+    return `ai${slot - humans}`;
+  }
+
+  /** Fresh 4-entrant table from the current grid roster (humans keep names/colors
+   * they race with all series long; AI personalities are module constants). */
+  function buildChampEntrants(): ChampEntrant[] {
+    const humans = world.twoPlayer ? 2 : 1;
+    const list: ChampEntrant[] = [
+      {
+        id: "p1",
+        name: humanName(player),
+        color: hexColor(playerTankDef().hullColor),
+        isPlayer: true,
+        points: 0,
+        times: [],
+        wins: 0,
+      },
+    ];
+    if (world.twoPlayer) {
+      list.push({
+        id: "p2",
+        name: "P2",
+        color: hexColor(P2_HULL_COLOR),
+        isPlayer: false,
+        isPlayerTwo: true,
+        points: 0,
+        times: [],
+        wins: 0,
+      });
+    }
+    for (let i = humans; i < GRID.length; i++) {
+      const pers = AI_PERSONALITIES[i - humans];
+      list.push({
+        id: `ai${i - humans}`,
+        name: pers.name,
+        color: `#${pers.hullColor.toString(16).padStart(6, "0")}`,
+        isPlayer: false,
+        points: 0,
+        times: [],
+        wins: 0,
+      });
+    }
+    return list;
+  }
+
+  /** P1's swatch tracks a mid-series tank re-pick (cosmetic only). */
+  function syncChampP1Color(): void {
+    if (!champ) return;
+    const p1 = champ.entrants.find((e) => e.id === "p1");
+    if (p1) p1.color = hexColor(playerTankDef().hullColor);
+  }
+
+  /**
+   * Award points for one completed race. `order` is finishing order (same sort
+   * as the results table): points by position, winner banks a win, DNF racers
+   * still score by progress but record no time (time tie-breaks penalize it).
+   */
+  function recordChampRace(order: Racer[]): ChampResultsView {
+    const st = champ!;
+    for (
+      let pos = 0;
+      pos < order.length && pos < CHAMP_POINTS.length;
+      pos++
+    ) {
+      const racer = order[pos];
+      const entrant = st.entrants.find(
+        (e) => e.id === entrantIdForSlot(world.racers.indexOf(racer)),
+      );
+      if (!entrant) continue;
+      entrant.points += CHAMP_POINTS[pos];
+      if (pos === 0) entrant.wins += 1;
+      entrant.times.push(racer.finishTime);
+    }
+    st.raceIndex += 1;
+    storeChamp(st); // crash-safe resume point even between this line + podium
+    return buildChampResultsView(st);
+  }
+
+  /** Sorted cumulative standings view for the results overlay sidebar. */
+  function buildChampResultsView(st: ChampState): ChampResultsView {
+    const sorted = sortStandings(st.entrants);
+    const done = st.raceIndex >= TRACK_DEFS.length;
+    return {
+      afterRace: st.raceIndex,
+      totalRaces: TRACK_DEFS.length,
+      prompt: done
+        ? "PRESS ENTER — FINAL PODIUM"
+        : `PRESS ENTER — RACE ${st.raceIndex + 1}/${TRACK_DEFS.length}: ${TRACK_DEFS[st.raceIndex].name}`,
+      standings: sorted.map((e, i) => ({
+        pos: i + 1,
+        name: e.name,
+        color: e.color,
+        points: e.points,
+        isPlayer: e.isPlayer,
+        isPlayerTwo: e.isPlayerTwo,
+      })),
+    };
+  }
+
+  /** Final podium data (points order; ties fall through time then wins). */
+  function buildPodiumView(st: ChampState): ChampPodiumView {
+    return {
+      entries: sortStandings(st.entrants).map((e, i) => ({
+        pos: i + 1,
+        name: e.name,
+        color: e.color,
+        points: e.points,
+        isPlayer: e.isPlayer,
+        isPlayerTwo: e.isPlayerTwo,
+        time:
+          totalTimeOf(e) !== null ? formatRaceTime(totalTimeOf(e)!) : "—",
+        wins: e.wins,
+      })),
+    };
+  }
+
+  /**
+   * ENTER on the title with the series toggle on: start a fresh championship
+   * at race 0, or continue the stored one at its saved race index — either way
+   * straight into that circuit's countdown without touching the title again.
+   */
+  function startSeriesRace(): void {
+    if (!champ) {
+      champ = {
+        v: 1,
+        raceIndex: 0,
+        twoPlayer: world.twoPlayer,
+        entrants: buildChampEntrants(),
+      };
+      storeChamp(champ);
+    }
+    syncChampP1Color();
+    loadTrack(champ.raceIndex); // fixed order — never the title picker's pick
+    beginCountdown();
+  }
+
+  /** Results-screen continue: next race's countdown, or the podium after #4. */
+  function continueFromResults(): void {
+    initAudio();
+    if (!champ) {
+      resetRace(); // single race: unchanged instant restart
+      return;
+    }
+    if (champ.raceIndex >= TRACK_DEFS.length) {
+      enterPodium();
+    } else {
+      loadTrack(champ.raceIndex);
+      beginCountdown();
+    }
+  }
+
+  /** Show the final standings and end the series (storage cleared here). */
+  function enterPodium(): void {
+    const st = champ;
+    if (!st) {
+      exitSeriesToTitle();
+      return;
+    }
+    champ = null;
+    clearChamp();
+    setPhase("podium");
+    screens.showPodium(buildPodiumView(st));
+  }
+
+  /** Abandon/leave any series context back to the title card. */
+  function exitSeriesToTitle(): void {
+    champ = null;
+    clearChamp();
+    screens.hideResults();
+    screens.showTitle(); // also removes the podium overlay
+    setPhase("title");
+    titleCamera(0); // snap the orbit cam somewhere sane for the first frame
+    loadTrack(champMode ? 0 : trackIndex); // preview race 1 / restore pick
+    if (champMode) {
+      // The series line must not keep pointing at a finished/abandoned race.
+      screens.setChampRace(`RACE 1 OF ${TRACK_DEFS.length}`);
+    }
+  }
+
+  /** Esc at an interstitial: abandon the series entirely. */
+  function abandonChampionship(): void {
+    exitSeriesToTitle();
+    screens.toast("CHAMPIONSHIP ABANDONED");
+  }
+
+  /**
+   * Title-screen V toggle. Blocked while a series is in progress — flipping
+   * modes mid-series would corrupt the persisted roster/mode pairing.
+   */
+  function toggleChampMode(): void {
+    if (world.phase !== "title") return;
+    if (champ) {
+      screens.toast("SERIES IN PROGRESS — FINISH OR ABANDON IT");
+      return;
+    }
+    champMode = !champMode;
+    storeChampMode(champMode);
+    sfx.pickup();
+    screens.setChampMode(champMode);
+    if (champMode) {
+      loadTrack(0); // series starts at the first circuit
+      screens.setChampRace(`RACE 1 OF ${TRACK_DEFS.length}`);
+    } else {
+      screens.setChampRace(null);
+      loadTrack(loadStoredTrackIndex()); // restore the single-race pick
     }
   }
 
@@ -353,6 +629,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   let trackIndex = loadStoredTrackIndex();
   let track!: Track; // assigned by loadTrack() below
   let powerups: Powerups; // rebuilt per track (crate spots come from the TrackDef)
+  // Declared before the boot-time setPhase("title"): updateTouchControlsVisibility
+  // reads it during init and a later `let` would be a TDZ crash.
+  let paused = false;
 
   function applyTheme(def: TrackDef): void {
     (scene.background as THREE.Color).setHex(def.skyColor);
@@ -386,7 +665,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     trackIndex =
       ((index % TRACK_DEFS.length) + TRACK_DEFS.length) % TRACK_DEFS.length;
     const def = TRACK_DEFS[trackIndex];
-    storeTrackIndex(trackIndex);
+    // Phase 15: championship previews/series tracks must not clobber the
+    // user's persisted single-race pick.
+    if (!champMode) storeTrackIndex(trackIndex);
 
     if (track) disposeTrackGroup(track.group);
     if (powerups) powerups.dispose();
@@ -490,6 +771,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
   const racers: Racer[] = [];
   const aiControllers: AIController[] = [];
+  // Declared before the boot-time applyMode() restore call, which fires the
+  // onModeChange callback (a later `let` here would be a TDZ crash).
+  let onModeChange: ((twoPlayer: boolean) => void) | null = null;
 
   // Phase 13: the third AI is benched (hidden + excluded) in 2P so the grid
   // stays at 4 tanks: P1, P2, then 2 AI.
@@ -561,11 +845,33 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     screens.setMode(world.twoPlayer); // ensure the title card shows the mode
   }
 
+  // Phase 15: restore the series toggle + any in-progress championship.
+  // A stored series pins the mode (the roster was built for it), re-colors
+  // P1's swatch to the persisted tank and previews the next race's circuit.
+  champMode = loadStoredChampMode();
+  screens.setChampMode(champMode);
+  champ = loadChamp();
+  if (champ && champ.raceIndex >= TRACK_DEFS.length) {
+    // Refreshed between the last finish and its continue press — the series
+    // is decided, so skip straight to the podium instead of a phantom race 5.
+    enterPodium();
+  } else if (champ) {
+    if (champ.twoPlayer !== world.twoPlayer) applyMode(champ.twoPlayer);
+    syncChampP1Color();
+    loadTrack(champ.raceIndex);
+    screens.setChampRace(
+      `RACE ${champ.raceIndex + 1} OF ${TRACK_DEFS.length}`,
+    );
+  } else if (champMode) {
+    loadTrack(0);
+    screens.setChampRace(`RACE 1 OF ${TRACK_DEFS.length}`);
+  }
+
   // --- Cameras -----------------------------------------------------------------
+  // (camera + camera2 are created up top — needed by boot-time applyMode)
   let countdownClock = 0;
   let countdownStep = -1;
   let goHideTimer = 0;  // Phase 9: pause freezes the whole sim; dust-puff spawn timer lives here too.
-  let paused = false;
   let dustTimer = 0;
 
   /**
@@ -592,19 +898,6 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     updateTouchControlsVisibility();
   }
 
-  const camera = new THREE.PerspectiveCamera(
-    BASE_FOV,
-    window.innerWidth / window.innerHeight,
-    0.5,
-    1000,
-  );
-  // Phase 13: second chase camera for P2's half of the split screen.
-  const camera2 = new THREE.PerspectiveCamera(
-    BASE_FOV,
-    window.innerWidth / window.innerHeight,
-    0.5,
-    1000,
-  );
   const CAM_DIST = 14;
   const CAM_HEIGHT = 7;
 
@@ -710,7 +1003,10 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     world.phase = phase;
     // HUD hidden on the title only; toggled on phase change, never per frame.
     const hud = document.getElementById("hud");
-    if (hud) hud.style.display = phase === "title" ? "none" : "";
+    if (hud) {
+      hud.style.display =
+        phase === "title" || phase === "podium" ? "none" : "";
+    }
     updateTouchControlsVisibility();
   }
 
@@ -781,7 +1077,6 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   }
 
   // --- Mode management (Phase 13): local 1P vs 2P split-screen -----------------
-  let onModeChange: ((twoPlayer: boolean) => void) | null = null;
 
   /**
    * Switch between 1P and 2P. Rebuilds the grid membership (P1, [P2,] AI…),
@@ -822,6 +1117,11 @@ export function createGame(canvas: HTMLCanvasElement): Game {
    */
   function toggleMode(): void {
     if (world.phase !== "title") return;
+    // Phase 15: a live series pins 1P/2P — its roster was built for that mode.
+    if (champ) {
+      screens.toast("SERIES IN PROGRESS — FINISH OR ABANDON IT");
+      return;
+    }
     if (!world.twoPlayer) {
       if (gamepadInput.connected) {
         screens.toast("🎮 GAMEPAD ACTIVE — 1P ONLY");
@@ -891,12 +1191,16 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       ghostData = loadGhost(track.def.id);
     }
 
-    screens.showResults(buildResultRows(), track.def.name, newBest);
+    // Phase 15: championship scoring — points/wins/times recorded BEFORE the
+    // overlay builds so the standings sidebar reflects this race's awards.
+    const champView = champ ? recordChampRace(finishingOrder()) : undefined;
+
+    screens.showResults(buildResultRows(), track.def.name, newBest, champView);
   }
 
-  function buildResultRows() {
-    // Finished racers by time, then unfinished by track progress.
-    const order = world.racers.slice().sort((a, b) => {
+  /** Finished racers by time, then unfinished by track progress. */
+  function finishingOrder(): Racer[] {
+    return world.racers.slice().sort((a, b) => {
       if (a.finishTime !== null && b.finishTime !== null) {
         return a.finishTime - b.finishTime;
       }
@@ -904,6 +1208,10 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       if (b.finishTime !== null) return 1;
       return b.progress.totalProgress - a.progress.totalProgress;
     });
+  }
+
+  function buildResultRows() {
+    const order = finishingOrder();
     const humans = humanCount();
     return order.map((racer) => {
       const isP1 = racer.tank === player;
@@ -1090,7 +1398,16 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     // untouched). While paused world.phase is still "race", so this same branch
     // handles resume.
     if (e.code === "KeyP" || e.code === "Escape") {
-      if (world.phase === "race") setPaused(!paused);
+      if (world.phase === "race") {
+        setPaused(!paused);
+      } else if (world.phase === "podium") {
+        // Phase 15: leave the finished series' podium for the title.
+        exitSeriesToTitle();
+      } else if (world.phase === "results" && champ) {
+        // Phase 15: Esc at a championship interstitial abandons the series.
+        // Single-race results are untouched — Esc keeps doing nothing there.
+        abandonChampionship();
+      }
       return;
     }
     // Restart from pause: unfreeze first so the countdown runs on live audio
@@ -1099,7 +1416,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       resetRace();
       return;
     }
-    // Phase 13/14: C toggles 1P/2P, G toggles the ghost replay (title only)
+    // Phase 13/14/15: C toggles 1P/2P, G the ghost replay, V single/champ
     if (e.code === "KeyC" && world.phase === "title") {
       toggleMode();
       return;
@@ -1108,14 +1425,19 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       toggleGhost();
       return;
     }
-    // Title screen: LEFT/RIGHT cycles circuits (Phase 6), UP/DOWN tanks (Phase 7)
+    if (e.code === "KeyV" && world.phase === "title") {
+      toggleChampMode();
+      return;
+    }
+    // Title screen: LEFT/RIGHT cycles circuits (Phase 6), UP/DOWN tanks (Phase 7).
+    // Phase 15: the track picker is inert in championship mode (fixed order).
     if (world.phase === "title") {
-      if (e.code === "ArrowLeft") {
+      if (!champMode && e.code === "ArrowLeft") {
         sfx.pickup();
         loadTrack(trackIndex - 1);
         return;
       }
-      if (e.code === "ArrowRight") {
+      if (!champMode && e.code === "ArrowRight") {
         sfx.pickup();
         loadTrack(trackIndex + 1);
         return;
@@ -1131,12 +1453,24 @@ export function createGame(canvas: HTMLCanvasElement): Game {
         return;
       }
     }
-    if (e.code === "Enter" && world.phase === "title") {
+    // Podium: Enter/R returns to the title (Esc handled above)
+    if (
+      (e.code === "Enter" || e.code === "KeyR") &&
+      world.phase === "podium"
+    ) {
+      exitSeriesToTitle();
+    } else if (e.code === "Enter" && world.phase === "title") {
       initAudio(); // first user gesture unlocks WebAudio
-      beginCountdown();
-    } else if (e.code === "KeyR" && world.phase === "results") {
-      initAudio();
-      resetRace(); // instant restart straight into COUNTDOWN
+      if (champMode) startSeriesRace();
+      else beginCountdown();
+    } else if (
+      world.phase === "results" &&
+      (e.code === "KeyR" || e.code === "Enter")
+    ) {
+      // Phase 15: next race in a series (Enter or R), else the unchanged
+      // single-race instant restart (R only — Enter stays inert in 1 race).
+      if (e.code === "Enter" && !champ) return;
+      continueFromResults();
     }
   };
   window.addEventListener("keydown", onKeyDown);
@@ -1174,11 +1508,13 @@ export function createGame(canvas: HTMLCanvasElement): Game {
         // A = Enter equivalent. Not while paused: pause only exists mid-race,
         // so this is just belt-and-braces against future phase changes.
         initAudio(); // first user gesture unlocks WebAudio
-        beginCountdown();
+        if (champMode) startSeriesRace();
+        else beginCountdown();
       }
+    } else if (world.phase === "podium" && action === "confirm") {
+      exitSeriesToTitle(); // A = Enter equivalent on the podium
     } else if (world.phase === "results" && action === "confirm") {
-      initAudio();
-      resetRace(); // A = R equivalent on results
+      continueFromResults(); // A = R equivalent on results
     }
   }
 
@@ -1195,21 +1531,30 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   // only, so the desktop click flow is untouched). Countdown has no keyboard
   // skip either — a mid-countdown tap is intentionally ignored.
   const onPointerDown = (e: PointerEvent) => {
-    if (!touchInput.enabled) return;
     const target = e.target as HTMLElement | null;
     if (target?.closest("#touch-controls")) return; // button press, not a screen tap
+    // Phase 15: the podium is dismissed by ANY click (spec: key/click → title),
+    // not just touch-mode taps.
+    if (world.phase === "podium") {
+      exitSeriesToTitle();
+      return;
+    }
+    if (!touchInput.enabled) return;
     if (world.phase === "title") {
       initAudio(); // same unlock as the Enter path
-      beginCountdown();
+      if (champMode) startSeriesRace();
+      else beginCountdown();
     } else if (world.phase === "results") {
-      initAudio();
-      resetRace();
+      continueFromResults();
     }
   };
   window.addEventListener("pointerdown", onPointerDown);
 
   return {
     world,
+    // Dev/debug handle: lets headless smoke tests read race state (not used
+    // by the game itself).
+    worldRef: world,
     update(dt: number) {
       // Phase 10: gamepad poll runs even while frozen so Start can resume.
       pollGamepad(dt);
@@ -1270,14 +1615,18 @@ export function createGame(canvas: HTMLCanvasElement): Game {
           simulate(dt, false);
           updateEngine(0, false);
           break;
+        case "podium":
+          // Phase 15: slow orbit behind the final standings card.
+          titleCamera(dt);
+          break;
       }
     },
     render() {
       const w = window.innerWidth;
       const h = window.innerHeight;
       // Phase 13: split-screen — P1 left half, P2 right half, one render pass
-      // per camera. The title always uses the single full-screen orbit cam.
-      if (!world.twoPlayer || world.phase === "title") {
+      // per camera. Title + podium always use the single full-screen orbit cam.
+      if (!world.twoPlayer || world.phase === "title" || world.phase === "podium") {
         renderer.setScissorTest(false);
         renderer.setViewport(0, 0, w, h);
         renderer.render(scene, camera);

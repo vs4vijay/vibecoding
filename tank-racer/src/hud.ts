@@ -300,7 +300,8 @@ export function initHud(world: World): Hud {
 
   function update() {
     // Track switched on the title screen → recompute minimap geometry once
-    if (world.track !== hudTrack) recomputeMinimap();
+    // (also covers the very first frames, before any recompute has run).
+    if (world.track !== hudTrack || outlinePts.length === 0) recomputeMinimap();
     for (const p of panels) updatePanel(p);
     drawMinimap();
     requestAnimationFrame(update);

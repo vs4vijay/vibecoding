@@ -34,6 +34,39 @@ export interface TankStatsView {
   fire: number;
 }
 
+/** One row of the championship standings table (Phase 15). */
+export interface ChampStandingRow {
+  pos: number;
+  name: string;
+  color: string;
+  points: number;
+  isPlayer: boolean;
+  isPlayerTwo?: boolean;
+}
+
+/** Championship sidebar shown under the RACE result (Phase 15). */
+export interface ChampResultsView {
+  /** Number of races completed so far (the one just raced included). */
+  afterRace: number;
+  totalRaces: number;
+  /** Preformatted continue prompt ("PRESS ENTER — …"). */
+  prompt: string;
+  standings: ChampStandingRow[];
+}
+
+/** One podium/finals-table entry with series totals (Phase 15). */
+export interface PodiumEntry extends ChampStandingRow {
+  /** Preformatted sum of finished race totals, "—" if none were finished. */
+  time: string;
+  wins: number;
+}
+
+/** Final screen data after the last championship race (Phase 15). */
+export interface ChampPodiumView {
+  /** Sorted 1st → 4th; screens renders top 3 as podium steps. */
+  entries: PodiumEntry[];
+}
+
 export interface Screens {
   showTitle(subtitle?: string): void;
   /** Title-screen track picker: updates the displayed circuit name. */
@@ -47,6 +80,10 @@ export interface Screens {
   setMode(twoPlayer: boolean): void;
   /** Phase 14: title-screen ghost toggle display ("GHOST ON" / "GHOST OFF"). */
   setGhost(on: boolean): void;
+  /** Phase 15: title-screen series pill + track-picker enable/disable. */
+  setChampMode(championship: boolean): void;
+  /** Phase 15: "RACE n/4" line under the track name (null hides it). */
+  setChampRace(text: string | null): void;
   /** Tank name shown under the big countdown text (Phase 7). */
   showCountdownTag(text: string): void;
   showCountdown(text: string): void;
@@ -57,8 +94,11 @@ export interface Screens {
     rows: ResultRow[],
     trackName: string,
     newBest?: NewBest,
+    champ?: ChampResultsView,
   ): void;
   hideResults(): void;
+  /** Phase 15: final championship screen (gold/silver/bronze podium). */
+  showPodium(view: ChampPodiumView): void;
   /** Small bottom-center notice (mute toggle). Auto-fades. */
   toast(text: string): void;
   /** PAUSED overlay while the sim is frozen (Phase 9). */
@@ -84,11 +124,14 @@ export function createScreens(rootId = "screens"): Screens {
   // --- Title ---------------------------------------------------------------
   let title: HTMLDivElement | null = null;
   let trackNameEl: HTMLDivElement | null = null;
+  let trackSelEl: HTMLDivElement | null = null;
   let bestTimesEl: HTMLDivElement | null = null;
+  let champRaceEl: HTMLDivElement | null = null;
   let tankNameEl: HTMLDivElement | null = null;
   let statsCardEl: HTMLDivElement | null = null;
   let modeEl: HTMLDivElement | null = null;
   let ghostEl: HTMLDivElement | null = null;
+  let champEl: HTMLDivElement | null = null;
   let controlsEl: HTMLDivElement | null = null;
   function ensureTitle(): HTMLDivElement {
     if (title) return title;
@@ -106,9 +149,11 @@ export function createScreens(rootId = "screens"): Screens {
     card.appendChild(h1);
     card.appendChild(sub);
 
-    // Track selector (Phase 6): LEFT/RIGHT cycles circuits
+    // Track selector (Phase 6): LEFT/RIGHT cycles circuits.
+    // Phase 15: dimmed + inert while championship mode is active (fixed order).
     const trackSel = document.createElement("div");
     trackSel.className = "track-select";
+    trackSelEl = trackSel;
     const prevArrow = document.createElement("span");
     prevArrow.className = "track-arrow";
     prevArrow.textContent = "◀";
@@ -128,6 +173,11 @@ export function createScreens(rootId = "screens"): Screens {
     bestTimesEl.id = "screen-best-times";
     bestTimesEl.textContent = "";
     card.appendChild(bestTimesEl);
+
+    // Phase 15: "RACE n OF 4" series line (championship mode only)
+    champRaceEl = document.createElement("div");
+    champRaceEl.id = "screen-champ-race";
+    card.appendChild(champRaceEl);
 
     // Tank selector (Phase 7): UP/DOWN cycles tanks
     const tankSel = document.createElement("div");
@@ -160,6 +210,11 @@ export function createScreens(rootId = "screens"): Screens {
     ghostEl = document.createElement("div");
     ghostEl.id = "screen-ghost-select";
     card.appendChild(ghostEl);
+
+    // Phase 15: series toggle — V flips SINGLE RACE / CHAMPIONSHIP (persisted)
+    champEl = document.createElement("div");
+    champEl.id = "screen-champ-select";
+    card.appendChild(champEl);
 
     // Controls listing: rebuilt per mode by renderControls() (setMode)
     controlsEl = document.createElement("div");
@@ -227,6 +282,24 @@ export function createScreens(rootId = "screens"): Screens {
     if (results) {
       results.remove();
       results = null;
+    }
+  }
+
+  // --- Phase 15: podium overlay -------------------------------------------------
+  let podium: HTMLDivElement | null = null;
+  function ensurePodium(): HTMLDivElement {
+    if (!podium) {
+      podium = document.createElement("div");
+      podium.id = "screen-podium";
+      podium.className = "screen-overlay dim";
+      root.appendChild(podium);
+    }
+    return podium;
+  }
+  function hidePodiumNow(): void {
+    if (podium) {
+      podium.remove();
+      podium = null;
     }
   }
   function hideCountdownNow(): void {
@@ -297,6 +370,7 @@ export function createScreens(rootId = "screens"): Screens {
         ["← →", "choose track"],
         ["↑ ↓", "choose tank"],
         ["C", "toggle 2P mode"],
+        ["V", "single / championship"],
         ["G", "toggle ghost"],
       ] as const) {
         el.appendChild(controlsRow(key, action));
@@ -326,6 +400,7 @@ export function createScreens(rootId = "screens"): Screens {
       ["← →", "choose track"],
       ["↑ ↓", "choose tank (P1)"],
       ["C", "toggle mode"],
+      ["V", "single / championship"],
       ["G", "toggle ghost"],
     ] as const) {
       el.appendChild(controlsRow(key, action));
@@ -335,6 +410,7 @@ export function createScreens(rootId = "screens"): Screens {
   return {
     showTitle(subtitle?: string) {
       hideResultsNow();
+      hidePodiumNow();
       hideCountdownNow();
       const card = ensureTitle();
       if (subtitle) {
@@ -373,11 +449,28 @@ export function createScreens(rootId = "screens"): Screens {
         ghostEl.classList.toggle("on", on);
       }
     },
+    // Phase 15: series pill + track picker availability
+    setChampMode(championship: boolean) {
+      ensureTitle();
+      if (champEl) {
+        champEl.textContent = championship ? "CHAMPIONSHIP" : "SINGLE RACE";
+        champEl.classList.toggle("on", championship);
+      }
+      if (trackSelEl) trackSelEl.classList.toggle("disabled", championship);
+    },
+    setChampRace(text: string | null) {
+      ensureTitle();
+      if (champRaceEl) champRaceEl.textContent = text ?? "";
+    },
     showCountdownTag(text: string) {
       ensureCountdownTag().textContent = text;
     },
     showCountdown(text: string) {
-      ensureCountdown().textContent = text;
+      const el = ensureCountdown();
+      // Leaving the title card: a starting race must not keep it on screen
+      // (showTitle restores visibility when returning to the title).
+      if (title) title.style.display = "none";
+      el.textContent = text;
     },
     hideCountdown() {
       hideCountdownNow();
@@ -402,6 +495,7 @@ export function createScreens(rootId = "screens"): Screens {
       rows: ResultRow[],
       trackName: string,
       newBest?: NewBest,
+      champ?: ChampResultsView,
     ) {
       const el = ensureResults();
       el.textContent = ""; // rebuild rows each race
@@ -465,15 +559,160 @@ export function createScreens(rootId = "screens"): Screens {
         card.appendChild(line);
       }
 
+      // Phase 15: championship standings under the race result. Kept compact
+      // (smaller font, tighter rows) so both tables fit on one screen.
+      if (champ) {
+        const divider = document.createElement("div");
+        divider.className = "champ-divider";
+        divider.textContent = `CHAMPIONSHIP STANDINGS · AFTER RACE ${champ.afterRace}/${champ.totalRaces}`;
+        card.appendChild(divider);
+
+        for (const row of champ.standings) {
+          const line = document.createElement("div");
+          line.className =
+            "champ-row" +
+            (row.isPlayer ? " player" : "") +
+            (row.isPlayerTwo ? " player-two" : "");
+
+          const pos = document.createElement("span");
+          pos.className = "champ-pos";
+          pos.textContent = `${row.pos}.`;
+
+          const swatch = document.createElement("span");
+          swatch.className = "result-swatch";
+          swatch.style.background = row.color;
+
+          const name = document.createElement("span");
+          name.className = "result-name";
+          name.textContent = row.name;
+
+          const pts = document.createElement("span");
+          pts.className = "champ-pts";
+          pts.textContent = `${row.points} PTS`;
+
+          line.appendChild(pos);
+          line.appendChild(swatch);
+          line.appendChild(name);
+          line.appendChild(pts);
+          card.appendChild(line);
+        }
+      }
+
       const press = document.createElement("p");
       press.className = "press blink";
-      press.textContent = "PRESS R TO RESTART";
+      press.textContent = champ ? champ.prompt : "PRESS R TO RESTART";
       card.appendChild(press);
 
       el.appendChild(card);
     },
     hideResults() {
       hideResultsNow();
+    },
+    // --- Phase 15: final podium -------------------------------------------------
+    showPodium(view: ChampPodiumView) {
+      hideResultsNow();
+      const el = ensurePodium();
+      // Cover the title card completely when the series ends straight from boot
+      if (title) title.style.display = "none";
+      el.textContent = "";
+
+      const card = document.createElement("div");
+      card.className = "results-card podium-card";
+
+      const h2 = document.createElement("h2");
+      h2.textContent = "CHAMPIONSHIP COMPLETE";
+      card.appendChild(h2);
+
+      const sub = document.createElement("div");
+      sub.className = "podium-champion-line";
+      const champEntry = view.entries[0];
+      const star = document.createElement("span");
+      star.className = "podium-star";
+      star.textContent = "★ ";
+      sub.appendChild(star);
+      sub.appendChild(document.createTextNode(`${champEntry.name} TAKES THE TITLE`));
+      card.appendChild(sub);
+
+      // Steps rendered 2nd / 1st / 3rd so the champion stands center + tall
+      const steps = document.createElement("div");
+      steps.className = "podium-steps";
+      const layout: Array<{ entryIdx: number; cls: "gold" | "silver" | "bronze" }> = [
+        { entryIdx: 1, cls: "silver" },
+        { entryIdx: 0, cls: "gold" },
+        { entryIdx: 2, cls: "bronze" },
+      ];
+      for (const { entryIdx, cls } of layout) {
+        const entry = view.entries[entryIdx];
+        if (!entry) continue;
+        const step = document.createElement("div");
+        step.className = `podium-step ${cls}` + (entryIdx === 0 ? " champion" : "");
+
+        const pos = document.createElement("div");
+        pos.className = "podium-pos";
+        pos.textContent = ["1ST", "2ND", "3RD"][entry.pos - 1] ?? `${entry.pos}TH`;
+
+        const swatch = document.createElement("span");
+        swatch.className = "result-swatch";
+        swatch.style.background = entry.color;
+
+        const name = document.createElement("div");
+        name.className = "podium-name";
+        name.textContent = entry.name;
+
+        const pts = document.createElement("div");
+        pts.className = "podium-pts";
+        pts.textContent = `${entry.points} PTS · ${entry.wins} WIN${entry.wins === 1 ? "" : "S"}`;
+
+        step.appendChild(pos);
+        step.appendChild(swatch);
+        step.appendChild(name);
+        step.appendChild(pts);
+        if (entryIdx === 0) {
+          const crown = document.createElement("div");
+          crown.className = "podium-crown";
+          crown.textContent = "★ CHAMPION ★";
+          step.appendChild(crown);
+        }
+        steps.appendChild(step);
+      }
+      card.appendChild(steps);
+
+      // Full final table (4th place included)
+      for (const entry of view.entries) {
+        const line = document.createElement("div");
+        line.className =
+          "champ-row" +
+          (entry.isPlayer ? " player" : "") +
+          (entry.isPlayerTwo ? " player-two" : "");
+        const pos = document.createElement("span");
+        pos.className = "champ-pos";
+        pos.textContent = `${entry.pos}.`;
+        const swatch = document.createElement("span");
+        swatch.className = "result-swatch";
+        swatch.style.background = entry.color;
+        const name = document.createElement("span");
+        name.className = "result-name";
+        name.textContent = entry.name;
+        const meta = document.createElement("span");
+        meta.className = "champ-meta";
+        meta.textContent = `${entry.time} · ${entry.wins}W`;
+        const pts = document.createElement("span");
+        pts.className = "champ-pts";
+        pts.textContent = `${entry.points} PTS`;
+        line.appendChild(pos);
+        line.appendChild(swatch);
+        line.appendChild(name);
+        line.appendChild(meta);
+        line.appendChild(pts);
+        card.appendChild(line);
+      }
+
+      const press = document.createElement("p");
+      press.className = "press blink";
+      press.textContent = "PRESS ENTER FOR TITLE · ESC ABANDONS";
+      card.appendChild(press);
+
+      el.appendChild(card);
     },
     showPaused() {
       if (!paused) {

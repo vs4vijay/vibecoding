@@ -21,3 +21,6 @@ function frame(now: number) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// Dev/debug: headless smoke tests read race state through this handle.
+(window as any).__tankracerWorld = game.worldRef;
