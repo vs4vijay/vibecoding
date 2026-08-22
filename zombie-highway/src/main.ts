@@ -66,6 +66,7 @@ export function boot(): void {
     audio.shot();
     if (coachActive) coach.notifyShot();
   });
+  emitter.on("attach", () => audio.attachThud());
   emitter.on("scrape", () => audio.scrape());
   emitter.on("levelUp", (level) => {
     audio.levelUpSting();
@@ -86,6 +87,7 @@ export function boot(): void {
       bestDist = stats.distanceM;
       save("bestDist", bestDist);
     }
+    if (newBestScore) hud.toast("NEW BEST!");
     menus.showGameOver(stats, newBestScore);
     hud.hide();
   });
@@ -93,6 +95,7 @@ export function boot(): void {
   // --- menu actions ---------------------------------------------------------
   menus.onPlay(() => {
     audio.unlock();
+    audio.uiClick();
     menus.hideAll();
     hud.show();
     session.startRun();
@@ -102,6 +105,16 @@ export function boot(): void {
     }
   });
   hud.onPause(() => session.togglePause());
+  // Defensive retry: Space/Enter restart even if RETRY focus was dropped.
+  const retryKey = (ev: KeyboardEvent) => {
+    if (
+      (ev.code === "Space" || ev.code === "Enter") &&
+      menus.gameOverVisible
+    ) {
+      menus.retryFromKey();
+    }
+  };
+  window.addEventListener("keydown", retryKey);
 
   // Boot straight into the title screen.
   menus.showTitle(bestScore);

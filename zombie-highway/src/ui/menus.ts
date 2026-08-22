@@ -83,6 +83,20 @@ export class Menus {
     this.o.wrap.classList.add("hidden");
   }
 
+  /** True while the game-over card is on screen. */
+  get gameOverVisible(): boolean {
+    return !this.o.wrap.classList.contains("hidden");
+  }
+
+  /**
+   * Defensive retry: activates RETRY even if programmatic focus was
+   * dropped (guarantees the instant-restart contract on Space/Enter).
+   */
+  retryFromKey(): void {
+    if (!this.gameOverVisible) return;
+    if (document.activeElement !== this.o.retry) this.o.retry.click();
+  }
+
   private syncMuteLabel(audio: AudioEngine): void {
     this.t.mute.textContent = audio.muted ? "🔇 SOUND OFF" : "🔊 SOUND ON";
   }

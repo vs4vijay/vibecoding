@@ -80,7 +80,7 @@ export class AudioEngine {
   private master: GainLike | null = null;
   private noise: BufferLike | null = null;
 
-  private engOscs: OscLike[] | null = null;
+  private engOscs: OscLike[] = [];
   private engGain: GainLike | null = null;
 
   private scrapeSrc: SourceLike | null = null;
@@ -337,8 +337,6 @@ export class AudioEngine {
   }
 
   // --- private builders and schedulers -------------------------------------
-
-  /** Two detuned sawtooths through a lowpass; pitch tracks speed01. */
   private buildEngine(): void {
     const ctx = this.ctx!;
     this.engGain = ctx.createGain();
@@ -354,7 +352,7 @@ export class AudioEngine {
       osc.detune.value = detune;
       osc.connect(lp);
       osc.start();
-      this.engOscs!.push(osc);
+      this.engOscs.push(osc);
     }
     lp.connect(this.engGain).connect(this.master!);
   }
@@ -376,7 +374,7 @@ export class AudioEngine {
   }
 
   private updateEngine(speed01: number, running: boolean): void {
-    if (!this.ctx || !this.engGain || this.engOscs === null) return;
+    if (!this.ctx || !this.engGain) return;
     const t = this.ctx.currentTime;
     const freq = ENGINE_BASE_HZ + speed01 * ENGINE_SPAN_HZ;
     const gain = running ? ENGINE_GAIN : SILENCE;
@@ -385,6 +383,7 @@ export class AudioEngine {
       osc.frequency.setTargetAtTime(freq, t, 0.06);
     }
   }
+
 
   private updateGroans(dt: number, zombiesActive: boolean): void {
     if (!zombiesActive) {

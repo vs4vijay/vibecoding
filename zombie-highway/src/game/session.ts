@@ -44,6 +44,8 @@ export type GameEvents = {
   scrape: [side: "left" | "right"];
   shot: [side: "left" | "right"];
   kill: [type: string, viaScrape: boolean];
+  /** A leaper landed and latched onto the hull. */
+  attach: [side: "left" | "right"];
 };
 
 /**
@@ -168,6 +170,7 @@ export class Session {
     carZ: 0,
     accuracy: 0,
     carSpeed: 0,
+    onAttach: (side) => this.emitter.emit("attach", side),
   };
   private readonly sctx = {
     carX: 0,

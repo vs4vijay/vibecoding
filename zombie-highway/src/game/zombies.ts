@@ -30,6 +30,8 @@ export type ZombieUpdateCtx = {
   accuracy: number;
   /** Live forward speed m/s; leap prediction falls back to cruise baseline when absent. */
   carSpeed?: number;
+  /** Invoked when a leaper lands and latches onto the hull (audio/fx hook). */
+  onAttach?: (side: "left" | "right") => void;
 };
 
 // Pure simulation constants (mesh binding arrives in Task 9).
@@ -268,8 +270,12 @@ export class ZombiePool {
     const grabsCar =
       Math.abs(dx) <= CONFIG.car.halfWidth + CLING_X_OFFSET &&
       Math.abs(dzLand) <= CONFIG.car.length / 2 + CLING_X_OFFSET;
-    if (grabsCar) this.attachClinging(z, dx, ctx);
-    else this.kill(z, false);
+    if (grabsCar) {
+      this.attachClinging(z, dx, ctx);
+      ctx.onAttach?.(z.side);
+    } else {
+      this.kill(z, false);
+    }
   }
 
   private attachClinging(z: Zombie, dx: number, ctx: ZombieUpdateCtx): void {
