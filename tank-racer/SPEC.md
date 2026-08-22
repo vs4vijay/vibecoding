@@ -110,6 +110,20 @@ README.md with run instructions + screenshot placeholder section.
 
 ---
 
+---
+
+# v1.1 PHASES
+
+## Phase 6 — Second Track + Track Selection
+Refactor track definition so a circuit is data (control points + dressing config + pad/gate/crate t-values) and `track.ts` builds a `Track` from it. Add a second circuit ("CANYON RUN") with a different character from track 1 ("DUST BOWL"): e.g. figure-eight-adjacent layout or long sweepers + chicane, distinct dressing (mesa rock slabs, more cacti, warmer sky tint). Both tracks get boost pads, 4 crates, 4 gates, tuned AI (existing curvature logic should just work — verify via scripts/sim-ai.ts on both). Title screen gains track selection: LEFT/RIGHT arrows to cycle tracks (name shown), persists choice in localStorage. Results screen shows which track was raced.
+**Done when:** both tracks playable end-to-end vs AI, sim script shows clean laps on each; build clean.
+
+## Phase 7 — Tank Selection + Best Times
+Three selectable tanks with real stat differences (same physics code, different params): **BALANCED** (default stats), **SPRINTER** (+20% max speed, slower accel, -25 HP), **BRUISER** (-15% max speed, faster accel, +50 HP, faster fire cooldown 0.6s). Distinct hull colors/shapes (small proportion tweaks). Title screen: UP/DOWN cycles tank (stats card shown), ENTER confirms after track pick. Best-times: store per-track best lap + best total time in localStorage; show on title screen per track and highlight "NEW BEST!" on results. HUD tank name shown at countdown.
+**Done when:** all 3 tanks selectable and meaningfully different to play, best times persist across reloads, full loop title→race→results→restart works for every track/tank combo; `bun run build` clean.
+
+---
+
 ## Out of scope (v1)
 Multiplayer, mobile/touch controls, multiple tracks, tank selection, persistence,
 championship mode, real 3D assets/audio files.
