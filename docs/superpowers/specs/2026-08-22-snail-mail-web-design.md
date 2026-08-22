@@ -58,8 +58,8 @@ multiplayer colors.
 ### 3.2 Speed & controls
 
 - Auto-forward at the level's cruise speed. No manual throttle — steering is the game.
-- Speed modifiers: asteroid hit / red ring slow Turbo; invincibility grants brief boost feel via trail VFX only (no speed change).
-- Controls: `←`/`→` or `A`/`D` steer; `Space` fire; `P`/`Esc` pause. Jump pods fire automatically on contact.
+- Speed modifiers: asteroid hit −40% speed for 2 s; red ring −60% for 3 s —
+  brutal right before a gap.
 
 ### 3.3 Camera
 
@@ -75,7 +75,7 @@ Health ("postal meter"): 3 pips. Depleted → game over. Falling into a gap → 
 | Slug | Contact knocks Turbo off (fail); passable while invincible | yes |
 | Asteroid | Blocks lane; slow + 1 damage; destructible by cannon | yes |
 | Heart | Restores 1 pip (cap 3) | yes |
-| White ring | Weapon ladder up: single → double → triple → laser → homing rocket → fast rocket → invincibility | yes |
+| White ring | Weapon ladder up: single → double → triple → laser → homing rocket → fast rocket → invincibility. Turbo starts at single; original started at double — intentional simplification | yes |
 | Yellow ring | Smart bomb: destroys all enemies ahead within window | yes |
 | Red ring | Trap: heavy speed cut — cruel when placed before gaps | yes |
 | Jump pod | Trampoline over gap segments | yes |
@@ -108,7 +108,8 @@ JSON per level under `levels/*.json`:
 - 8–10 handcrafted levels escalate: L1–2 steering + packages + slugs; L3–4 asteroids +
   shooting; L5–6 gaps + jump pods; L7–8 red-ring traps + combinations; L9–10 gauntlet.
 - Sequential unlock: finishing level N unlocks N+1.
-- Score = packages × 100 + finish bonus + health bonus. Per-level best time + best score tracked.
+- Score = packages × 100 + finish bonus (1,000 × level id) + health bonus
+  (250 per remaining pip). Per-level best time + best score tracked.
 - Save (`localStorage`, key `snail-mail-save-v1`): `{ unlockedLevel, bestTimes, bestScores, muted }`.
   Single `SaveService`; corrupt data resets to defaults.
 
@@ -128,6 +129,10 @@ snail-mail-web/
 │   │   ├── TrackCurve.ts  // spline + s→world math
 │   │   ├── TrackMesh.ts   // ribbon + rails + gap builder
 │   │   └── LevelLoader.ts // JSON → runtime level (validates features)
+│   ├── systems/
+│   │   ├── Collision.ts   // (s,x) proximity, sorted-by-s windows
+│   │   ├── Weapons.ts     // ladder, projectiles, smart bomb
+│   │   └── Spawner.ts     // activate entities near player, recycle behind
 │   ├── entities/
 │   │   ├── Entity.ts      // { type, s, x, mesh?, alive }
 │   │   ├── SpawnRegistry.ts
