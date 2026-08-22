@@ -271,6 +271,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     (scene.background as THREE.Color).setHex(def.skyColor);
     (scene.fog as THREE.Fog).color.setHex(def.skyColor);
     (ground.material as THREE.MeshLambertMaterial).color.setHex(def.groundColor);
+    // Phase 12: night circuits can boost ambient / dim the sun for readability
+    hemi.intensity = def.hemiIntensity ?? 0.9;
+    sun.intensity = def.sunIntensity ?? 1.6;
   }
 
   /** Free a track group's GPU resources and remove it from the scene. */
@@ -425,7 +428,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   // Build the persisted track, seat all tanks, wire crates + AI brains
   loadTrack(trackIndex);
 
-  screens.showTitle();
+  screens.showTitle(`${TRACK_DEFS.length} CIRCUITS`);
   setPhase("title"); // hoisted function decl; hides the HUD behind the title card
   selectTank(tankIndex); // applies livery/stats + title-screen stats card
   touchInput.attach(); // safe now: world + phase exist for the onEnable callback

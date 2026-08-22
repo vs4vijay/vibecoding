@@ -28,6 +28,9 @@ export interface TrackDressing {
   rockColor: number;
   cactusColor: number;
   mesaColor: number;
+  /** Phase 12 METRO RUSH: night-city props (0/undefined disables them). */
+  buildings?: number;
+  streetlights?: number;
 }
 
 export interface TrackDef {
@@ -44,6 +47,10 @@ export interface TrackDef {
   /** Scene background/fog tint. */
   skyColor: number;
   groundColor: number;
+  /** Hemisphere-light intensity override (night circuits boost readability). */
+  hemiIntensity?: number;
+  /** Directional sun/moon intensity override. */
+  sunIntensity?: number;
   /** Road half-width in u (default ROAD_HALF_WIDTH = 7 → ~14u wide road). */
   roadHalfWidth?: number;
   /** Spline t-ranges surfaced with low-grip ice (Phase 11 GLACIER LOOP). */
@@ -151,8 +158,55 @@ const GLACIER_LOOP: TrackDef = {
   ],
 };
 
+const METRO_RUSH: TrackDef = {
+  id: "metro-rush",
+  name: "METRO RUSH",
+  points: [
+    { x: -60, z: -200 }, // 0: start/finish, short bottom straight heading +X
+    { x: 50, z: -205 }, // 1: end of the bottom straight
+    { x: 105, z: -160 }, // 2: quick right kink up
+    { x: 70, z: -95 }, // 3: left hook back west
+    { x: 130, z: -50 }, // 4: short NE dash
+    { x: 210, z: -80 }, // 5: east hairpin entry
+    { x: 240, z: -10 }, // 6: hairpin far point
+    { x: 175, z: 40 }, // 7: exit heading WNW
+    { x: 90, z: 15 }, // 8: chicane dip south
+    { x: 55, z: 90 }, // 9: chicane rise north
+    { x: -35, z: 145 }, // 10: top sweeper, east → west
+    { x: -130, z: 190 }, // 11: top-west run
+    { x: -205, z: 150 }, // 12: NW corner far point
+    { x: -220, z: 60 }, // 13: down the west side
+    { x: -150, z: 5 }, // 14: quick left toward center
+    { x: -185, z: -85 }, // 15: right-left flick
+    { x: -125, z: -165 }, // 16: final corner onto the start straight
+  ],
+  padTs: [0.03, 0.26, 0.64], // bottom straight, NE dash, top sweeper
+  crateTs: [0.08, 0.31, 0.52, 0.83],
+  gates: [0, 0.25, 0.5, 0.75],
+  dressing: {
+    seed: 7777,
+    rocks: 0,
+    cacti: 0,
+    mesas: 0,
+    rockColor: 0x000000, // unused on this track
+    cactusColor: 0x000000,
+    mesaColor: 0x000000,
+    buildings: 42,
+    streetlights: 30,
+  },
+  skyColor: 0x0a1230, // deep navy night sky + fog tint
+  groundColor: 0x161a2b, // dark asphalt plaza
+  hemiIntensity: 1.35, // boosted ambient so gameplay stays readable at night
+  sunIntensity: 0.55, // dim "moon" — shadows still read, mood stays dark
+};
+
 /** All selectable circuits (Phase 6) — order = title-screen cycle order. */
-export const TRACK_DEFS: TrackDef[] = [DUST_BOWL, CANYON_RUN, GLACIER_LOOP];
+export const TRACK_DEFS: TrackDef[] = [
+  DUST_BOWL,
+  CANYON_RUN,
+  GLACIER_LOOP,
+  METRO_RUSH,
+];
 
 export const ROAD_HALF_WIDTH = 7; // road is ~14 units wide (per-track default)
 export const WALL_HEIGHT = 1.2;
@@ -317,6 +371,13 @@ export function createTrack(def: TrackDef): Track {
   }
 
   for (const pt of buildDressing(table, def.dressing)) group.add(pt);
+
+  // Phase 12: night-city dressing (buildings + streetlights), emissive-only
+  if ((def.dressing.buildings ?? 0) > 0 || (def.dressing.streetlights ?? 0) > 0) {
+    for (const mesh of buildCityDressing(points, table, halfWidth, def.dressing)) {
+      group.add(mesh);
+    }
+  }
 
   const pads = def.padTs.map((t) => createPadMesh(points, t));
   for (const pad of pads) group.add(pad.mesh);
@@ -565,6 +626,186 @@ function buildDressing(table: ClosestTable, dressing: TrackDressing): THREE.Mesh
         new THREE.MeshLambertMaterial({ color: dressing.mesaColor }),
       ),
     );
+  }
+  return meshes;
+}
+
+// ---------------------------------------------------------------------------
+// Night-city dressing (Phase 12 METRO RUSH) — emissive-only lighting, merged
+// geometry: one mesh per material ≈ 6 draw calls total. No dynamic lights.
+// ---------------------------------------------------------------------------
+
+const CITY_BUILDING_COLOR = 0x232a3d; // dark blue-gray tower bodies
+const CITY_POLE_COLOR = 0x3a4256;
+/** Unlit "emissive" materials — MeshBasicMaterial ignores scene lights. */
+const CITY_WINDOW_COLORS = [0xffd27a, 0x8fd4ff]; // warm + cool windows
+const CITY_LAMP_COLOR = 0xfff3c8;
+
+function buildCityDressing(
+  points: Vec2[],
+  table: ClosestTable,
+  halfWidth: number,
+  dressing: TrackDressing,
+): THREE.Mesh[] {
+  const rng = mulberry32((dressing.seed ^ 0x5f3c) >>> 0);
+  const maxRadius = 300;
+
+  // Buildings need a wider berth than rocks: no overhang above the road.
+  const clearOfTrack = (x: number, z: number, margin: number): boolean => {
+    const minDistSq = margin * margin;
+    for (let s = 0; s < table.points.length; s += 4) {
+      const dx = table.points[s].x - x;
+      const dz = table.points[s].z - z;
+      if (dx * dx + dz * dz < minDistSq) return false;
+    }
+    return true;
+  };
+
+  const buildingGeos: THREE.BufferGeometry[] = [];
+  const windowGeos: THREE.BufferGeometry[][] = CITY_WINDOW_COLORS.map(() => []);
+
+  for (
+    let i = 0;
+    i < 400 && buildingGeos.length < (dressing.buildings ?? 0);
+    i++
+  ) {
+    const x = (rng() * 2 - 1) * maxRadius;
+    const z = (rng() * 2 - 1) * maxRadius;
+    if (!clearOfTrack(x, z, 30)) continue;
+    // Axis-aligned boxes read as a city grid and make window placement exact
+    const w = 10 + rng() * 14;
+    const d = 10 + rng() * 14;
+    const h = 14 + rng() * 46;
+    const box = new THREE.BoxGeometry(w, h, d);
+    box.translate(x, h / 2, z);
+    buildingGeos.push(box);
+
+    // A few lit windows: thin slabs protruding from random faces
+    const windows = 3 + Math.floor(rng() * 6);
+    for (let wn = 0; wn < windows; wn++) {
+      const face = Math.floor(rng() * 4);
+      const fy = 2 + rng() * (h - 4);
+      const along = (rng() * 2 - 1) * 0.32; // fraction across the chosen face
+      let geo: THREE.BoxGeometry;
+      if (face < 2) {
+        // ±X faces — thin in x
+        geo = new THREE.BoxGeometry(0.25, 1.8, 1.5);
+        geo.translate(
+          x + (face === 0 ? w / 2 + 0.15 : -(w / 2 + 0.15)),
+          fy,
+          z + along * d,
+        );
+      } else {
+        // ±Z faces — thin in z
+        geo = new THREE.BoxGeometry(1.5, 1.8, 0.25);
+        geo.translate(
+          x + along * w,
+          fy,
+          z + (face === 2 ? d / 2 + 0.15 : -(d / 2 + 0.15)),
+        );
+      }
+      windowGeos[Math.floor(rng() * windowGeos.length)].push(geo);
+    }
+  }
+
+  // Streetlights: evenly spaced along the spline, alternating sides, lamp arms
+  // reaching over the wall with a soft glow pool on the ground.
+  const poleGeos: THREE.BufferGeometry[] = [];
+  const lampGeos: THREE.BufferGeometry[] = [];
+  const glowGeos: THREE.BufferGeometry[] = [];
+  const lightCount = dressing.streetlights ?? 0;
+  for (let i = 0; i < lightCount; i++) {
+    const t = i / lightCount;
+    const p = getPoint(points, t);
+    const tan = getTangent(points, t);
+    const len = Math.hypot(tan.x, tan.z) || 1;
+    const side = i % 2 === 0 ? 1 : -1;
+    const nx = (tan.z / len) * side;
+    const nz = (-tan.x / len) * side;
+    const px = p.x + nx * (halfWidth + 2.6);
+    const pz = p.z + nz * (halfWidth + 2.6);
+    const poleH = 5.2 + rng() * 0.8;
+    const pole = new THREE.CylinderGeometry(0.14, 0.18, poleH, 6);
+    pole.translate(px, poleH / 2, pz);
+    poleGeos.push(pole);
+    // Arm reaching from the pole toward the track
+    const armLen = 1.4;
+    const ax = px - nx * armLen;
+    const az = pz - nz * armLen;
+    const arm = new THREE.BoxGeometry(
+      Math.abs(nx) > Math.abs(nz) ? armLen : 0.16,
+      0.16,
+      Math.abs(nz) >= Math.abs(nx) ? armLen : 0.16,
+    );
+    arm.translate((px + ax) / 2, poleH, (pz + az) / 2);
+    poleGeos.push(arm);
+    // Emissive head at the end of the arm
+    const head = new THREE.BoxGeometry(0.7, 0.22, 0.7);
+    head.translate(ax, poleH - 0.15, az);
+    lampGeos.push(head);
+    // Glow pool on the ground under the lamp (outside the wall)
+    const disc = new THREE.CircleGeometry(2.6, 10);
+    disc.rotateX(-Math.PI / 2);
+    disc.translate(ax, 0.04, az);
+    glowGeos.push(disc);
+  }
+
+  const meshes: THREE.Mesh[] = [];
+  if (buildingGeos.length > 0) {
+    meshes.push(
+      new THREE.Mesh(
+        mergeGeometries(buildingGeos)!,
+        new THREE.MeshLambertMaterial({ color: CITY_BUILDING_COLOR }),
+      ),
+    );
+  }
+  for (let c = 0; c < windowGeos.length; c++) {
+    if (windowGeos[c].length === 0) continue;
+    meshes.push(
+      new THREE.Mesh(
+        mergeGeometries(windowGeos[c])!,
+        new THREE.MeshBasicMaterial({ color: CITY_WINDOW_COLORS[c] }),
+      ),
+    );
+  }
+  if (poleGeos.length > 0) {
+    meshes.push(
+      new THREE.Mesh(
+        mergeGeometries(poleGeos)!,
+        new THREE.MeshLambertMaterial({ color: CITY_POLE_COLOR }),
+      ),
+    );
+  }
+  if (lampGeos.length > 0) {
+    meshes.push(
+      new THREE.Mesh(
+        mergeGeometries(lampGeos)!,
+        new THREE.MeshBasicMaterial({ color: CITY_LAMP_COLOR }),
+      ),
+    );
+  }
+  if (glowGeos.length > 0) {
+    meshes.push(
+      new THREE.Mesh(
+        mergeGeometries(glowGeos)!,
+        new THREE.MeshBasicMaterial({
+          color: CITY_LAMP_COLOR,
+          transparent: true,
+          opacity: 0.16,
+          depthWrite: false,
+        }),
+      ),
+    );
+  }
+  // Free the temp geometries that made it into the merged buffers
+  for (const g of [
+    ...buildingGeos,
+    ...windowGeos.flat(),
+    ...poleGeos,
+    ...lampGeos,
+    ...glowGeos,
+  ]) {
+    g.dispose();
   }
   return meshes;
 }

@@ -33,7 +33,7 @@ export interface TankStatsView {
 }
 
 export interface Screens {
-  showTitle(): void;
+  showTitle(subtitle?: string): void;
   /** Title-screen track picker: updates the displayed circuit name. */
   setTrackName(name: string): void;
   /** Title-screen best times for the displayed circuit (null = no record). */
@@ -286,10 +286,15 @@ export function createScreens(rootId = "screens"): Screens {
   }
 
   return {
-    showTitle() {
+    showTitle(subtitle?: string) {
       hideResultsNow();
       hideCountdownNow();
-      ensureTitle().style.display = "";
+      const card = ensureTitle();
+      if (subtitle) {
+        const sub = card.querySelector<HTMLElement>(".subtitle");
+        if (sub) sub.textContent = `${subtitle} · ${sub.textContent}`;
+      }
+      card.style.display = "";
     },
     setTrackName(name: string) {
       ensureTitle(); // build the title card if needed so the element exists
