@@ -138,6 +138,19 @@ Detect touch devices (`pointer: coarse` media query / first touchstart). On touc
 
 ---
 
+# v1.3 PHASES
+
+## Phase 10 — Gamepad Support
+Gamepad API integration: poll navigator.getGamepads() each frame; first connected gamepad drives the player. Standard mapping: left stick X = steer (deadzone 0.15), A or RT = throttle, B/LT = brake/reverse, X or RB = fire, Start = pause, Menu nav on title/results (dpad/left-stick cycles track/tank, A confirms). Show a small "🎮 connected" toast on connect/disconnect. Touch/keyboard flows unchanged; last-used input device wins per-frame (simple merge like touch).
+**Done when:** playable end-to-end with a standard-mapped gamepad including menus; keyboard/touch unaffected; build clean.
+
+## Phase 11 — Third Track + Deploy Setup
+- New TrackDef "GLACIER LOOP": icy circuit (long sweeping corners, wide road ~16u), pale blue/white dressing (snow banks instead of rocks, ice-blue sky/fog). Ice patches: sections of the spline flagged low-grip (lateral grip ×0.35, accel ×0.6 while on them — patch data in TrackDef, visualized as lighter blue road segments). AI must cope: their corner-speed model already reads grip — verify via sim script and tune until clean laps.
+- Deploy: set up static hosting readiness — `bun run build` output already plain static; add `base` support so the app works when served from a subpath (`--base=/vibecoding/tank-racer/` build arg documented, or vite.config conditional). Add GitHub Actions workflow `.github/workflows/tank-racer-deploy.yml`: on push to main, paths-filtered to tank-racer/**, builds in tank-racer/ with bun and deploys dist to GitHub Pages artifact (actions-configure-pages + upload-pages-artifact + deploy-pages). Document deploy steps in README.
+**Done when:** GLACIER LOOP sims clean vs AI; ice feel noticeably slippery but fair; workflow file valid YAML following repo conventions; build clean.
+
+---
+
 ## Out of scope (v1)
 Multiplayer, mobile/touch controls, multiple tracks, tank selection, persistence,
 championship mode, real 3D assets/audio files.
