@@ -17,8 +17,28 @@ Three.js, no assets (all audio is synthesized with WebAudio oscillators).
 | `A` `D` / `←` `→` | Steer            |
 | `Space`        | Fire shell          |
 | `Enter`        | Start race (title)  |
-| `R`            | Restart (results)   |
+| `R`            | Restart (results; also while paused) |
+| `P` / `Esc`    | Pause / resume (race) |
 | `M`            | Mute / unmute       |
+
+## Pause
+
+Press `P` or `Esc` during a race to freeze the entire simulation — physics,
+timers, lap logic, AI, shells and power-up respawn clocks all stop, and all
+audio suspends. The same key resumes exactly where you left off; `R` while
+paused restarts the race.
+
+## Touch controls
+
+On touch devices (detected via `pointer: coarse` or the first touch), overlay
+buttons appear during the countdown and race:
+
+- **Auto-throttle** is always on — no accelerate button needed
+- **◀ ▶** buttons (lower-left) steer; multi-touch safe, so you can steer and fire together
+- **FIRE** button (lower-right) shoots one shell per press
+
+Title/results screens are tappable (tap = Enter/R equivalent). Desktop keyboard
+flow is completely unchanged.
 
 Boost pads on the track give an automatic speed burst. Power-up crates grant a
 random pickup: Speed Boost (auto), Shield (absorbs one hit), or Triple-Shot
@@ -49,7 +69,9 @@ bun run build   # typecheck + production build into dist/
 - `src/hud.ts` — DOM HUD (speed, health, power-up slot, lap/pos/time, minimap)
 - `src/screens.ts` — title / countdown / banner / results overlays
 - `src/audio.ts` — WebAudio oscillator SFX + engine hum (created on first key
-  press to satisfy autoplay policies)
+  press to satisfy autoplay policies), plus a procedural music loop and
+  pause/resume via AudioContext suspension
+- `src/juice.ts` — cheap particle juice: drift dust, impact sparks, wreck bursts
 
 ## scripts/sim-ai.ts
 

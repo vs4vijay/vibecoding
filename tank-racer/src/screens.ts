@@ -54,6 +54,9 @@ export interface Screens {
   hideResults(): void;
   /** Small bottom-center notice (mute toggle). Auto-fades. */
   toast(text: string): void;
+  /** PAUSED overlay while the sim is frozen (Phase 9). */
+  showPaused(): void;
+  hidePaused(): void;
 }
 
 const SECONDS_PER_MINUTE = 60;
@@ -165,6 +168,7 @@ export function createScreens(rootId = "screens"): Screens {
       ["S / ↓", "brake / reverse"],
       ["A D / ← →", "steer"],
       ["SPACE", "fire shell"],
+      ["P / ESC", "pause"],
       ["M", "mute"],
     ] as const) {
       const row = document.createElement("div");
@@ -217,6 +221,7 @@ export function createScreens(rootId = "screens"): Screens {
   // --- Banner + toast share one fading element style --------------------------
   let banner: HTMLDivElement | null = null;
   let toastEl: HTMLDivElement | null = null;
+  let paused: HTMLDivElement | null = null;
 
   /** Restart a CSS fade animation by force-reflowing between class toggles. */
   function replayAnimation(el: HTMLElement, text: string): void {
@@ -399,6 +404,28 @@ export function createScreens(rootId = "screens"): Screens {
     },
     hideResults() {
       hideResultsNow();
+    },
+    showPaused() {
+      if (!paused) {
+        paused = document.createElement("div");
+        paused.id = "screen-paused";
+        paused.className = "screen-overlay dim";
+        const card = document.createElement("div");
+        card.className = "results-card";
+        const h2 = document.createElement("h2");
+        h2.textContent = "PAUSED";
+        const press = document.createElement("p");
+        press.className = "press blink";
+        press.textContent = "P / ESC RESUME · R RESTART";
+        card.appendChild(h2);
+        card.appendChild(press);
+        paused.appendChild(card);
+        root.appendChild(paused);
+      }
+      paused.style.display = "";
+    },
+    hidePaused() {
+      if (paused) paused.style.display = "none";
     },
   };
 }

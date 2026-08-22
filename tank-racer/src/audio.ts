@@ -173,3 +173,154 @@ export function updateEngine(speed01: number, running: boolean): void {
   e.osc2.frequency.setTargetAtTime(freq * 1.5 + 2, t, 0.08);
   e.filter.frequency.setTargetAtTime(220 + s * 520, t, 0.1);
 }
+
+// ---------------------------------------------------------------------------
+// Procedural music loop (Phase 9)
+//
+// A 4-bar eighth-note pattern: sawtooth bass line over an Am-F-C-G riff plus
+// high-passed noise "hat" blips. Notes are scheduled ahead of time against
+// AudioContext.currentTime (lookahead pattern), so timing is sample-accurate
+// and immune to frame hitches; every note gets its own gain envelope, so the
+// pattern can loop forever without clicks at the seam.
+// ---------------------------------------------------------------------------
+
+const MUSIC_BPM = 132;
+const STEPS_PER_BAR = 8; // eighth notes
+const BARS = 4;
+const MUSIC_STEP_DUR = 60 / MUSIC_BPM / 2; // one eighth note in seconds
+const MUSIC_TOTAL_STEPS = STEPS_PER_BAR * BARS;
+const LOOKAHEAD = 0.25; // seconds of scheduling head-start
+const TICK_MS = 80;
+
+/** Music bus — everything routes here, then into master. Kept well under SFX. */
+let musicBus: GainNode | null = null;
+let musicTimer: ReturnType<typeof setInterval> | null = null;
+let musicStep = 0;
+let musicNextTime = 0;
+let musicPlaying = false;
+
+const MUSIC_BUS_VOLUME = 0.3;
+
+/** Chord root per bar (Hz): Am – F – C – G, one octave below middle range. */
+const BAR_ROOTS = [55.0, 43.65, 65.41, 49.0]; // A1 F1 C2 G1
+
+function ensureMusicBus(): GainNode {
+  if (!musicBus) {
+    musicBus = ctx!.createGain();
+    musicBus.gain.value = MUSIC_BUS_VOLUME;
+    musicBus.connect(master!);
+  }
+  return musicBus;
+}
+
+/** One enveloped synth note into the music bus (envelope = no clicks). */
+function musicNote(
+  freq: number,
+  time: number,
+  dur: number,
+  type: OscillatorType,
+  vol: number,
+): void {
+  if (!ctx || !musicBus) return;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, time);
+  g.gain.setValueAtTime(0.0001, time);
+  g.gain.linearRampToValueAtTime(vol, time + 0.008); // soft attack
+  g.gain.exponentialRampToValueAtTime(0.001, time + dur); // full decay
+  osc.connect(g).connect(musicBus);
+  osc.start(time);
+  osc.stop(time + dur + 0.03);
+}
+
+/** One hat blip: short high-passed slice of the shared noise buffer. */
+function musicHat(time: number, vol: number): void {
+  if (!ctx || !musicBus || !noiseBuffer) return;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuffer;
+  src.loop = true;
+  const hp = ctx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 6500;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(vol, time);
+  g.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+  src.connect(hp).connect(g).connect(musicBus);
+  src.start(time);
+  src.stop(time + 0.07);
+}
+
+/** Bass hits on steps 0/3/6 of each bar; step 4 pops up an octave. */
+function scheduleMusicStep(stepInLoop: number, time: number): void {
+  const bar = Math.floor(stepInLoop / STEPS_PER_BAR) % BARS;
+  const step = stepInLoop % STEPS_PER_BAR;
+  const root = BAR_ROOTS[bar];
+
+  // Hat on every eighth, accented offbeats for drive
+  musicHat(time, step % 2 === 1 ? 0.05 : 0.02);
+
+  if (step === 0) musicNote(root, time, 0.4, "sawtooth", 0.22);
+  else if (step === 3) musicNote(root, time, 0.18, "sawtooth", 0.16);
+  else if (step === 4) musicNote(root * 2, time, 0.16, "square", 0.09);
+  else if (step === 6) musicNote(root * 1.5, time, 0.18, "sawtooth", 0.14);
+}
+
+function musicSchedulerTick(): void {
+  if (!ctx || !musicBus) return;
+  while (musicNextTime < ctx.currentTime + LOOKAHEAD) {
+    scheduleMusicStep(musicStep % MUSIC_TOTAL_STEPS, musicNextTime);
+    musicStep += 1;
+    musicNextTime += MUSIC_STEP_DUR;
+  }
+}
+
+/** Start the loop from step 0 with a short fade-in. No-op before initAudio(). */
+export function startMusic(): void {
+  if (!ctx || !master || musicPlaying) return;
+  const bus = ensureMusicBus();
+  musicPlaying = true;
+  musicStep = 0;
+  musicNextTime = ctx.currentTime + 0.05;
+
+  // Fade the bus in from wherever it currently sits (covers a stop() fade-out)
+  const t = ctx.currentTime;
+  bus.gain.cancelScheduledValues(t);
+  bus.gain.setValueAtTime(Math.max(bus.gain.value, 0.0001), t);
+  bus.gain.linearRampToValueAtTime(MUSIC_BUS_VOLUME, t + 0.35);
+
+  musicSchedulerTick();
+  musicTimer = setInterval(musicSchedulerTick, TICK_MS);
+}
+
+/**
+ * Stop the loop: fade the bus to silence (killing any already-scheduled notes
+ * click-free), then halt the scheduler. Restarting begins a fresh pattern.
+ */
+export function stopMusic(fadeSeconds = 0.6): void {
+  if (!ctx || !musicBus) return;
+  const t = ctx.currentTime;
+  musicBus.gain.cancelScheduledValues(t);
+  musicBus.gain.setValueAtTime(musicBus.gain.value, t);
+  musicBus.gain.exponentialRampToValueAtTime(0.0001, t + fadeSeconds);
+  if (musicTimer !== null) {
+    clearInterval(musicTimer);
+    musicTimer = null;
+  }
+  musicPlaying = false;
+}
+
+
+// ---------------------------------------------------------------------------
+// Pause support (Phase 9): suspending the context freezes ALL audio — SFX,
+// engine hum and the music scheduler (which runs on ctx.currentTime) — so
+// resume is seamless with no drift or dt-style jumps.
+// ---------------------------------------------------------------------------
+
+export function suspendAudio(): void {
+  if (ctx && ctx.state === "running") void ctx.suspend();
+}
+
+export function resumeAudio(): void {
+  if (ctx && ctx.state === "suspended") void ctx.resume();
+}

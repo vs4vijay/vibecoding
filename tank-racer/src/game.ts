@@ -36,7 +36,8 @@ import {
   type NewBest,
   type TankStatsView,
 } from "./screens";
-import { initAudio, sfx, toggleMute, updateEngine } from "./audio";
+import { initAudio, resumeAudio, startMusic, stopMusic, sfx, suspendAudio, toggleMute, updateEngine } from "./audio";
+import { createJuice } from "./juice";
 
 /** High-level game flow (Phase 5): title → countdown → race → results. */
 export type Phase = "title" | "countdown" | "race" | "results";
@@ -298,6 +299,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     if (track) disposeTrackGroup(track.group);
     if (powerups) powerups.dispose();
     weapons.reset(world); // stale shells/puffs from any previous race
+    juice.reset();
 
     track = createTrack(def);
     scene.add(track.group);
@@ -391,14 +393,17 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   }
 
   // --- Weapons (audio/juice hooks wired here) ---------------------------------
+  const juice = createJuice(scene);
   const weapons = createWeapons(scene, {
     onShot: () => sfx.shot(),
     onHit: (target) => {
       sfx.hit();
+      juice.impactSparks(target.position.x, 1.2, target.position.z);
       if (target === player) shake = PLAYER_HIT_SHAKE;
     },
     onWreck: (target) => {
       sfx.explosion();
+      juice.wreckBurst(target.position.x, 0.5, target.position.z);
       if (target === player) shake = PLAYER_WRECK_SHAKE;
     },
   });
@@ -420,6 +425,32 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   let countdownClock = 0;
   let countdownStep = -1;
   let goHideTimer = 0;
+
+  // Phase 9: pause freezes the whole sim; dust-puff spawn timer lives here too.
+  let paused = false;
+  let dustTimer = 0;
+
+  /**
+   * Freeze/resume everything. The AudioContext suspends with the sim, which
+   * silences SFX/engine/music at once — the music scheduler runs on
+   * ctx.currentTime, so it resumes exactly where it left off. world.phase
+   * stays "race" while paused, so resume simply continues the frame loop.
+   */
+  function setPaused(value: boolean): void {
+    if (paused === value) return;
+    paused = value;
+    if (value) {
+      suspendAudio();
+      screens.showPaused();
+    } else {
+      resumeAudio();
+      screens.hidePaused();
+      // Drop anything pressed during the freeze so no stale shot/steer leaks in
+      input.consumeFire();
+      touchInput.consumeFire();
+    }
+    updateTouchControlsVisibility();
+  }
 
   const camera = new THREE.PerspectiveCamera(
     BASE_FOV,
@@ -498,7 +529,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   /** Touch buttons live on the countdown + race only; screens stay tappable. */
   function updateTouchControlsVisibility(): void {
     touchInput.setControlsVisible(
-      world.phase === "race" || world.phase === "countdown",
+      !paused && (world.phase === "race" || world.phase === "countdown"),
     );
   }
 
@@ -522,8 +553,10 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       racers[i].finishTime = null;
     }
     weapons.reset(world); // stale shells/puffs/wreck visuals
+    juice.reset(); // dust/sparks/bursts from the previous race
     powerups.reset(); // crates back up, bubbles hidden
     world.raceTime = 0;
+    stopMusic(0.3); // restart path: music comes back fresh at GO
     updateStandings(world);
     beginCountdown();
   }
@@ -546,6 +579,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
   function finishRace(): void {
     setPhase("results");
+    stopMusic(); // duck the loop out under the results screen
     const racer = world.racers[0]; // the player
     const best = loadBestTimes(track.def.id);
     const newBest: NewBest = { lap: false, total: false };
@@ -645,6 +679,18 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       updateTankPhysics(tank, dt);
       collideWithWalls(track, tank);
       if (checkBoostPads(track, tank) && tank === player) sfx.boost();
+      // Phase 9 juice: dust when lateral slip is high (drifting / hard turns
+      // at speed — turning rotates the heading away from the velocity vector,
+      // which shows up as lateral velocity). Rate-gated by a shared timer.
+      dustTimer -= dt;
+      const dropDust = dustTimer <= 0;
+      if (dropDust) dustTimer = 0.07;
+      if (dropDust && tank.wreckTimer <= 0) {
+        const fx = Math.sin(tank.heading);
+        const fz = Math.cos(tank.heading);
+        const lateral = Math.abs(tank.velocity.x * fz - tank.velocity.z * fx);
+        if (tank.velocity.length() > 10 && lateral > 5) juice.dust(tank);
+      }
       // Progress: closest point on the centerline drives gates/laps.
       // Frozen once the race is over so times stay exactly as displayed.
       if (driving) {
@@ -660,6 +706,8 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     updateBoostPads(track, dt);
     // Shell movement/hits + wreck timers → respawn
     weapons.update(world, dt);
+    // Dust/sparks/burst particles
+    juice.update(dt);
     // Crate animation, pickups, shield bubbles
     powerups.update(world, dt);
     chaseCamera(dt);
@@ -674,6 +722,19 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     if (e.code === "KeyM") {
       const muted = toggleMute();
       screens.toast(muted ? "SOUND OFF" : "SOUND ON");
+      return;
+    }
+    // Phase 9: pause lives in the race phase only (countdown/title/results are
+    // untouched). While paused world.phase is still "race", so this same branch
+    // handles resume.
+    if (e.code === "KeyP" || e.code === "Escape") {
+      if (world.phase === "race") setPaused(!paused);
+      return;
+    }
+    // Restart from pause: unfreeze first so the countdown runs on live audio
+    if (e.code === "KeyR" && paused) {
+      setPaused(false);
+      resetRace();
       return;
     }
     // Title screen: LEFT/RIGHT cycles circuits (Phase 6), UP/DOWN tanks (Phase 7)
@@ -729,6 +790,11 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   return {
     world,
     update(dt: number) {
+      // Phase 9: frozen sim — nothing advances (physics, timers, lap logic,
+      // AI, shells, crate respawn clocks, music). The RAF loop keeps ticking
+      // and main.ts keeps refreshing its `last` timestamp, so the first dt
+      // after resume is a normal frame — no physics jump.
+      if (paused) return;
       switch (world.phase) {
         case "title":
           titleCamera(dt); // slow orbit; tanks idle at the grid
@@ -745,6 +811,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
               screens.showCountdown(COUNTDOWN_LABELS[step]);
               if (step === COUNTDOWN_LABELS.length - 1) {
                 sfx.go();
+                startMusic(); // race music kicks in exactly at GO
                 screens.showCountdownTag(
                   `${playerTankDef().name} — GO!`,
                 ); // Phase 7
@@ -759,6 +826,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
           // so lap timers can't start early and tanks stay locked on the grid.
           updateBoostPads(track, dt);
           weapons.update(world, dt);
+          juice.update(dt);
           powerups.update(world, dt);
           chaseCamera(dt);
           updateEngine(0, false);
@@ -794,6 +862,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       window.removeEventListener("pointerdown", onPointerDown);
       input.detach();
       touchInput.dispose();
+      stopMusic(0.1);
       renderer.dispose();
     },
   };
