@@ -16,8 +16,11 @@ const STEER_KEYS: Record<string, number> = {
   ArrowLeft: -KEY_STEER,
   KeyA: -KEY_STEER,
 };
-/** Fire keys: "," fires the left gun, "." the right gun. */
-const FIRE_KEYS: Record<string, FireSide> = { ",": "left", ".": "right" };
+/** Fire keys: Comma fires the left gun, Period the right gun (ev.code). */
+const FIRE_KEYS: Record<string, FireSide> = {
+  Comma: "left",
+  Period: "right",
+};
 /** Pause keys: Escape or P. */
 const PAUSE_KEYS: Record<string, true> = { Escape: true, KeyP: true };
 

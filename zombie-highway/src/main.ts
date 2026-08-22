@@ -1,3 +1,4 @@
+import "./style.css";
 import { CONFIG } from "./config";
 import { scoreForLevel } from "./game/difficulty";
 import { Emitter } from "./core/emitter";
@@ -26,9 +27,16 @@ export function boot(): void {
   const input = new InputController(canvas);
 
   const audio = new AudioEngine(load("muted", false));
+  // Separate overlay roots: hud.hide() must never hide menus/coach/toasts.
+  const mkRoot = (id: string): HTMLElement => {
+    const node = document.createElement("div");
+    node.id = id;
+    document.body.append(node);
+    return node;
+  };
   const hud = new Hud(hudRoot);
-  const menus = new Menus(hudRoot, audio);
-  const coach = new Coach(hudRoot);
+  const menus = new Menus(mkRoot("menus"), audio);
+  const coach = new Coach(mkRoot("coach"));
 
   // Session owns the sim and attaches every pooled mesh to the scene.
   const session = new Session({

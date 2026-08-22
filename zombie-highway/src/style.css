@@ -14,6 +14,13 @@ canvas {
   pointer-events: none;
 }
 
+#menus,
+#coach {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
 .hidden {
   display: none !important;
 }
