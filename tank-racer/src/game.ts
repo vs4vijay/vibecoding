@@ -11,6 +11,7 @@ import {
   type TankState,
 } from "./tank";
 import { PlayerInput } from "./player";
+import { TouchInput } from "./touch";
 import { closestOnSpline } from "./spline";
 import {
   checkBoostPads,
@@ -359,6 +360,13 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   const input = new PlayerInput();
   input.attach();
 
+  // Phase 8: touch controls — same TankInput shape, merged in readPlayerInput().
+  // attach() happens further down, after `world` exists (a synchronous
+  // coarse-pointer enable would otherwise read world.phase too early).
+  const touchInput = new TouchInput({
+    onEnable: updateTouchControlsVisibility,
+  });
+
   const racers: Racer[] = [];
   const aiControllers: AIController[] = [];
 
@@ -405,6 +413,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   screens.showTitle();
   setPhase("title"); // hoisted function decl; hides the HUD behind the title card
   selectTank(tankIndex); // applies livery/stats + title-screen stats card
+  touchInput.attach(); // safe now: world + phase exist for the onEnable callback
 
   // --- Cameras -----------------------------------------------------------------
   let shake = 0;
@@ -483,6 +492,14 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     // HUD hidden on the title only; toggled on phase change, never per frame.
     const hud = document.getElementById("hud");
     if (hud) hud.style.display = phase === "title" ? "none" : "";
+    updateTouchControlsVisibility();
+  }
+
+  /** Touch buttons live on the countdown + race only; screens stay tappable. */
+  function updateTouchControlsVisibility(): void {
+    touchInput.setControlsVisible(
+      world.phase === "race" || world.phase === "countdown",
+    );
   }
 
   function beginCountdown(): void {
@@ -591,13 +608,28 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   }
 
   /**
+   * Merge keyboard + touch into one TankInput — the exact shape the AI brains
+   * produce, so physics/weapons need no special cases. Auto-throttle wins over
+   * "no key held"; steering sums so a stuck touch can't outvote the keys.
+   */
+  function readPlayerInput(): TankInput {
+    const kb = input.read();
+    const tc = touchInput.read();
+    return {
+      throttle: Math.max(kb.throttle, tc.throttle),
+      steer: kb.steer + tc.steer,
+    };
+  }
+
+  /**
    * One simulated race frame. `driving=false` freezes everyone's inputs
    * (countdown coast-in / post-finish freeze); physics and FX keep running.
    */
   function simulate(dt: number, driving: boolean): void {
-    player.input = driving ? input.read() : NO_INPUT;
-    const firePressed = input.consumeFire(); // always drain queued shots
-    if (driving && firePressed) weapons.tryFire(player);
+    player.input = driving ? readPlayerInput() : NO_INPUT;
+    const kbFire = input.consumeFire(); // always drain queued shots
+    const touchFire = touchInput.consumeFire();
+    if (driving && (kbFire || touchFire)) weapons.tryFire(player);
 
     for (let i = 0; i < world.tanks.length; i++) {
       const tank = world.tanks[i];
@@ -677,6 +709,23 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   };
   window.addEventListener("keydown", onKeyDown);
 
+  // Phase 8: tap anywhere = Enter/R equivalent on title/results (touch mode
+  // only, so the desktop click flow is untouched). Countdown has no keyboard
+  // skip either — a mid-countdown tap is intentionally ignored.
+  const onPointerDown = (e: PointerEvent) => {
+    if (!touchInput.enabled) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("#touch-controls")) return; // button press, not a screen tap
+    if (world.phase === "title") {
+      initAudio(); // same unlock as the Enter path
+      beginCountdown();
+    } else if (world.phase === "results") {
+      initAudio();
+      resetRace();
+    }
+  };
+  window.addEventListener("pointerdown", onPointerDown);
+
   return {
     world,
     update(dt: number) {
@@ -742,7 +791,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     },
     dispose() {
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pointerdown", onPointerDown);
       input.detach();
+      touchInput.dispose();
       renderer.dispose();
     },
   };

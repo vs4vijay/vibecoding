@@ -415,3 +415,164 @@ body {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
 }
+
+/* --- Phase 8: touch controls (visible only in touch mode, countdown+race) -- */
+
+#touch-controls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none; /* children re-enable — taps pass through elsewhere */
+  z-index: 5;
+}
+
+.touch-btn {
+  position: absolute;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(10, 14, 20, 0.45);
+  border: 3px solid rgba(255, 255, 255, 0.7);
+  color: #fff;
+  font-weight: bold;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none; /* no scroll/zoom gestures steal the press */
+}
+
+.touch-btn.active {
+  background: rgba(65, 217, 255, 0.35);
+  border-color: #41d9ff;
+}
+
+#touch-steer-left,
+#touch-steer-right {
+  width: 84px;
+  height: 84px;
+  bottom: 28px;
+  font-size: 34px;
+}
+
+#touch-steer-left {
+  left: 22px;
+}
+
+#touch-steer-right {
+  left: 122px;
+}
+
+#touch-fire {
+  right: 24px;
+  bottom: 28px;
+  width: 104px;
+  height: 104px;
+  font-size: 22px;
+  letter-spacing: 2px;
+}
+
+/* Touch mode: lift bottom HUD widgets clear of the steering/fire buttons */
+.touch-mode #hud-speed {
+  bottom: 160px;
+}
+
+.touch-mode #hud-health {
+  bottom: 150px;
+}
+
+.touch-mode #hud-power {
+  bottom: 182px;
+}
+
+/* --- Phase 8: responsive HUD — phone-sized viewports ------------------------ */
+
+@media (max-width: 700px) {
+  /* Minimap canvas keeps its 170px backing store; CSS shrinks it visually */
+  #hud-minimap {
+    width: 110px;
+    height: 110px;
+  }
+
+  #hud-speed {
+    font-size: clamp(18px, 4vw, 28px);
+    right: 14px;
+    bottom: 12px;
+  }
+
+  #hud-lap {
+    font-size: clamp(18px, 4.5vw, 30px);
+  }
+
+  #hud-pos,
+  #hud-time {
+    font-size: clamp(13px, 3vw, 20px);
+  }
+
+  #hud-power {
+    font-size: clamp(14px, 3.2vw, 22px);
+  }
+
+  #hud-health-bar {
+    width: min(150px, 32vw);
+  }
+
+  .title-card,
+  .results-card {
+    padding: 20px 22px;
+    max-width: calc(100vw - 24px);
+  }
+
+  .title-card h1 {
+    font-size: clamp(34px, 9vw, 72px);
+    letter-spacing: clamp(3px, 1.5vw, 12px);
+  }
+
+  #screen-track-name {
+    font-size: clamp(20px, 5.5vw, 34px);
+    min-width: 0;
+  }
+
+  #screen-tank-name {
+    font-size: clamp(18px, 5vw, 30px);
+    min-width: 0;
+  }
+
+  .controls {
+    font-size: clamp(12px, 3vw, 18px);
+  }
+
+  .controls-row .key {
+    min-width: 100px;
+  }
+
+  .press {
+    font-size: clamp(14px, 3.5vw, 20px);
+  }
+
+  #screen-countdown {
+    font-size: clamp(64px, 20vw, 140px);
+  }
+
+  #screen-countdown-tag {
+    font-size: clamp(16px, 5vw, 30px);
+    top: calc(50% + clamp(48px, 15vw, 95px));
+  }
+
+  #screen-banner {
+    font-size: clamp(28px, 9vw, 56px);
+  }
+
+  .result-row {
+    font-size: clamp(14px, 3.8vw, 22px);
+  }
+
+  .result-name {
+    width: auto;
+  }
+
+  .result-best {
+    width: auto;
+  }
+}
