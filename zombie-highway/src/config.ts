@@ -48,4 +48,13 @@ export const CONFIG = {
     unlockLevel: { walker: 1, runner: 2, brute: 3 },
   },
   spawn: { shoulderOffset: 1.2, zMinAhead: 70, zMaxAhead: 110 },
+  world: { duskColor: 0x3d1f10 },
+  camera: {
+    fovBase: 62,
+    fovBoost: 74,
+    near: 0.1,
+    far: 2000,
+    offset: { x: 0.55, y: 4.2, z: 9 },
+    lookAt: { x: 0.8, y: 1.2, z: -14 },
+  },
 };
