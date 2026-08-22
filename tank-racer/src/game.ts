@@ -48,12 +48,18 @@ export type Phase = "title" | "countdown" | "race" | "results";
 export interface World {
   tanks: TankState[];
   player: TankState;
+  /** Phase 13: second human player in 2P split-screen (null in 1P). */
+  player2: TankState | null;
+  /** Phase 13: true while local 2-player split-screen is active. */
+  twoPlayer: boolean;
   /** One progress record per tank (parallel to `tanks`). */
   racers: Racer[];
   /** Racers sorted by race position (index 0 = 1st). Recomputed every frame. */
   standings: Racer[];
   /** Player's 1-based race position — for the HUD POS readout. */
   playerPosition: number;
+  /** Phase 13: P2's 1-based race position (HUD in 2P only). */
+  playerPosition2: number;
   /** Closed circuit: road, walls, boost pads, spline table. */
   track: Track;
   /** Current game-flow phase. */
@@ -75,6 +81,8 @@ export interface Game {
   render(): void;
   onResize(): void;
   dispose(): void;
+  /** Phase 13: notified whenever the 1P/2P mode changes (HUD rebuild). */
+  setOnModeChange(cb: (twoPlayer: boolean) => void): void;
 }
 
 const START_T = 0.005; // just past the start/finish line
@@ -88,8 +96,13 @@ const SHAKE_DECAY = 7; // 1/s exponential falloff of screen shake
 const PLAYER_HIT_SHAKE = 0.5;
 const PLAYER_WRECK_SHAKE = 1.0;
 
-/** Start grid — player at the front, AIs behind/beside. Module-level so
- * resetRace() can put everyone back exactly where they started. */
+/** Phase 13: P2's fixed livery (orange — pairs with P1's cyan HUD accent). */
+const P2_HULL_COLOR = 0xff8c00;
+const P2_TURRET_COLOR = 0xffb066;
+
+/** Start grid — humans at the front, AIs behind/beside. In 2P the grid stays
+ * 4 tanks: P1, P2, then only 2 AI (the third AI tank is benched). Module-level
+ * so resetRace() can put everyone back exactly where they started. */
 const GRID = [
   { t: START_T, lateral: 0 },
   { t: START_T - 0.003, lateral: -3.6 },
@@ -185,6 +198,26 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   }
 
   let tankIndex = loadStoredTankIndex();
+
+  // --- Mode selection (Phase 13): local 1P vs 2P split-screen -----------------
+  /** localStorage key for the last-used mode ("1p" | "2p"). */
+  const MODE_STORAGE_KEY = "tankracer.mode";
+
+  function loadStoredTwoPlayer(): boolean {
+    try {
+      return localStorage.getItem(MODE_STORAGE_KEY) === "2p";
+    } catch {
+      return false;
+    }
+  }
+
+  function storeMode(twoPlayer: boolean): void {
+    try {
+      localStorage.setItem(MODE_STORAGE_KEY, twoPlayer ? "2p" : "1p");
+    } catch {
+      /* private mode etc. — selection just won't persist */
+    }
+  }
 
   /** Definition of the tank the player will race (title-screen selection). */
   function playerTankDef(): TankDef {
@@ -316,23 +349,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     });
     applyTheme(def);
 
-    // Rebuild progress + AI brains against the new spline, tanks on the grid
-    racers.length = 0;
-    aiControllers.length = 0;
-    for (let i = 0; i < GRID.length && i < world.tanks.length; i++) {
-      placeTankAtGridSlot(world.tanks[i], track, GRID[i].t, GRID[i].lateral);
-      resetTankCombat(world.tanks[i]);
-      racers.push({
-        tank: world.tanks[i],
-        progress: createTankProgress(GRID[i].t),
-        finishTime: null,
-      });
-    }
-    for (let i = 1; i < racers.length; i++) {
-      aiControllers.push(
-        createAIController(AI_PERSONALITIES[i - 1], racers[i], track),
-      );
-    }
+    seatRacers();
     world.track = track;
     world.raceTime = 0;
 
@@ -350,19 +367,49 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     showBestTimesForTrack(def);
   }
 
-  /** Display name + swatch color per racer index (player first) — results UI.
-   * Player color is resolved at row-build time so it tracks the selected tank. */
-  const roster: { name: string; color: string }[] = [
-    { name: "YOU", color: "" },
-    ...AI_PERSONALITIES.map((p) => ({
-      name: p.name,
-      color: `#${p.hullColor.toString(16).padStart(6, "0")}`,
-    })),
-  ];
+  /** How many human tanks lead world.tanks (1 in 1P, P1+P2 in 2P). */
+  function humanCount(): number {
+    return world.twoPlayer ? 2 : 1;
+  }
+
+  /**
+   * Seat every tank in world.tanks on the grid (humans first, AIs after),
+   * rebuild progress records and AI brains. Used by loadTrack(), applyMode()
+   * and resetRace() so all three paths seat tanks identically.
+   */
+  function seatRacers(): void {
+    racers.length = 0;
+    aiControllers.length = 0;
+    const n = Math.min(GRID.length, world.tanks.length);
+    for (let i = 0; i < n; i++) {
+      placeTankAtGridSlot(world.tanks[i], track, GRID[i].t, GRID[i].lateral);
+      resetTankCombat(world.tanks[i]);
+      racers.push({
+        tank: world.tanks[i],
+        progress: createTankProgress(GRID[i].t),
+        finishTime: null,
+      });
+    }
+    // AI brains only for the slots behind the humans (Phase 13: 2 AI in 2P)
+    for (let i = humanCount(); i < racers.length; i++) {
+      aiControllers.push(
+        createAIController(AI_PERSONALITIES[i - humanCount()], racers[i], track),
+      );
+    }
+  }
 
   // --- Player tank + input --------------------------------------------------
   const player = createTankState(createTankMesh(), playerTankDef());
   scene.add(player.mesh.root);
+
+  // Phase 13: P2's tank — fixed orange livery (BALANCED stats) so both humans
+  // read instantly on screen and on the minimap. Created once; joins
+  // world.tanks only while 2P mode is active.
+  const player2 = createTankState(
+    createTankMesh(P2_HULL_COLOR, P2_TURRET_COLOR),
+  );
+  player2.mesh.root.visible = false;
+  scene.add(player2.mesh.root);
 
   const input = new PlayerInput();
   input.attach();
@@ -385,25 +432,33 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   const racers: Racer[] = [];
   const aiControllers: AIController[] = [];
 
+  // Phase 13: the third AI is benched (hidden + excluded) in 2P so the grid
+  // stays at 4 tanks: P1, P2, then 2 AI.
+  const aiTanks: TankState[] = [];
+
   const world: World = {
     tanks: [player],
     player,
+    player2: null,
+    twoPlayer: false,
     racers,
     standings: [],
     playerPosition: 1,
+    playerPosition2: 1,
     track: null as unknown as Track, // set by loadTrack() immediately below
     phase: "title",
     raceTime: 0,
   };
 
   // --- AI opponents (meshes created once; loadTrack() re-seats them) ----------
-  for (let i = 1; i < GRID.length && i <= AI_PERSONALITIES.length; i++) {
-    const pers = AI_PERSONALITIES[i - 1];
+  for (let i = 0; i < AI_PERSONALITIES.length && aiTanks.length < GRID.length - 1; i++) {
+    const pers = AI_PERSONALITIES[i];
     const mesh = createTankMesh(pers.hullColor, pers.turretColor);
     const ai = createTankState(mesh);
     scene.add(ai.mesh.root);
-    world.tanks.push(ai);
+    aiTanks.push(ai);
   }
+  world.tanks = [player, ...aiTanks];
 
   // --- Weapons (audio/juice hooks wired here) ---------------------------------
   const juice = createJuice(scene);
@@ -412,12 +467,14 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     onHit: (target) => {
       sfx.hit();
       juice.impactSparks(target.position.x, 1.2, target.position.z);
-      if (target === player) shake = PLAYER_HIT_SHAKE;
+      if (target === player) rig1.shake = PLAYER_HIT_SHAKE;
+      else if (target === player2) rig2.shake = PLAYER_HIT_SHAKE;
     },
     onWreck: (target) => {
       sfx.explosion();
       juice.wreckBurst(target.position.x, 0.5, target.position.z);
-      if (target === player) shake = PLAYER_WRECK_SHAKE;
+      if (target === player) rig1.shake = PLAYER_WRECK_SHAKE;
+      else if (target === player2) rig2.shake = PLAYER_WRECK_SHAKE;
     },
   });
 
@@ -433,13 +490,21 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   selectTank(tankIndex); // applies livery/stats + title-screen stats card
   touchInput.attach(); // safe now: world + phase exist for the onEnable callback
 
+  // Phase 13: restore the persisted mode. Touch and gamepad devices are
+  // 1P-only, so a stored "2p" silently falls back to "1p" there.
+  let wantedTwoPlayer = loadStoredTwoPlayer();
+  if (wantedTwoPlayer && gamepadInput.connected) wantedTwoPlayer = false;
+  if (wantedTwoPlayer && touchInput.enabled) wantedTwoPlayer = false;
+  if (wantedTwoPlayer !== world.twoPlayer) {
+    applyMode(wantedTwoPlayer);
+  } else {
+    screens.setMode(world.twoPlayer); // ensure the title card shows the mode
+  }
+
   // --- Cameras -----------------------------------------------------------------
-  let shake = 0;
   let countdownClock = 0;
   let countdownStep = -1;
-  let goHideTimer = 0;
-
-  // Phase 9: pause freezes the whole sim; dust-puff spawn timer lives here too.
+  let goHideTimer = 0;  // Phase 9: pause freezes the whole sim; dust-puff spawn timer lives here too.
   let paused = false;
   let dustTimer = 0;
 
@@ -460,6 +525,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       screens.hidePaused();
       // Drop anything pressed during the freeze so no stale shot/steer leaks in
       input.consumeFire();
+      input.consumeFire2();
       touchInput.consumeFire();
       gamepadInput.consumeFire();
     }
@@ -472,51 +538,99 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     0.5,
     1000,
   );
+  // Phase 13: second chase camera for P2's half of the split screen.
+  const camera2 = new THREE.PerspectiveCamera(
+    BASE_FOV,
+    window.innerWidth / window.innerHeight,
+    0.5,
+    1000,
+  );
   const CAM_DIST = 14;
   const CAM_HEIGHT = 7;
 
   let titleAngle = 0;
 
+  /**
+   * Per-camera chase state: smoothed position + independent screen shake
+   * (each player feels their own hits/wrecks in their own half).
+   */
+  interface CamRig {
+    camera: THREE.PerspectiveCamera;
+    pos: THREE.Vector3;
+    shake: number;
+  }
+  const rig1: CamRig = { camera, pos: new THREE.Vector3(), shake: 0 };
+  const rig2: CamRig = { camera: camera2, pos: new THREE.Vector3(), shake: 0 };
+
   // Preallocated vectors — the chase camera runs every frame; no allocations.
-  const camPos = new THREE.Vector3();
   const camTarget = new THREE.Vector3();
   const fwdVec = new THREE.Vector3();
   const CAM_LIFT = new THREE.Vector3(0, CAM_HEIGHT, 0);
 
-  function snapChaseCamera(): void {
-    fwdVec.set(Math.sin(player.heading), 0, Math.cos(player.heading));
-    camPos
-      .copy(player.position)
-      .addScaledVector(fwdVec, -CAM_DIST)
-      .add(CAM_LIFT);
-    camera.position.copy(camPos);
-    camera.lookAt(player.position.x, player.position.y + 2, player.position.z);
+  /** Keep each active camera's aspect matched to its viewport (half in 2P). */
+  function updateCameraAspects(): void {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if (world.twoPlayer) {
+      const aspect = w / 2 / h;
+      camera.aspect = aspect;
+      camera2.aspect = aspect;
+    } else {
+      camera.aspect = w / h;
+    }
+    camera.updateProjectionMatrix();
+    camera2.updateProjectionMatrix();
   }
 
-  function chaseCamera(dt: number): void {
-    fwdVec.set(Math.sin(player.heading), 0, Math.cos(player.heading));
-    camTarget.copy(player.position).addScaledVector(fwdVec, -CAM_DIST);
+  function snapChaseCameraRig(tank: TankState, rig: CamRig): void {
+    fwdVec.set(Math.sin(tank.heading), 0, Math.cos(tank.heading));
+    rig.pos
+      .copy(tank.position)
+      .addScaledVector(fwdVec, -CAM_DIST)
+      .add(CAM_LIFT);
+    rig.camera.position.copy(rig.pos);
+    rig.camera.lookAt(tank.position.x, tank.position.y + 2, tank.position.z);
+  }
+
+  /** Snap both active chase cams (used at countdown start). */
+  function snapChaseCamera(): void {
+    snapChaseCameraRig(player, rig1);
+    if (world.twoPlayer && world.player2) snapChaseCameraRig(world.player2, rig2);
+  }
+
+  function chaseCameraRig(tank: TankState, rig: CamRig, dt: number): void {
+    fwdVec.set(Math.sin(tank.heading), 0, Math.cos(tank.heading));
+    camTarget.copy(tank.position).addScaledVector(fwdVec, -CAM_DIST);
     camTarget.y += CAM_HEIGHT;
     // Frame-rate independent smoothing
-    camPos.lerp(camTarget, 1 - Math.exp(-5 * dt));
-    camera.position.copy(camPos);
+    rig.pos.lerp(camTarget, 1 - Math.exp(-5 * dt));
+    rig.camera.position.copy(rig.pos);
 
     // Screen-shake pulse (decays exponentially)
+    const shake = rig.shake;
     if (shake > 0.002) {
-      camera.position.x += (Math.random() * 2 - 1) * shake;
-      camera.position.y += (Math.random() * 2 - 1) * shake * 0.6;
-      camera.position.z += (Math.random() * 2 - 1) * shake;
-      shake *= Math.exp(-SHAKE_DECAY * dt);
+      rig.camera.position.x += (Math.random() * 2 - 1) * shake;
+      rig.camera.position.y += (Math.random() * 2 - 1) * shake * 0.6;
+      rig.camera.position.z += (Math.random() * 2 - 1) * shake;
+      rig.shake *= Math.exp(-SHAKE_DECAY * dt);
     }
 
-    camera.lookAt(player.position.x, player.position.y + 2, player.position.z);
+    rig.camera.lookAt(tank.position.x, tank.position.y + 2, tank.position.z);
 
     // FOV kick while boosting — smooth toward the target, skip DOM-free no-ops
     const targetFov =
-      BASE_FOV + (player.boostTimer > 0 ? BOOST_FOV_KICK : 0);
-    if (Math.abs(camera.fov - targetFov) > 0.01) {
-      camera.fov += (targetFov - camera.fov) * Math.min(1, 8 * dt);
-      camera.updateProjectionMatrix();
+      BASE_FOV + (tank.boostTimer > 0 ? BOOST_FOV_KICK : 0);
+    if (Math.abs(rig.camera.fov - targetFov) > 0.01) {
+      rig.camera.fov += (targetFov - rig.camera.fov) * Math.min(1, 8 * dt);
+      rig.camera.updateProjectionMatrix();
+    }
+  }
+
+  /** Advance every active chase camera (P1 always; P2 too while in 2P). */
+  function chaseCamera(dt: number): void {
+    chaseCameraRig(player, rig1, dt);
+    if (world.twoPlayer && world.player2) {
+      chaseCameraRig(world.player2, rig2, dt);
     }
   }
 
@@ -552,9 +666,16 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     countdownStep = -1;
     goHideTimer = 0;
     screens.hideResults();
-    screens.showCountdownTag(`${playerTankDef().name} — READY`); // Phase 7
+    // Phase 13: "P1 vs P2" flavor in split-screen mode
+    screens.showCountdownTag(
+      world.twoPlayer ? "P1 VS P2 — READY" : `${playerTankDef().name} — READY`,
+    );
     setPhase("countdown");
     snapChaseCamera(); // spec: snap straight to the chase cam on Enter
+    // Drop any fire presses queued on the title/results screens (e.g. the
+    // Enter press that started this race must not fire P2's cannon at GO).
+    input.consumeFire();
+    input.consumeFire2();
   }
 
   /** Full state reset for restart: grid positions, HP, crates, shells, timers. */
@@ -591,23 +712,96 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     tank.input = { throttle: 0, steer: 0 };
   }
 
+  // --- Mode management (Phase 13): local 1P vs 2P split-screen -----------------
+  let onModeChange: ((twoPlayer: boolean) => void) | null = null;
+
+  /**
+   * Switch between 1P and 2P. Rebuilds the grid membership (P1, [P2,] AI…),
+   * re-seats everyone, refreshes the title card + HUD layout and camera
+   * aspects. Only ever invoked from the title screen, so no race state is
+   * ever torn down mid-race.
+   */
+  function applyMode(twoPlayer: boolean): void {
+    world.twoPlayer = twoPlayer;
+    world.player2 = twoPlayer ? player2 : null;
+    world.playerPosition2 = 1;
+    input.setTwoPlayer(twoPlayer);
+    storeMode(twoPlayer);
+
+    if (twoPlayer) {
+      // Grid stays at 4 tanks: P1, P2, then the first 2 AI. The third AI is
+      // benched — hidden and excluded from shells/pickups/AI targeting.
+      world.tanks = [player, player2, ...aiTanks.slice(0, 2)];
+      aiTanks[2].mesh.root.visible = false;
+    } else {
+      world.tanks = [player, ...aiTanks];
+      aiTanks[2].mesh.root.visible = true;
+    }
+
+    seatRacers(); // fresh grid + progress for the new roster
+    weapons.reset(world); // stale shells referencing a benched tank
+    juice.reset();
+    powerups.reset();
+    updateStandings(world);
+    updateCameraAspects();
+    screens.setMode(twoPlayer);
+    onModeChange?.(twoPlayer);
+  }
+
+  /**
+   * Title-screen toggle (key C / gamepad Y). Touch or gamepad devices are
+   * single-player only: enabling 2P there shows a toast instead.
+   */
+  function toggleMode(): void {
+    if (world.phase !== "title") return;
+    if (!world.twoPlayer) {
+      if (gamepadInput.connected) {
+        screens.toast("🎮 GAMEPAD ACTIVE — 1P ONLY");
+        return;
+      }
+      if (touchInput.enabled) {
+        screens.toast("TOUCH CONTROLS ACTIVE — 1P ONLY");
+        return;
+      }
+      sfx.pickup();
+    } else {
+      sfx.pickup();
+    }
+    applyMode(!world.twoPlayer);
+  }
+
+  /** True if this tank is driven by a human (P1 always, P2 in 2P). */
+  function isHumanTank(tank: TankState): boolean {
+    return tank === player || (world.twoPlayer && tank === world.player2);
+  }
+
+  /** Display name for a human tank (banners/results). */
+  function humanName(tank: TankState): string {
+    if (tank === world.player2 && world.twoPlayer) return "P2";
+    return world.twoPlayer ? "P1" : "YOU";
+  }
+
   function finishRace(): void {
     setPhase("results");
     stopMusic(); // duck the loop out under the results screen
-    const racer = world.racers[0]; // the player
+    // Phase 13: every HUMAN finisher is eligible for best times — in 2P both
+    // players' best laps and totals are compared against the stored records.
     const best = loadBestTimes(track.def.id);
     const newBest: NewBest = { lap: false, total: false };
-    const bestLap = racer.progress.bestLap;
-    if (bestLap !== null && (best.lap === null || bestLap < best.lap)) {
-      best.lap = bestLap;
-      newBest.lap = true;
-    }
-    if (
-      racer.finishTime !== null &&
-      (best.total === null || racer.finishTime < best.total)
-    ) {
-      best.total = racer.finishTime;
-      newBest.total = true;
+    for (const racer of world.racers) {
+      if (!isHumanTank(racer.tank)) continue;
+      const bestLap = racer.progress.bestLap;
+      if (bestLap !== null && (best.lap === null || bestLap < best.lap)) {
+        best.lap = bestLap;
+        newBest.lap = true;
+      }
+      if (
+        racer.finishTime !== null &&
+        (best.total === null || racer.finishTime < best.total)
+      ) {
+        best.total = racer.finishTime;
+        newBest.total = true;
+      }
     }
     if (newBest.lap || newBest.total) storeBestTimes(track.def.id, best);
     screens.showResults(buildResultRows(), track.def.name, newBest);
@@ -623,16 +817,31 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       if (b.finishTime !== null) return 1;
       return b.progress.totalProgress - a.progress.totalProgress;
     });
+    const humans = humanCount();
     return order.map((racer) => {
-      const idx = world.racers.indexOf(racer);
-      const entry = roster[idx] ?? { name: "???", color: "#888888" };
+      const isP1 = racer.tank === player;
+      const isP2 = world.twoPlayer && racer.tank === world.player2;
+      const ai = AI_PERSONALITIES[world.racers.indexOf(racer) - humans];
+      let name: string;
+      let color: string;
+      if (isP1) {
+        name = humanName(player);
+        color = hexColor(playerTankDef().hullColor); // tracks the selected tank
+      } else if (isP2) {
+        name = "P2";
+        color = hexColor(P2_HULL_COLOR);
+      } else {
+        name = ai?.name ?? "???";
+        color =
+          ai != null
+            ? `#${ai.hullColor.toString(16).padStart(6, "0")}`
+            : "#888888";
+      }
       return {
-        name: entry.name,
-        color:
-          racer.tank === player
-            ? hexColor(playerTankDef().hullColor) // tracks the selected tank
-            : entry.color,
-        isPlayer: racer.tank === player,
+        name,
+        color,
+        isPlayer: isP1,
+        isPlayerTwo: isP2, // Phase 13: P2's row highlighted orange
         time:
           racer.finishTime !== null ? formatRaceTime(racer.finishTime) : "—",
         best:
@@ -649,8 +858,19 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     const prog = racer.progress;
     if (prog.lap > TOTAL_LAPS) {
       if (racer.finishTime === null) racer.finishTime = world.raceTime;
-      if (tank === player) finishRace(); // player finish triggers results
-    } else if (tank === player && prog.lap === TOTAL_LAPS) {
+      if (isHumanTank(tank)) {
+        // Phase 13: results wait until EVERY human has finished, so both
+        // players' total/best-lap times make it onto the results screen.
+        const pending = world.racers.filter(
+          (r) => isHumanTank(r.tank) && r.finishTime === null,
+        ).length;
+        if (pending === 0) {
+          finishRace();
+        } else {
+          screens.flashBanner(`${humanName(tank)} FINISHED!`);
+        }
+      }
+    } else if (isHumanTank(tank) && prog.lap === TOTAL_LAPS) {
       screens.flashBanner("FINAL LAP");
     }
   }
@@ -674,19 +894,30 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   /**
    * One simulated race frame. `driving=false` freezes everyone's inputs
    * (countdown coast-in / post-finish freeze); physics and FX keep running.
+   * Phase 13: world.tanks is humans-first — P1 (and P2 in 2P) read their own
+   * inputs; everything after them is AI.
    */
   function simulate(dt: number, driving: boolean): void {
+    const p2 = world.player2;
     player.input = driving ? readPlayerInput() : NO_INPUT;
-    const kbFire = input.consumeFire(); // always drain queued shots
+    if (world.twoPlayer && p2) p2.input = driving ? input.read2() : NO_INPUT;
+
+    // Always drain the fire queues so presses never leak across frames/phases
+    const kbFire = input.consumeFire();
+    const kb2Fire = input.consumeFire2();
     const touchFire = touchInput.consumeFire();
     const padFire = gamepadInput.consumeFire();
-    if (driving && (kbFire || touchFire || padFire)) weapons.tryFire(player);
+    if (driving) {
+      if (kbFire || touchFire || padFire) weapons.tryFire(player);
+      if (world.twoPlayer && p2 && kb2Fire) weapons.tryFire(p2);
+    }
 
+    const humans = humanCount();
     for (let i = 0; i < world.tanks.length; i++) {
       const tank = world.tanks[i];
-      if (driving && i > 0) {
+      if (driving && i >= humans) {
         // AI brains produce the same input shape as the player's keyboard
-        const d = aiControllers[i - 1].think(dt, world);
+        const d = aiControllers[i - humans].think(dt, world);
         tank.input.throttle = d.throttle;
         tank.input.steer = d.steer;
         if (d.fire) weapons.tryFire(tank);
@@ -698,7 +929,12 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       applySurfaceGrip(track, tank, racers[i].progress.lastT);
       updateTankPhysics(tank, dt);
       collideWithWalls(track, tank);
-      if (checkBoostPads(track, tank) && tank === player) sfx.boost();
+      if (
+        checkBoostPads(track, tank) &&
+        (tank === player || (world.twoPlayer && tank === p2))
+      ) {
+        sfx.boost();
+      }
       // Phase 9 juice: dust when lateral slip is high (drifting / hard turns
       // at speed — turning rotates the heading away from the velocity vector,
       // which shows up as lateral velocity). Rate-gated by a shared timer.
@@ -731,9 +967,16 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     // Crate animation, pickups, shield bubbles
     powerups.update(world, dt);
     chaseCamera(dt);
-    // Keep shadow frustum centered on the action
-    sun.position.set(player.position.x + 60, 90, player.position.z + 40);
-    sun.target.position.copy(player.position);
+    // Keep shadow frustum centered on the action — between both players in 2P
+    if (world.twoPlayer && p2) {
+      const mx = (player.position.x + p2.position.x) / 2;
+      const mz = (player.position.z + p2.position.z) / 2;
+      sun.position.set(mx + 60, 90, mz + 40);
+      sun.target.position.set(mx, 0, mz);
+    } else {
+      sun.position.set(player.position.x + 60, 90, player.position.z + 40);
+      sun.target.position.copy(player.position);
+    }
   }
 
   // --- Global keys: Enter (start), R (restart), M (mute), ←/→ track select -----
@@ -755,6 +998,11 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     if (e.code === "KeyR" && paused) {
       setPaused(false);
       resetRace();
+      return;
+    }
+    // Phase 13: C toggles 1P/2P on the title screen
+    if (e.code === "KeyC" && world.phase === "title") {
+      toggleMode();
       return;
     }
     // Title screen: LEFT/RIGHT cycles circuits (Phase 6), UP/DOWN tanks (Phase 7)
@@ -803,7 +1051,11 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       return;
     }
     if (world.phase === "title") {
-      if (action === "left") {
+      if (action === "mode") {
+        // Phase 13: Y = key C equivalent (1P/2P toggle; blocked with a toast
+        // while a gamepad is connected, handled inside toggleMode).
+        toggleMode();
+      } else if (action === "left") {
         sfx.pickup();
         loadTrack(trackIndex - 1);
       } else if (action === "right") {
@@ -881,8 +1133,8 @@ export function createGame(canvas: HTMLCanvasElement): Game {
                 sfx.go();
                 startMusic(); // race music kicks in exactly at GO
                 screens.showCountdownTag(
-                  `${playerTankDef().name} — GO!`,
-                ); // Phase 7
+                  world.twoPlayer ? "P1 VS P2 — GO!" : `${playerTankDef().name} — GO!`,
+                ); // Phase 7/13
                 setPhase("race"); // timer starts exactly at GO
                 goHideTimer = 0.8; // let "GO!" linger briefly
               } else {
@@ -918,12 +1170,38 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       }
     },
     render() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      // Phase 13: split-screen — P1 left half, P2 right half, one render pass
+      // per camera. The title always uses the single full-screen orbit cam.
+      if (!world.twoPlayer || world.phase === "title") {
+        renderer.setScissorTest(false);
+        renderer.setViewport(0, 0, w, h);
+        renderer.render(scene, camera);
+        return;
+      }
+      // Viewport/scissor are in CSS pixels — the renderer scales them by the
+      // pixel ratio internally. With scissor test on, each pass clears only
+      // its own half, so no bleed-over between views.
+      const half = Math.floor(w / 2);
+      renderer.setScissorTest(true);
+
+      renderer.setViewport(0, 0, half, h); // P1
+      renderer.setScissor(0, 0, half, h);
       renderer.render(scene, camera);
+
+      renderer.setViewport(half, 0, w - half, h); // P2
+      renderer.setScissor(half, 0, w - half, h);
+      renderer.render(scene, camera2);
+
+      renderer.setScissorTest(false);
     },
     onResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
+      updateCameraAspects(); // half-width aspects while in 2P
       renderer.setSize(window.innerWidth, window.innerHeight);
+    },
+    setOnModeChange(cb) {
+      onModeChange = cb;
     },
     dispose() {
       window.removeEventListener("keydown", onKeyDown);
@@ -948,4 +1226,8 @@ function updateStandings(world: World): void {
   );
   world.standings = sorted;
   world.playerPosition = sorted.indexOf(world.racers[0]) + 1;
+  // Phase 13: second human's position (HUD reads it in 2P only)
+  if (world.racers[1]) {
+    world.playerPosition2 = sorted.indexOf(world.racers[1]) + 1;
+  }
 }

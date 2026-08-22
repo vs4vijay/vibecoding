@@ -4,7 +4,10 @@ import { initHud } from "./hud";
 
 const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
 const game = createGame(canvas);
-initHud(game.world);
+const hud = initHud(game.world);
+
+// Phase 13: rebuild the HUD layout whenever the 1P/2P mode flips on the title
+game.setOnModeChange((twoPlayer) => hud.setMode(twoPlayer));
 
 window.addEventListener("resize", () => game.onResize());
 

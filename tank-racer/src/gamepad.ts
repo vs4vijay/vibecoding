@@ -16,7 +16,8 @@ export type GamepadMenuAction =
   | "up"
   | "down"
   | "confirm"
-  | "pause";
+  | "pause"
+  | "mode"; // Phase 13: Y toggles 1P/2P on the title screen (like key C)
 
 export interface GamepadCallbacks {
   /** Fired on every `gamepadconnected` event (for the 🎓/🎮 toast). */
@@ -57,6 +58,7 @@ export class GamepadInput {
   private prevFire = false;
   private prevStart = false;
   private prevConfirm = false;
+  private prevMode = false;
   private prevDir: MenuDir = 0;
 
   /** Queued on each new FIRE press; consumed by the game loop. */
@@ -99,6 +101,7 @@ export class GamepadInput {
       this.prevFire = false;
       this.prevStart = false;
       this.prevConfirm = false;
+      this.prevMode = false;
       this.prevDir = 0;
       return;
     }
@@ -145,6 +148,7 @@ export class GamepadInput {
    * - dpad / left-stick direction edge → immediate action, then slow repeats
    *   while held (cooldown prevents cycling several options per flick)
    * - A (button 0) edge → "confirm" (= Enter on title, R on results)
+   * - Y (button 3) edge → "mode" (Phase 13: 1P/2P toggle on title)
    */
   drainMenuActions(): GamepadMenuAction[] {
     const actions: GamepadMenuAction[] = [];
@@ -169,6 +173,11 @@ export class GamepadInput {
     const confirm = held(this.buttons, 0);
     if (confirm && !this.prevConfirm) actions.push("confirm");
     this.prevConfirm = confirm;
+
+    // Phase 13: Y (button 3) = mode toggle on the title screen.
+    const y = held(this.buttons, 3);
+    if (y && !this.prevMode) actions.push("mode");
+    this.prevMode = y;
 
     return actions;
   }

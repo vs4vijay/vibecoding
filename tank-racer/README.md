@@ -22,6 +22,25 @@ assets (all audio is synthesized with WebAudio oscillators).
 | `R`            | Restart (results; also while paused) |
 | `P` / `Esc`    | Pause / resume (race) |
 | `M`            | Mute / unmute       |
+| `C`            | Toggle 1 PLAYER / 2 PLAYERS (title) |
+
+### 2-Player split-screen
+
+Press `C` on the title screen (or `Y` on a gamepad) to switch to **2 PLAYERS**.
+The mode is remembered in localStorage. In 2P the screen splits into two halves,
+each with its own chase camera and color-coded HUD (P1 cyan, P2 orange), plus
+one shared minimap highlighting both players:
+
+| Player | Drive            | Fire  |
+| ------ | ---------------- | ----- |
+| **P1** | `W` `A` `S` `D`  | Space |
+| **P2** | Arrow keys       | Enter |
+
+In 2P the arrow keys drive P2 exclusively — they no longer steer P1. The grid
+stays at four tanks: P1, P2, then two AI. Results wait until both players have
+finished and highlight both rows; each human finisher is eligible for best-time
+records. Touch devices and gamepad users are 1P-only: trying to enable 2P while
+touch controls or a gamepad are active shows a toast instead.
 
 ### Gamepad (standard mapping)
 
@@ -37,6 +56,7 @@ and touch still work — last input wins each frame.
 | Start                      | Pause / resume                           |
 | D-pad / left stick         | Cycle track (◀ ▶) and tank (▲ ▼) on menus |
 | A (bottom)                 | Confirm (= Enter / R)                    |
+| Y (top)                    | Toggle 1P / 2P mode (title)              |
 
 ## Tracks
 

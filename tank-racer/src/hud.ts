@@ -1,59 +1,62 @@
 import type { World } from "./game";
+import type { TankState } from "./tank";
 import { TOTAL_LAPS } from "./track";
 
 /** Boost pads use ×1.5; pickup boost is ×1.4 — used to distinguish the slot text. */
 const PICKUP_BOOST_MULT = 1.4;
 
-/** Phase 2 HUD: speed readout, lap counter, lap timer, minimap canvas. */
-export function initHud(world: World): void {
-  const root = document.getElementById("hud");
-  if (!root) return;
+/** Phase 13 player accents (match the on-screen tank liveries). */
+const P1_COLOR = "#41d9ff";
+const P2_COLOR = "#ffa04d";
+const AI_DOT_COLOR = "#e05a4e";
 
-  // --- Speed (bottom-right) -------------------------------------------------
-  const speed = document.createElement("div");
-  speed.id = "hud-speed";
-  root.appendChild(speed);
+interface PanelRefs {
+  speed: HTMLDivElement;
+  lap: HTMLDivElement;
+  pos: HTMLDivElement;
+  time: HTMLDivElement;
+  healthFill: HTMLDivElement;
+  power: HTMLDivElement;
+}
 
-  // --- Health bar (bottom-left) ----------------------------------------------
-  const healthBlock = document.createElement("div");
-  healthBlock.id = "hud-health";
-  const healthBar = document.createElement("div");
-  healthBar.id = "hud-health-bar";
-  const healthFill = document.createElement("div");
-  healthFill.id = "hud-health-fill";
-  healthBar.appendChild(healthFill);
-  healthBlock.appendChild(healthBar);
-  root.appendChild(healthBlock);
+/** Last-rendered values per panel — DOM is only touched on change. */
+interface PanelCache {
+  speed: number;
+  lap: string;
+  pos: string;
+  time: string;
+  hpPct: number;
+  hpColor: string;
+  power: string | null;
+}
 
-  // --- Power-up slot indicator (above the health bar) -------------------------
-  const power = document.createElement("div");
-  power.id = "hud-power";
-  root.appendChild(power);
+interface Panel {
+  tank: TankState;
+  posOf(): number;
+  refs: PanelRefs;
+  cache: PanelCache;
+}
 
+export interface Hud {
+  /** Rebuild the HUD layout for the given mode (Phase 13). */
+  setMode(twoPlayer: boolean): void;
+}
 
-  // --- Lap + position + time block (top-right) -------------------------------
-  const raceBlock = document.createElement("div");
-  raceBlock.id = "hud-race";
-  const lap = document.createElement("div");
-  lap.id = "hud-lap";
-  const pos = document.createElement("div");
-  pos.id = "hud-pos";
-  const time = document.createElement("div");
-  time.id = "hud-time";
-  raceBlock.appendChild(lap);
-  raceBlock.appendChild(pos);
-  raceBlock.appendChild(time);
-  root.appendChild(raceBlock);
+/**
+ * Phase 2/8/13 HUD. In 1P this is the classic layout (unchanged ids/CSS).
+ * In 2P split-screen each half gets a compact color-coded panel and ONE
+ * minimap sits centered between the halves, highlighting both players.
+ */
+export function initHud(world: World): Hud {
+  const rootEl = document.getElementById("hud");
+  if (!rootEl) return { setMode() { /* no #hud in DOM */ } };
+  const root: HTMLElement = rootEl;
 
-  // --- Minimap (top-left) -----------------------------------------------------
-  const minimap = document.createElement("canvas");
-  minimap.id = "hud-minimap";
-  minimap.width = 170;
-  minimap.height = 170;
-  root.appendChild(minimap);
-  const ctx = minimap.getContext("2d")!;
+  // --- Minimap canvas + geometry caches (survive setMode rebuilds) ----------
+  let minimap: HTMLCanvasElement | null = null;
+  let ctx: CanvasRenderingContext2D | null = null;
+  let panels: Panel[] = [];
 
-  // Precompute spline outline in canvas space (rebuilt if the track changes)
   const MARGIN = 12;
   let minX = 0, maxX = 0, minZ = 0, maxZ = 0;
   let scale = 1;
@@ -69,20 +72,185 @@ export function initHud(world: World): void {
       maxZ = Math.max(maxZ, p.z);
     }
     scale = Math.min(
-      (minimap.width - MARGIN * 2) / (maxX - minX),
-      (minimap.height - MARGIN * 2) / (maxZ - minZ),
+      (minimap!.width - MARGIN * 2) / (maxX - minX),
+      (minimap!.height - MARGIN * 2) / (maxZ - minZ),
     );
     outlinePts = world.track.outline.map(toCanvas);
     hudTrack = world.track;
   }
 
   const toCanvas = (p: { x: number; z: number }): [number, number] => [
-    (p.x - minX) * scale + (minimap.width - (maxX - minX) * scale) / 2,
-    (p.z - minZ) * scale + (minimap.height - (maxZ - minZ) * scale) / 2,
+    (p.x - minX) * scale + (minimap!.width - (maxX - minX) * scale) / 2,
+    (p.z - minZ) * scale + (minimap!.height - (maxZ - minZ) * scale) / 2,
   ];
-  recomputeMinimap();
+
+  // --- Element helpers -------------------------------------------------------
+  function div(id?: string, className?: string): HTMLDivElement {
+    const d = document.createElement("div");
+    if (id) d.id = id;
+    if (className) d.className = className;
+    return d;
+  }
+
+  function makeMinimap(className?: string): void {
+    minimap = document.createElement("canvas");
+    minimap.id = "hud-minimap";
+    if (className) minimap.className = className;
+    minimap.width = 170;
+    minimap.height = 170;
+    root.appendChild(minimap);
+    ctx = minimap.getContext("2d")!;
+  }
+
+  function mkPanel(tank: TankState, posOf: () => number, refs: PanelRefs): Panel {
+    return {
+      tank,
+      posOf,
+      refs,
+      cache: {
+        speed: -1, lap: "", pos: "", time: "",
+        hpPct: -1, hpColor: "", power: null,
+      },
+    };
+  }
+
+  /** Phase 13 compact panel inside one half of a .hud-half container. */
+  function buildCompactHalf(half: HTMLElement, accentClass: string, tag: string, tank: TankState, posOf: () => number): void {
+    const raceBlock = div(undefined, "hud-race");
+    const lap = div(undefined, `hud-lap ${accentClass}`);
+    const pos = div(undefined, `hud-pos ${accentClass}`);
+    const time = div(undefined, "hud-time");
+    raceBlock.append(lap, pos, time);
+
+    const speed = div(undefined, "hud-speed");
+    const power = div(undefined, "hud-power");
+    const healthBlock = div(undefined, "hud-health");
+    const healthBar = div(undefined, "hud-health-bar");
+    const healthFill = div(undefined, "hud-health-fill");
+    healthBar.appendChild(healthFill);
+    healthBlock.appendChild(healthBar);
+
+    const label = div(undefined, `hud-player-tag ${accentClass}`);
+    label.textContent = tag;
+
+    half.append(label, power, healthBlock, speed, raceBlock);
+    panels.push(mkPanel(tank, posOf, { speed, lap, pos, time, healthFill, power }));
+  }
+
+  /** Build the whole HUD for the active mode; wipes whatever existed. */
+  function buildHud(twoPlayer: boolean): void {
+    root.innerHTML = "";
+    panels = [];
+
+    if (!twoPlayer) {
+      // Classic single-player layout (ids unchanged since Phase 2)
+      const speed = div("hud-speed");
+      root.appendChild(speed);
+
+      const healthBlock = div("hud-health");
+      const healthBar = div("hud-health-bar");
+      const healthFill = div("hud-health-fill");
+      healthBar.appendChild(healthFill);
+      healthBlock.appendChild(healthBar);
+      root.appendChild(healthBlock);
+
+      const power = div("hud-power");
+      root.appendChild(power);
+
+      const raceBlock = div("hud-race");
+      const lap = div("hud-lap");
+      const pos = div("hud-pos");
+      const time = div("hud-time");
+      raceBlock.append(lap, pos, time);
+      root.appendChild(raceBlock);
+
+      makeMinimap();
+
+      panels.push(
+        mkPanel(world.player, () => world.playerPosition, {
+          speed, lap, pos, time, healthFill, power,
+        }),
+      );
+      return;
+    }
+
+    // Split-screen: vertical divider + two compact color-coded halves
+    const divider = div(undefined, "hud-split-divider");
+    root.appendChild(divider);
+
+    const left = div(undefined, "hud-half left");
+    const right = div(undefined, "hud-half right");
+    root.appendChild(left);
+    root.appendChild(right);
+
+    buildCompactHalf(left, "accent-p1", "P1", world.player, () => world.playerPosition);
+    buildCompactHalf(right, "accent-p2", "P2", world.player2!, () => world.playerPosition2);
+
+    // ONE minimap, centered between the halves
+    makeMinimap("centered");
+  }
+
+  // --- Per-frame updates -------------------------------------------------------
+
+  function updatePanel(p: Panel): void {
+    const t = p.tank;
+    const c = p.cache;
+
+    const s = Math.abs(Math.round(t.velocity.length() * 3.6)); // fake km/h
+    if (s !== c.speed) {
+      c.speed = s;
+      p.refs.speed.textContent = `${s} km/h`;
+    }
+
+    const prog = world.racers.find((r) => r.tank === t)?.progress;
+    if (prog) {
+      const lapText = `LAP ${Math.min(prog.lap, TOTAL_LAPS)}/${TOTAL_LAPS}`;
+      if (lapText !== c.lap) {
+        c.lap = lapText;
+        p.refs.lap.textContent = lapText;
+      }
+      const timeText = formatLapTime(prog.lapTime);
+      if (timeText !== c.time) {
+        c.time = timeText;
+        p.refs.time.textContent = timeText;
+      }
+    }
+
+    const posText = `POS ${p.posOf()}/${world.tanks.length}`;
+    if (posText !== c.pos) {
+      c.pos = posText;
+      p.refs.pos.textContent = posText;
+    }
+
+    // Health bar: only touch the DOM when the integer % changes
+    const hpPct = Math.max(0, Math.round((t.hp / t.maxHp) * 100));
+    if (hpPct !== c.hpPct) {
+      c.hpPct = hpPct;
+      p.refs.healthFill.style.width = `${hpPct}%`;
+    }
+    const hpColor = hpPct > 60 ? "#41d977" : hpPct > 30 ? "#ffc23d" : "#e05a4e";
+    if (hpColor !== c.hpColor) {
+      c.hpColor = hpColor;
+      p.refs.healthFill.style.background = hpColor;
+    }
+
+    // Power-up slot: armed pickup only (boost auto-consumes)
+    const powerText = t.tripleShots > 0
+      ? `TRIPLE x${t.tripleShots}`
+      : t.shield
+      ? "SHIELD"
+      : t.boostTimer > 0 && t.boostMultiplier === PICKUP_BOOST_MULT
+      ? "BOOST"
+      : "";
+    if (powerText !== c.power) {
+      c.power = powerText;
+      p.refs.power.textContent = powerText;
+      p.refs.power.style.opacity = powerText ? "1" : "0.35";
+    }
+  }
 
   function drawMinimap(): void {
+    if (!ctx || !minimap) return;
     ctx.clearRect(0, 0, minimap.width, minimap.height);
     ctx.fillStyle = "rgba(10, 14, 20, 0.55)";
     ctx.beginPath();
@@ -113,91 +281,45 @@ export function initHud(world: World): void {
       ctx.fill();
     }
 
-    // Tanks — player highlighted
+    // Tanks — both humans highlighted in their own accent colors (Phase 13)
     for (const racer of world.racers) {
       const [x, y] = toCanvas(racer.tank.position);
-      const isPlayer = racer.tank === world.player;
-      ctx.fillStyle = isPlayer ? "#41d9ff" : "#e05a4e";
+      const isP1 = racer.tank === world.player;
+      const isP2 = world.twoPlayer && racer.tank === world.player2;
+      ctx.fillStyle = isP1 ? P1_COLOR : isP2 ? P2_COLOR : AI_DOT_COLOR;
       ctx.beginPath();
-      ctx.arc(x, y, isPlayer ? 4 : 3.5, 0, Math.PI * 2);
+      ctx.arc(x, y, isP1 || isP2 ? 4.5 : 3.5, 0, Math.PI * 2);
       ctx.fill();
+      if (isP1 || isP2) {
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
     }
   }
 
-  let shownSpeed = -1;
-  let shownLapText = "";
-  let shownPosText = "";
-  let shownTime = "";
-  let shownHealthPct = -1;
-  let shownHealthColor = "";
-  let shownPowerText: string | null = null;
   function update() {
     // Track switched on the title screen → recompute minimap geometry once
     if (world.track !== hudTrack) recomputeMinimap();
-
-    const s = Math.abs(Math.round(world.player.velocity.length() * 3.6)); // fake km/h
-    if (s !== shownSpeed) {
-      shownSpeed = s;
-      speed.textContent = `${s} km/h`;
-    }
-
-    const prog = world.racers.find((r) => r.tank === world.player)?.progress;
-    if (prog) {
-      const lapText = `LAP ${Math.min(prog.lap, TOTAL_LAPS)}/${TOTAL_LAPS}`;
-      if (lapText !== shownLapText) {
-        shownLapText = lapText;
-        lap.textContent = lapText;
-      }
-      const timeText = formatLapTime(prog.lapTime);
-      if (timeText !== shownTime) {
-        shownTime = timeText;
-        time.textContent = timeText;
-      }
-    }
-
-    // --- Race position: only touch the DOM when it changes -------------------
-    const posText = `POS ${world.playerPosition}/${world.tanks.length}`;
-    if (posText !== shownPosText) {
-      shownPosText = posText;
-      pos.textContent = posText;
-    }
-
-    // --- Health bar: only touch the DOM when the integer % changes -----------
-    // Phase 7: normalized against the selected tank's max HP
-    const hpPct = Math.max(
-      0,
-      Math.round((world.player.hp / world.player.maxHp) * 100),
-    );
-    if (hpPct !== shownHealthPct) {
-      shownHealthPct = hpPct;
-      healthFill.style.width = `${hpPct}%`;
-    }
-    const healthColor =
-      hpPct > 60 ? "#41d977" : hpPct > 30 ? "#ffc23d" : "#e05a4e";
-    if (healthColor !== shownHealthColor) {
-      shownHealthColor = healthColor;
-      healthFill.style.background = healthColor;
-    }
-
-    // --- Power-up slot: armed pickup only (boost auto-consumes) ---------------
-    const p = world.player;
-    const powerText = p.tripleShots > 0
-      ? `TRIPLE x${p.tripleShots}`
-      : p.shield
-      ? "SHIELD"
-      : p.boostTimer > 0 && p.boostMultiplier === PICKUP_BOOST_MULT
-      ? "BOOST"
-      : "";
-    if (powerText !== shownPowerText) {
-      shownPowerText = powerText;
-      power.textContent = powerText;
-      power.style.opacity = powerText ? "1" : "0.35";
-    }
-
+    for (const p of panels) updatePanel(p);
     drawMinimap();
     requestAnimationFrame(update);
   }
+
+  buildHud(world.twoPlayer);
   update();
+
+  return {
+    setMode(twoPlayer: boolean) {
+      if (
+        (twoPlayer && panels.length === 2) ||
+        (!twoPlayer && panels.length === 1)
+      ) {
+        return; // already in the requested layout
+      }
+      buildHud(twoPlayer);
+    },
+  };
 }
 
 function formatLapTime(seconds: number): string {

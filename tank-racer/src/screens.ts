@@ -9,6 +9,8 @@ export interface ResultRow {
   /** CSS color for the little tank swatch. */
   color: string;
   isPlayer: boolean;
+  /** Phase 13: second human player row (highlighted in P2 orange). */
+  isPlayerTwo?: boolean;
   /** Preformatted total race time, or "—" if the racer didn't finish. */
   time: string;
   /** Preformatted best lap, or "—" if no lap was completed. */
@@ -40,6 +42,9 @@ export interface Screens {
   setBestTimes(lap: string | null, total: string | null): void;
   /** Title-screen tank picker: name, blurb and stat bars (Phase 7). */
   setTankCard(stats: TankStatsView): void;
+  /** Phase 13: title-screen mode display ("1 PLAYER" / "2 PLAYERS") +
+   * per-player control hints in 2P. */
+  setMode(twoPlayer: boolean): void;
   /** Tank name shown under the big countdown text (Phase 7). */
   showCountdownTag(text: string): void;
   showCountdown(text: string): void;
@@ -80,6 +85,8 @@ export function createScreens(rootId = "screens"): Screens {
   let bestTimesEl: HTMLDivElement | null = null;
   let tankNameEl: HTMLDivElement | null = null;
   let statsCardEl: HTMLDivElement | null = null;
+  let modeEl: HTMLDivElement | null = null;
+  let controlsEl: HTMLDivElement | null = null;
   function ensureTitle(): HTMLDivElement {
     if (title) return title;
     title = document.createElement("div");
@@ -141,50 +148,15 @@ export function createScreens(rootId = "screens"): Screens {
     statsCardEl.id = "screen-tank-stats";
     card.appendChild(statsCardEl);
 
-    const trackHint = document.createElement("div");
-    trackHint.className = "controls-row";
-    const hintKey = document.createElement("span");
-    hintKey.className = "key";
-    hintKey.textContent = "← →";
-    const hintText = document.createElement("span");
-    hintText.textContent = "choose track";
-    trackHint.appendChild(hintKey);
-    trackHint.appendChild(hintText);
+    // Phase 13: mode toggle — C (or gamepad Y) flips 1 PLAYER / 2 PLAYERS
+    modeEl = document.createElement("div");
+    modeEl.id = "screen-mode-select";
+    card.appendChild(modeEl);
 
-    const tankHint = document.createElement("div");
-    tankHint.className = "controls-row";
-    const tankHintKey = document.createElement("span");
-    tankHintKey.className = "key";
-    tankHintKey.textContent = "↑ ↓";
-    const tankHintText = document.createElement("span");
-    tankHintText.textContent = "choose tank";
-    tankHint.appendChild(tankHintKey);
-    tankHint.appendChild(tankHintText);
-
-    const controls = document.createElement("div");
-    controls.className = "controls";
-    for (const [key, action] of [
-      ["W / ↑", "accelerate"],
-      ["S / ↓", "brake / reverse"],
-      ["A D / ← →", "steer"],
-      ["SPACE", "fire shell"],
-      ["P / ESC", "pause"],
-      ["M", "mute"],
-    ] as const) {
-      const row = document.createElement("div");
-      row.className = "controls-row";
-      const k = document.createElement("span");
-      k.className = "key";
-      k.textContent = key;
-      const a = document.createElement("span");
-      a.textContent = action;
-      row.appendChild(k);
-      row.appendChild(a);
-      controls.appendChild(row);
-    }
-    controls.appendChild(trackHint);
-    controls.appendChild(tankHint);
-    card.appendChild(controls);
+    // Controls listing: rebuilt per mode by renderControls() (setMode)
+    controlsEl = document.createElement("div");
+    controlsEl.className = "controls";
+    card.appendChild(controlsEl);
 
     const press = document.createElement("p");
     press.className = "press blink";
@@ -255,8 +227,7 @@ export function createScreens(rootId = "screens"): Screens {
   }
 
   /** Rebuild the stat-bar card for one tank definition view. */
-  function renderStatsCard(stats: TankStatsView): void {
-    const el = statsCardEl!;
+  function renderStatsCard(stats: TankStatsView): void {    const el = statsCardEl!;
     el.textContent = "";
     for (const [label, fill] of [
       ["SPEED", stats.speed],
@@ -285,6 +256,72 @@ export function createScreens(rootId = "screens"): Screens {
     el.appendChild(blurb);
   }
 
+  /** One "KEY — action" row of the controls listing. */
+  function controlsRow(key: string, action: string): HTMLDivElement {
+    const row = document.createElement("div");
+    row.className = "controls-row";
+    const k = document.createElement("span");
+    k.className = "key";
+    k.textContent = key;
+    const a = document.createElement("span");
+    a.textContent = action;
+    row.appendChild(k);
+    row.appendChild(a);
+    return row;
+  }
+
+  /**
+   * Phase 13: rebuild the title-screen controls listing for the active mode.
+   * 1P keeps the classic single list; 2P swaps it for side-by-side per-player
+   * columns so both humans can see their keys at a glance.
+   */
+  function renderControls(twoPlayer: boolean): void {
+    const el = controlsEl!;
+    el.textContent = "";
+    if (!twoPlayer) {
+      for (const [key, action] of [
+        ["W / ↑", "accelerate"],
+        ["S / ↓", "brake / reverse"],
+        ["A D / ← →", "steer"],
+        ["SPACE", "fire shell"],
+        ["P / ESC", "pause"],
+        ["M", "mute"],
+        ["← →", "choose track"],
+        ["↑ ↓", "choose tank"],
+        ["C", "toggle 2P mode"],
+      ] as const) {
+        el.appendChild(controlsRow(key, action));
+      }
+      return;
+    }
+    // 2P: two color-coded player columns + shared rows underneath
+    const cols = document.createElement("div");
+    cols.className = "controls-cols";
+    for (const [tag, label, drive, fire] of [
+      ["p1", "P1", "W A S D", "SPACE"],
+      ["p2", "P2", "ARROW KEYS", "ENTER"],
+    ] as const) {
+      const col = document.createElement("div");
+      col.className = `p-col ${tag}`;
+      const h3 = document.createElement("h3");
+      h3.textContent = label;
+      col.appendChild(h3);
+      col.appendChild(controlsRow(drive, "drive"));
+      col.appendChild(controlsRow(fire, "fire"));
+      cols.appendChild(col);
+    }
+    el.appendChild(cols);
+    for (const [key, action] of [
+      ["P / ESC", "pause"],
+      ["M", "mute"],
+      ["← →", "choose track"],
+      ["↑ ↓", "choose tank (P1)"],
+      ["C", "toggle mode"],
+    ] as const) {
+      el.appendChild(controlsRow(key, action));
+    }
+  }
+
   return {
     showTitle(subtitle?: string) {
       hideResultsNow();
@@ -310,6 +347,14 @@ export function createScreens(rootId = "screens"): Screens {
       ensureTitle();
       if (tankNameEl) tankNameEl.textContent = stats.name;
       if (statsCardEl) renderStatsCard(stats);
+    },
+    setMode(twoPlayer: boolean) {
+      ensureTitle(); // build the card so the elements exist
+      if (modeEl) {
+        modeEl.textContent = twoPlayer ? "2 PLAYERS — SPLIT SCREEN" : "1 PLAYER";
+        modeEl.classList.toggle("two", twoPlayer);
+      }
+      renderControls(twoPlayer);
     },
     showCountdownTag(text: string) {
       ensureCountdownTag().textContent = text;
@@ -370,7 +415,10 @@ export function createScreens(rootId = "screens"): Screens {
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const line = document.createElement("div");
-        line.className = "result-row" + (row.isPlayer ? " player" : "");
+        line.className =
+          "result-row" +
+          (row.isPlayer ? " player" : "") +
+          (row.isPlayerTwo ? " player-two" : "");
 
         const pos = document.createElement("span");
         pos.className = "result-pos";
