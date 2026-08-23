@@ -128,6 +128,7 @@ export function boot(): void {
   window.addEventListener("keydown", retryKey);
 
   // Boot straight into the title screen.
+  menus.showTitle(bestScore);
   let last = performance.now();
   // Preallocated per-frame HUD snapshot: written in place, never reallocated.
   const hudSnap: HudState = {
@@ -180,6 +181,8 @@ export function boot(): void {
       coachActive = false;
       markCoachSeen();
     }
+
+    requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
 
