@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { predictLanding, ZombiePool } from "../src/game/zombies";
+import { predictLanding, ZombiePool, type Zombie } from "../src/game/zombies";
 
 describe("predictLanding", () => {
   it("leads the target by car velocity and clamps to road by accuracy", () => {
@@ -23,7 +23,9 @@ describe("ZombiePool", () => {
       if (z.state === "clinging") landed = true;
     }
     expect(landed).toBe(true);
-    expect(pool.attachedWeight(2)).toEqual({ left: 0, right: 1 });
+    const w = { left: 0, right: 0 };
+    pool.attachedWeight(2, w);
+    expect(w).toEqual({ left: 0, right: 1 });
   });
   it("hit respects recent-leap double damage", () => {
     const pool = new ZombiePool();
@@ -40,7 +42,8 @@ describe("ZombiePool", () => {
     const b = pool.spawnLurker("walker", -3, 90)!;
     a.state = "clinging"; b.state = "clinging";
     a.side = "right"; b.side = "left";
-    const killed = pool.scrapeSide("right");
+    const killed: Zombie[] = [];
+    pool.scrapeSide("right", killed);
     expect(killed.map((k) => k.id)).toEqual([a.id]);
     expect(b.hp).toBe(1);
   });

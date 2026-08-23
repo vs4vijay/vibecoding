@@ -128,10 +128,23 @@ export function boot(): void {
   window.addEventListener("keydown", retryKey);
 
   // Boot straight into the title screen.
-  menus.showTitle(bestScore);
+  let last = performance.now();
+  // Preallocated per-frame HUD snapshot: written in place, never reallocated.
+  const hudSnap: HudState = {
+    phase: "title",
+    score: 0,
+    best: 0,
+    distanceM: 0,
+    level: 1,
+    levelProgress: 0,
+    tilt: 0,
+    imbalance: 0,
+    mag: { left: CONFIG.gun.magSize, right: CONFIG.gun.magSize },
+    reload01: { left: 1, right: 1 },
+    multiplier: 1,
+  };
   hud.hide();
 
-  let last = performance.now();
   const tick = (now: number) => {
     const dt = Math.min((now - last) / 1000, CONFIG.sim.maxFrameDt);
     last = now;
@@ -154,7 +167,8 @@ export function boot(): void {
     session.update(dt);
 
     if (session.phase !== "title") {
-      hud.update(hudState(session, bestScore, imb));
+      writeHudState(hudSnap, session, bestScore, imb);
+      hud.update(hudSnap);
     }
     world.update(session.carZValue);
     rig.follow(session.car.x, session.carZValue, session.speed01, dt);
@@ -166,12 +180,16 @@ export function boot(): void {
       coachActive = false;
       markCoachSeen();
     }
-
-    requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
 
-  function hudState(s: Session, best: number, imbalance: number): HudState {
+  /** Writes the live HUD snapshot into `out` (preallocated). */
+  function writeHudState(
+    out: HudState,
+    s: Session,
+    best: number,
+    imbalance: number,
+  ): void {
     const lvl = s.level;
     const reqLo = scoreForLevel(lvl);
     const reqHi = scoreForLevel(lvl + 1);
@@ -179,25 +197,23 @@ export function boot(): void {
       0,
       Math.min(1, (s.scoring.score - reqLo) / (reqHi - reqLo)),
     );
-    return {
-      phase: session.phase,
-      score: s.scoring.score,
-      best,
-      distanceM: s.scoring.distanceM,
-      level: lvl,
-      levelProgress: Number.isFinite(progress) ? progress : 1,
-      tilt: s.car.tilt,
-      imbalance,
-      mag: { left: s.gun.left.mag, right: s.gun.right.mag },
-      reload01: {
-        left: s.gun.left.reloadT <= 0 ? 1 : 1 - s.gun.left.reloadT / CONFIG.gun.reloadS,
-        right:
-          s.gun.right.reloadT <= 0
-            ? 1
-            : 1 - s.gun.right.reloadT / CONFIG.gun.reloadS,
-      },
-      multiplier: s.scoring.multiplier,
-    };
+    out.phase = session.phase;
+    out.score = s.scoring.score;
+    out.best = best;
+    out.distanceM = s.scoring.distanceM;
+    out.level = lvl;
+    out.levelProgress = Number.isFinite(progress) ? progress : 1;
+    out.tilt = s.car.tilt;
+    out.imbalance = imbalance;
+    out.mag.left = s.gun.left.mag;
+    out.mag.right = s.gun.right.mag;
+    out.reload01.left =
+      s.gun.left.reloadT <= 0 ? 1 : 1 - s.gun.left.reloadT / CONFIG.gun.reloadS;
+    out.reload01.right =
+      s.gun.right.reloadT <= 0
+        ? 1
+        : 1 - s.gun.right.reloadT / CONFIG.gun.reloadS;
+    out.multiplier = s.scoring.multiplier;
   }
 }
 

@@ -40,6 +40,59 @@ const SKY_COUNT = 24;
 const SKY_SPACING = 7.5;
 const SKY_BEHIND = 40;
 
+/** Flat plane in the XZ plane (rotated flat), centered at (x, y, z). */
+function planeXZ(
+  w: number,
+  len: number,
+  x: number,
+  y: number,
+  z: number,
+): THREE.BufferGeometry {
+  const geo = new THREE.PlaneGeometry(w, len);
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(x, y, z);
+  return geo;
+}
+
+/** Axis-aligned box centered at (x, y, z). */
+function boxAt(
+  w: number,
+  h: number,
+  d: number,
+  x: number,
+  y: number,
+  z: number,
+): THREE.BufferGeometry {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  geo.translate(x, y, z);
+  return geo;
+}
+
+/** Merge non-indexed copies of `parts` into one geometry (build-time only). */
+function mergeGeometries(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const nonIndexed = parts.map((p) => p.toNonIndexed());
+  const merged = mergeGeometriesImpl(nonIndexed);
+  for (const p of parts) p.dispose();
+  for (const p of nonIndexed) p.dispose();
+  return merged;
+}
+
+/** Minimal position-only geometry concatenation (three's addon equivalent). */
+function mergeGeometriesImpl(geos: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const attrs = geos.map((g) => g.getAttribute("position") as THREE.BufferAttribute);
+  const total = attrs.reduce((n, a) => n + a.count, 0);
+  const out = new THREE.BufferGeometry();
+  const merged = new Float32Array(total * 3);
+  let o = 0;
+  for (const a of attrs) {
+    merged.set(a.array as Float32Array, o);
+    o += a.array.length;
+  }
+  out.setAttribute("position", new THREE.BufferAttribute(merged, 3));
+  out.computeVertexNormals();
+  return out;
+}
+
 /** Pooled dusk highway: asphalt, dashed lines, guardrails, streetlights, sand shoulders, skyline. */
 export class World {
   group = new THREE.Group();
@@ -52,20 +105,44 @@ export class World {
   private tmpM = new THREE.Matrix4();
 
   constructor(scene: THREE.Scene) {
-    // --- Shared geometries/materials, built once and reused by the pool ---
-    const asphaltGeo = new THREE.PlaneGeometry(16, SEG_LEN);
+    // --- Shared materials, built once and reused by the pool ---
     const asphaltMat = new THREE.MeshLambertMaterial({ color: 0x1c1c20 });
-    const dashGeo = new THREE.PlaneGeometry(0.18, 2.2);
     const dashMat = new THREE.MeshBasicMaterial({ color: 0xc9b47a });
-    const railGeo = new THREE.BoxGeometry(0.12, 0.35, SEG_LEN);
-    const postGeo = new THREE.BoxGeometry(0.14, 0.7, 0.14);
     const railMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
-    const poleGeo = new THREE.BoxGeometry(0.16, 6, 0.16);
     const poleMat = new THREE.MeshLambertMaterial({ color: 0x181820 });
-    const headGeo = new THREE.BoxGeometry(1.1, 0.22, 0.5);
     const headMat = new THREE.MeshBasicMaterial({ color: 0xffb347 });
-    const sandGeo = new THREE.PlaneGeometry(26, SEG_LEN);
     const sandMat = new THREE.MeshLambertMaterial({ color: 0x4a3421 });
+
+    // --- Per-material merged segment geometry (built once) ---
+    // Every segment is identical, so each material's pieces are baked into a
+    // single BufferGeometry; one segment = 6 draw calls total instead of ~17.
+    const asphaltGeo = mergeGeometries(
+      [planeXZ(16, SEG_LEN, 0, 0, 0)],
+    );
+    const dashParts: THREE.BufferGeometry[] = [];
+    for (let d = 0; d < 6; d++) {
+      dashParts.push(planeXZ(0.18, 2.2, 0, 0.02, -SEG_LEN / 2 + (d + 0.5) * (SEG_LEN / 6)));
+    }
+    const dashGeo = mergeGeometries(dashParts);
+    const railParts: THREE.BufferGeometry[] = [];
+    for (const side of [-1, 1] as const) {
+      railParts.push(boxAt(0.12, 0.35, SEG_LEN, side * 7.35, 0.55, 0));
+      for (let p = 0; p < 4; p++) {
+        railParts.push(
+          boxAt(0.14, 0.7, 0.14, side * 7.35, 0.35, -SEG_LEN / 2 + (p + 0.5) * (SEG_LEN / 4)),
+        );
+      }
+    }
+    const railGeo = mergeGeometries(railParts);
+    const sandParts: THREE.BufferGeometry[] = [
+      planeXZ(26, SEG_LEN, -20.5, -0.05, 0),
+      planeXZ(26, SEG_LEN, 20.5, -0.05, 0),
+    ];
+    const sandGeo = mergeGeometries(sandParts);
+    // Streetlight: pole is per-segment-identical (side applied via mesh
+    // position); the amber head bakes its own offset.
+    const poleGeo = boxAt(0.16, 6, 0.16, 0, 3, 0);
+    const headGeo = boxAt(1.1, 0.22, 0.5, 0, 5.9, 0);
 
     // --- Skyline: one InstancedMesh of dark silhouette boxes ---
     const skylineMat = new THREE.MeshBasicMaterial({ color: 0x120a12 });
@@ -85,47 +162,23 @@ export class World {
     }
     this.skyline.instanceMatrix.needsUpdate = true;
 
-    // --- Pooled road segments ---
+    // --- Pooled road segments: one merged mesh per material ---
     for (let i = 0; i < R.visibleSegments; i++) {
       const g = new THREE.Group();
+      g.add(new THREE.Mesh(asphaltGeo, asphaltMat));
+      g.add(new THREE.Mesh(dashGeo, dashMat));
+      g.add(new THREE.Mesh(railGeo, railMat));
+      g.add(new THREE.Mesh(sandGeo, sandMat));
 
-      const asphalt = new THREE.Mesh(asphaltGeo, asphaltMat);
-      asphalt.rotation.x = -Math.PI / 2;
-      g.add(asphalt);
-
-      for (let d = 0; d < 6; d++) {
-        const dash = new THREE.Mesh(dashGeo, dashMat);
-        dash.rotation.x = -Math.PI / 2;
-        dash.position.set(0, 0.02, -SEG_LEN / 2 + (d + 0.5) * (SEG_LEN / 6));
-        g.add(dash);
-      }
-
-      for (const side of [-1, 1] as const) {
-        const rail = new THREE.Mesh(railGeo, railMat);
-        rail.position.set(side * 7.35, 0.55, 0);
-        g.add(rail);
-        for (let p = 0; p < 4; p++) {
-          const post = new THREE.Mesh(postGeo, railMat);
-          post.position.set(side * 7.35, 0.35, -SEG_LEN / 2 + (p + 0.5) * (SEG_LEN / 4));
-          g.add(post);
-        }
-      }
-
-      // Streetlight every segment, alternating sides; emissive-looking head, no real light.
+      // Streetlight every segment, alternating sides; emissive-looking head,
+      // no real light. (Side varies per segment, so pole/head stay separate.)
       const lampSide = i % 2 === 0 ? -1 : 1;
       const pole = new THREE.Mesh(poleGeo, poleMat);
-      pole.position.set(lampSide * 7.9, 3, 0);
+      pole.position.set(lampSide * 7.9, 0, 0);
       g.add(pole);
       const head = new THREE.Mesh(headGeo, headMat);
-      head.position.set(lampSide * 7.35, 5.9, 0);
+      head.position.set(lampSide * 7.35, 0, 0);
       g.add(head);
-
-      for (const side of [-1, 1] as const) {
-        const sand = new THREE.Mesh(sandGeo, sandMat);
-        sand.rotation.x = -Math.PI / 2;
-        sand.position.set(side * 20.5, -0.05, 0);
-        g.add(sand);
-      }
 
       g.position.z = -i * SEG_LEN;
       this.segs.push({ mesh: g, z: -i * SEG_LEN });

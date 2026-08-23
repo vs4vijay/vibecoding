@@ -25,7 +25,7 @@ import type { ObstacleKind } from "./obstacles";
 import { ObstaclePool, classifyContact } from "./obstacles";
 import { Scoring } from "./scoring";
 import { Spawner } from "./spawner";
-import type { ZombieSide, ZombieUpdateCtx } from "./zombies";
+import type { Zombie, ZombieSide, ZombieUpdateCtx } from "./zombies";
 import { ZombiePool } from "./zombies";
 
 export type Phase = "title" | "running" | "paused" | "over";
@@ -162,6 +162,9 @@ export class Session {
     number
   >();
   private pendingShots: ZombieSide[] = [];
+  /** Preallocated per-step result buffers: attachedWeight / scrapeSide out. */
+  private readonly weightScratch = { left: 0, right: 0 };
+  private readonly killedScratch: Zombie[] = [];
 
   // Preallocated per-step contexts: zero steady-state allocation.
   private readonly zctx: ZombieUpdateCtx = {
@@ -408,9 +411,9 @@ export class Session {
     if (crashed) return;
 
     // 5) weight sync (absolute set from clingers + injected bonus)
-    const w = this.zombies.attachedWeight(this.car.x);
-    this.car.leftWeight = w.left + this.bonusWeight.left;
-    this.car.rightWeight = w.right + this.bonusWeight.right;
+    this.zombies.attachedWeight(this.car.x, this.weightScratch);
+    this.car.leftWeight = this.weightScratch.left + this.bonusWeight.left;
+    this.car.rightWeight = this.weightScratch.right + this.bonusWeight.right;
     // Flip surfaces as a stepCar event at the top of the next step.
 
     // 6) gun fire edges
@@ -449,7 +452,9 @@ export class Session {
       FX_GOLD,
       10,
     );
-    for (const z of this.zombies.scrapeSide(side)) {
+    this.killedScratch.length = 0;
+    this.zombies.scrapeSide(side, this.killedScratch);
+    for (const z of this.killedScratch) {
       this.registerKill(z.type, true, z.x, z.z);
     }
   }

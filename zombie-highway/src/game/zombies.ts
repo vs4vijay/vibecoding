@@ -135,7 +135,7 @@ export class ZombiePool {
     return spot;
   }
 
-  update(dt: number, ctx: ZombieUpdateCtx): Zombie[] {
+  update(dt: number, ctx: ZombieUpdateCtx): void {
     this.now += dt;
     for (const z of this.zombies) {
       if (!z.active) continue;
@@ -157,7 +157,21 @@ export class ZombiePool {
           break;
       }
     }
-    return this.zombies.filter((z) => z.active);
+  }
+
+  /**
+   * Road rash against one flank; appends the clingers it killed to `out`
+   * (preallocated by the caller — no per-call allocation).
+   */
+  scrapeSide(side: ZombieSide, out: Zombie[]): void {
+    for (const z of this.zombies) {
+      if (!z.active || z.state !== "clinging" || z.side !== side) continue;
+      z.hp -= CONFIG.scrape.dmgToClingers;
+      if (z.hp <= 0) {
+        this.kill(z, true);
+        out.push(z);
+      }
+    }
   }
 
   /**
@@ -181,31 +195,19 @@ export class ZombiePool {
     return this.now < z.recentLeapUntil;
   }
 
-  /** Road rash against one flank; returns the clingers it killed. */
-  scrapeSide(side: ZombieSide): Zombie[] {
-    const killed: Zombie[] = [];
-    for (const z of this.zombies) {
-      if (!z.active || z.state !== "clinging" || z.side !== side) continue;
-      z.hp -= CONFIG.scrape.dmgToClingers;
-      if (z.hp <= 0) {
-        this.kill(z, true);
-        killed.push(z);
-      }
-    }
-    return killed;
-  }
-
-  /** Weight currently hanging off each flank (drives car tilt/flip risk). */
-  attachedWeight(_carX: number): { left: number; right: number } {
-    let left = 0;
-    let right = 0;
+  /**
+   * Weight currently hanging off each flank (drives car tilt/flip risk).
+   * Writes into `out` — preallocated by the caller, no per-call allocation.
+   */
+  attachedWeight(_carX: number, out: { left: number; right: number }): void {
+    out.left = 0;
+    out.right = 0;
     for (const z of this.zombies) {
       if (!z.active || z.state !== "clinging") continue;
       const w = CONFIG.zombies[z.type].weight;
-      if (z.side === "left") left += w;
-      else right += w;
+      if (z.side === "left") out.left += w;
+      else out.right += w;
     }
-    return { left, right };
   }
 
   forEachClinging(fn: (z: Zombie) => void): void {
