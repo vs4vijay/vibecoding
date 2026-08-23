@@ -161,6 +161,34 @@ describe("Session", () => {
     expect(session.gun.left.reloadT).toBeGreaterThan(0);
   });
 
+  it("magazine refills to full after the auto-reload completes", () => {
+    const { session, input } = makeSession(42);
+    session.startRun();
+    const cdSteps = Math.ceil(CONFIG.gun.fireIntervalS / CONFIG.sim.dt);
+
+    // Drain the mag with spaced pulls.
+    let guard = 200;
+    while (session.gun.left.mag > 0 && guard-- > 0) {
+      input.fire("left");
+      for (let i = 0; i < cdSteps; i++) session.update(1 / 60);
+    }
+    expect(session.gun.left.mag).toBe(0);
+
+    // One more pull arms the reload; after reloadS elapses the mag is full.
+    input.fire("left");
+    session.update(1 / 60);
+    expect(session.gun.left.reloadT).toBeGreaterThan(0);
+    for (
+      let t = 0;
+      t < CONFIG.gun.reloadS + 0.25 && session.gun.left.mag === 0;
+      t += 1 / 60
+    ) {
+      session.update(1 / 60);
+    }
+    expect(session.gun.left.mag).toBe(CONFIG.gun.magSize);
+    expect(session.gun.left.reloadT).toBeLessThanOrEqual(0);
+  });
+
   it("fixed-step accumulator is deterministic for equal wall time", () => {
     const a = makeSession(9);
     const b = makeSession(9);

@@ -462,7 +462,11 @@ export class Session {
   private consumeShotEdges(): void {
     for (const side of ["left", "right"] as const) {
       const g = this.gun[side];
-      if (g.reloadT > 0) g.reloadT -= CONFIG.sim.dt;
+      // Auto-reload completes: the magazine refills to full (plan §2.1).
+      if (g.reloadT > 0) {
+        g.reloadT -= CONFIG.sim.dt;
+        if (g.reloadT <= 0) g.mag = CONFIG.gun.magSize;
+      }
       if (this.fireCd[side] > 0) this.fireCd[side] -= CONFIG.sim.dt;
     }
     while (this.pendingShots.length > 0) {
