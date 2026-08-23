@@ -4,8 +4,11 @@ export type FireSide = "left" | "right";
 const TAP_MAX_MS = 200;
 const TAP_MAX_PX = 10;
 
-/** Drag velocity (px/ms) mapped through half-width and this gain to steer. */
+/** Drag steering: exponential moving average toward the sampled velocity,
+ * time-constant ~100 ms — smooths per-sample jitter without added lag feel. */
 const DRAG_STEER_GAIN = 0.01;
+/** EMA time constant for drag steering, seconds. */
+const STEER_TAU_S = 0.1;
 
 /** Keyboard steering magnitude per held key. */
 const KEY_STEER = 1;
@@ -71,6 +74,8 @@ export class InputController {
 
   private readonly canvas: CanvasLike;
   private readonly testHooks: boolean;
+  /** Whether the EMA has a sample since gesture start; -1 = no. */
+  private steerSmoothed = -1;
   private readonly fireCbs = new Set<(side: FireSide) => void>();
   private readonly pauseCbs = new Set<() => void>();
 
@@ -81,6 +86,7 @@ export class InputController {
   private lastY = 0;
   private lastTime = 0;
   private travel = 0;
+
   /** Held steer keys in press order; last entry wins. */
   private readonly heldSteerKeys: string[] = [];
 
@@ -110,6 +116,7 @@ export class InputController {
   press(x: number, y: number, t: number): void {
     if (!this.testHooks || this.pointerId !== null) return;
     this.pointerId = 1; // synthetic primary pointer
+    this.steerSmoothed = -1;
     this.beginGesture(x, y, t);
   }
 
@@ -135,10 +142,17 @@ export class InputController {
 
   // --- Gesture internals shared by DOM events and test hooks. ---
 
-  private applyDragSteer(dx: number, dt: number): void {
-    const vx = dx / dt; // px per ms
+  private applyDragSteer(dx: number, dtMs: number): void {
+    const vx = dx / dtMs; // px per ms
     const halfWidth = this.canvas.clientWidth / 2;
-    this.steer = Math.max(-1, Math.min(1, vx * halfWidth * DRAG_STEER_GAIN));
+    const target = Math.max(-1, Math.min(1, vx * halfWidth * DRAG_STEER_GAIN));
+    // Exponential moving average toward the sampled velocity (~100 ms tau):
+    // raw per-sample velocity is far too twitchy on touch. The first sample
+    // after a gesture start snaps to the target so steering feels immediate.
+    const k = 1 - Math.exp(-dtMs / (STEER_TAU_S * 1000));
+    this.steer =
+      this.steerSmoothed < 0 ? target : this.steer + (target - this.steer) * k;
+    this.steerSmoothed = 1;
   }
 
   private updateKeySteer(): void {
@@ -150,7 +164,8 @@ export class InputController {
     }
   }
 
-  private handleKey(code: string, down: boolean): void {
+  private handleKey(code: string, down: boolean, repeat = false): void {
+    if (repeat) return; // OS key-repeat must not machine-gun the guns
     if (code in STEER_KEYS) {
       const idx = this.heldSteerKeys.indexOf(code);
       if (down) {
@@ -193,6 +208,7 @@ export class InputController {
   private bind(): void {
     const canvas = domOf(this.canvas);
     this.on(canvas, "pointerdown", (ev: PointerEvent) => {
+      if (!ev.isPrimary) return; // multitouch second fingers never steer/fire
       if (this.pointerId !== null) return; // single primary pointer only
       this.pointerId = ev.pointerId;
       canvas.setPointerCapture(ev.pointerId);
@@ -208,13 +224,17 @@ export class InputController {
     });
     this.on(canvas, "pointercancel", (ev: PointerEvent) => {
       if (ev.pointerId !== this.pointerId) return;
-      this.endGesture(ev.timeStamp);
+      // System stole the gesture (scroll/incoming call): no tap-fire, no
+      // lingering steer.
+      this.cancelGesture();
     });
 
     this.on(window, "keydown", (ev: KeyboardEvent) =>
-      this.handleKey(ev.code, true),
+      this.handleKey(ev.code, true, ev.repeat),
     );
-    this.on(window, "keyup", (ev: KeyboardEvent) => this.handleKey(ev.code, false));
+    this.on(window, "keyup", (ev: KeyboardEvent) =>
+      this.handleKey(ev.code, false),
+    );
   }
 
   private unbind(): void {
@@ -252,6 +272,15 @@ export class InputController {
       this.fire(this.downX < this.canvas.clientWidth / 2 ? "left" : "right");
       return;
     }
+    this.steer = 0;
+  }
+
+  /**
+   * A gesture the system took away (pointercancel): never classifies as a
+   * tap — that would fire the gun on an interrupted touch.
+   */
+  private cancelGesture(): void {
+    this.pointerId = null;
     this.steer = 0;
   }
 }

@@ -44,6 +44,7 @@ export function boot(): void {
     emitter,
     render: { scene, camera, shake: (i: number) => rig.shake(i) },
   });
+  rig.resetDeathCam();
 
   // Persistence snapshot for this session.
   let bestScore = load("bestScore", 0);
@@ -80,6 +81,7 @@ export function boot(): void {
     audio.levelUpSting();
     hud.toast(`LEVEL ${level}`);
   });
+  emitter.on("gameOver", () => rig.armDeathCam());
 
   emitter.on("gameOver", (stats) => {
     audio.crashSting();
@@ -106,6 +108,7 @@ export function boot(): void {
     audio.uiClick();
     menus.hideAll();
     hud.show();
+    rig.resetDeathCam();
     session.startRun();
     if (coachWanted) {
       coachActive = true;

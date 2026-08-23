@@ -8,6 +8,8 @@ const DEAD_SINK_M = 1.6;
 const BRUTE_SCALE = 1.5;
 const HEAD_COLOR = 0x93a06a;
 const SKIN_COLOR = 0x5f7350;
+const HEAD_MAT = new THREE.MeshLambertMaterial({ color: HEAD_COLOR });
+const SKIN_MAT = new THREE.MeshLambertMaterial({ color: SKIN_COLOR });
 
 const TORSO_COLOR: Record<ZombieType, number> = {
   walker: 0x6b7d4f,
@@ -15,17 +17,22 @@ const TORSO_COLOR: Record<ZombieType, number> = {
   brute: 0x8b3a2e,
 };
 
-const TORSO_MAT: Record<ZombieType, THREE.MeshLambertMaterial> = {
-  walker: new THREE.MeshLambertMaterial({ color: TORSO_COLOR.walker }),
-  runner: new THREE.MeshLambertMaterial({ color: TORSO_COLOR.runner }),
-  brute: new THREE.MeshLambertMaterial({ color: TORSO_COLOR.brute }),
+/** Per-type torso tints applied via instanceColor (white base material). */
+const TORSO_TINT: Record<ZombieType, THREE.Color> = {
+  walker: new THREE.Color(TORSO_COLOR.walker),
+  runner: new THREE.Color(TORSO_COLOR.runner),
+  brute: new THREE.Color(TORSO_COLOR.brute),
 };
+/** Shared torso material; the per-instance color carries the type tint. */
+const TORSO_MAT = new THREE.MeshLambertMaterial({ color: 0xffffff });
+
+/** Shared scratch transform for composing instance matrices. */
+const SCRATCH = new THREE.Object3D();
 
 type Slot = {
-  root: THREE.Group;
-  torso: THREE.Mesh;
-  head: THREE.Mesh;
-  arms: THREE.Mesh[];
+  torso: THREE.InstancedMesh;
+  head: THREE.InstancedMesh;
+  arms: [THREE.InstancedMesh, THREE.InstancedMesh];
 };
 
 export type ZombieBindings = {
@@ -33,8 +40,9 @@ export type ZombieBindings = {
 };
 
 /**
- * One static mesh rig per pool slot (stable objects — bind once, mutate
- * transforms after). Torso + head + two arm boxes; brute slots scale 1.5.
+ * Four InstancedMesh body parts (torso/head/armL/armR), `capacity` instances
+ * each: the whole horde costs 4 draw calls instead of 4 per zombie. Slot i
+ * owns instance i of every part; poses compose into a scratch Object3D.
  */
 export function createZombieMeshes(
   scene: THREE.Scene,
@@ -43,37 +51,32 @@ export function createZombieMeshes(
   const torsoGeo = new THREE.BoxGeometry(0.5, 0.9, 0.3);
   const headGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
   const armGeo = new THREE.BoxGeometry(0.14, 0.62, 0.14);
-
-  const headMat = new THREE.MeshLambertMaterial({ color: HEAD_COLOR });
-  const skinMat = new THREE.MeshLambertMaterial({ color: SKIN_COLOR });
-
+  const torsoMesh = new THREE.InstancedMesh(torsoGeo, TORSO_MAT, capacity);
+  const headMesh = new THREE.InstancedMesh(headGeo, HEAD_MAT, capacity);
+  const armLMesh = new THREE.InstancedMesh(armGeo, SKIN_MAT, capacity);
+  const armRMesh = new THREE.InstancedMesh(armGeo, SKIN_MAT, capacity);
+  for (const m of [torsoMesh, headMesh, armLMesh, armRMesh]) {
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    m.frustumCulled = false; // instances span the visible band
+    scene.add(m);
+  }
   const slots: Slot[] = [];
   for (let i = 0; i < capacity; i++) {
-    const root = new THREE.Group();
-    const torso = new THREE.Mesh(torsoGeo, TORSO_MAT.walker);
-    torso.position.y = 0.85;
-    const head = new THREE.Mesh(headGeo, headMat);
-    head.position.y = 1.48;
-    const armL = new THREE.Mesh(armGeo, skinMat);
-    const armR = new THREE.Mesh(armGeo, skinMat);
-    armL.position.set(-0.34, 1.15, 0);
-    armR.position.set(0.34, 1.15, 0);
-    root.add(torso, head, armL, armR);
-    root.visible = false;
-    scene.add(root);
-    slots.push({ root, torso, head, arms: [armL, armR] });
+    slots.push({
+      torso: torsoMesh,
+      head: headMesh,
+      arms: [armLMesh, armRMesh],
+    });
   }
   return { slots };
 }
 
 /**
- * Per-frame binding for every slot. Poses:
- * cling — arms up gripping the car flank with a per-slot bob; telegraph —
- * squash to y*0.7; dead — tumble rotation and sink below the road; else
- * upright sprint lean with pumping arms.
- *
- * Pool x/z are car-relative; placed into world space around (carX, carZ).
- * Iterates pool order so slot i always binds pool slot i (stable indices).
+ * Per-frame binding: compose every active zombie's part matrices from pool
+ * state. Poses: cling — arms up gripping the car flank with a per-slot bob;
+ * telegraph — squash to y*0.7; dead — tumble rotation and sink below the
+ * road; else upright sprint lean with pumping arms. Slot i owns instance i
+ * of each part (stable indices); unused instances park under the road.
  */
 export function updateZombieMeshes(
   bindings: ZombieBindings,
@@ -82,13 +85,42 @@ export function updateZombieMeshes(
   carZ: number,
   nowS: number,
 ): void {
-  let i = 0;
-  for (const z of zombies.allSlots()) bind(bindings.slots[i++], z, carX, carZ, nowS);
-  for (; i < bindings.slots.length; i++) bindings.slots[i].root.visible = false;
+  const parts = bindings.slots[0];
+  let used = 0;
+  for (const z of zombies.allSlots()) {
+    if (!z.active) continue;
+    bind(parts, z, carX, carZ, nowS, used);
+    used++;
+  }
+  // Unused instances park under the road.
+  for (let i = used; i < bindings.slots.length; i++) {
+    hideInstance(parts, i);
+  }
+  for (const m of [parts.torso, parts.head, parts.arms[0], parts.arms[1]]) {
+    m.instanceMatrix.needsUpdate = true;
+  }
+  if (parts.torso.instanceColor) parts.torso.instanceColor.needsUpdate = true;
 }
-/** Hides every slot; called on run reset. */
+
+/** Hides every zombie; called on run reset. */
 export function resetZombieMeshes(bindings: ZombieBindings): void {
-  for (const slot of bindings.slots) slot.root.visible = false;
+  const parts = bindings.slots[0];
+  for (let i = 0; i < bindings.slots.length; i++) hideInstance(parts, i);
+  for (const m of [parts.torso, parts.head, parts.arms[0], parts.arms[1]]) {
+    m.instanceMatrix.needsUpdate = true;
+  }
+}
+
+/** Park instance i below the road so it never shades a pixel. */
+function hideInstance(parts: Slot, i: number): void {
+  SCRATCH.position.set(0, -50, 0);
+  SCRATCH.rotation.set(0, 0, 0);
+  SCRATCH.scale.set(1, 1, 1);
+  SCRATCH.updateMatrix();
+  parts.torso.setMatrixAt(i, SCRATCH.matrix);
+  parts.head.setMatrixAt(i, SCRATCH.matrix);
+  parts.arms[0].setMatrixAt(i, SCRATCH.matrix);
+  parts.arms[1].setMatrixAt(i, SCRATCH.matrix);
 }
 
 function bind(
@@ -97,54 +129,64 @@ function bind(
   carX: number,
   _carZ: number,
   nowS: number,
+  index: number,
 ): void {
-  if (!z.active) {
-    slot.root.visible = false;
-    return;
-  }
-  slot.root.visible = true;
-  slot.torso.material = TORSO_MAT[z.type];
+  slot.torso.setColorAt(index, TORSO_TINT[z.type]);
   const brute = z.type === "brute" ? BRUTE_SCALE : 1;
   // Pool x is car-relative for clingers (flank offset) and road-space for
   // everyone else; pool z is already world space (spawner/cling math).
   const worldX = z.state === "clinging" ? carX + z.x : z.x;
-  slot.root.position.set(worldX, z.y, z.z);
-  slot.root.scale.set(brute, brute, brute);
-  slot.root.rotation.set(0, 0, 0);
+  SCRATCH.position.set(worldX, z.y, z.z);
+  SCRATCH.rotation.set(0, 0, 0);
+  SCRATCH.scale.set(brute, brute, brute);
+  if (z.state === "telegraphing") SCRATCH.scale.y *= 0.7;
+
+  // Arm pose per state; running pumps, clinging grips overhead.
+  let armPitchL = 0.2;
+  let armPitchR = -0.2;
+  let armY = 1.05;
   if (z.state === "clinging") {
-    poseClinging(slot, z, nowS);
+    // Arms up over the head gripping the hull; bob phase keyed by zombie id.
+    SCRATCH.position.y += Math.max(Math.sin(nowS * 9 + z.id * 2.1) * 0.08, 0);
+    armPitchL = Math.PI * 0.95;
+    armPitchR = Math.PI * 0.95;
+    armY = 1.55;
   } else if (z.state === "dead") {
-    poseDead(slot, z);
+    // Ragdoll: pitch/tumble by deathT, sinking under the road as it decays.
+    SCRATCH.rotation.x = z.deathT * 6;
+    SCRATCH.rotation.z = z.deathT * 3.5;
+    SCRATCH.position.y -= Math.min(z.deathT / DEATH_TUMBLE_S, 1) * DEAD_SINK_M;
   } else {
-    poseRunning(slot, z, nowS);
-    if (z.state === "telegraphing") slot.root.scale.y *= 0.7;
+    // Upright sprint: slight forward lean, arms pumping back in antiphase.
+    const pump = Math.sin(nowS * 11 + z.id) * 0.63;
+    armPitchL = pump;
+    armPitchR = -pump;
+    SCRATCH.rotation.x = 0.18;
   }
+
+  SCRATCH.updateMatrix();
+  slot.torso.setMatrixAt(index, SCRATCH.matrix);
+
+  SCRATCH.position.y += 1.48;
+  SCRATCH.updateMatrix();
+  slot.head.setMatrixAt(index, SCRATCH.matrix);
+  SCRATCH.position.y -= 1.48;
+
+  placeArm(slot.arms[0], index, worldX + 0.34, armY, armPitchL);
+  placeArm(slot.arms[1], index, worldX - 0.34, armY, armPitchR);
 }
 
-function poseClinging(slot: Slot, z: Zombie, nowS: number): void {
-  // Arms up over the head gripping the hull; bob phase keyed by zombie id.
-  slot.root.position.y += Math.max(Math.sin(nowS * 9 + z.id * 2.1) * 0.08, 0);
-  for (const arm of slot.arms) {
-    arm.rotation.set(Math.PI * 0.95, 0, 0);
-    arm.position.y = 1.55;
-  }
-  slot.head.rotation.x = -0.25;
-}
-
-/** Ragdoll: pitch/tumble by deathT, sinking under the road as it decays. */
-function poseDead(slot: Slot, z: Zombie): void {
-  slot.root.rotation.x = z.deathT * 6;
-  slot.root.rotation.z = z.deathT * 3.5;
-  slot.root.position.y -= Math.min(z.deathT / DEATH_TUMBLE_S, 1) * DEAD_SINK_M;
-}
-
-/** Upright sprint: slight forward lean, arms pumping back. */
-function poseRunning(slot: Slot, z: Zombie, nowS: number): void {
-  const pump = Math.sin(nowS * 11 + z.id) * 0.7;
-  slot.arms[0].rotation.set(pump * 0.9, 0, 0.2);
-  slot.arms[1].rotation.set(-pump * 0.9, 0, -0.2);
-  slot.arms[0].position.y = 1.05;
-  slot.arms[1].position.y = 1.05;
-  slot.head.rotation.x = 0;
-  slot.root.rotation.x = 0.18;
+/** Compose one arm instance from its local offset relative to the torso base. */
+function placeArm(
+  mesh: THREE.InstancedMesh,
+  index: number,
+  x: number,
+  y: number,
+  pitch: number,
+): void {
+  SCRATCH.position.x = x;
+  SCRATCH.position.y = y;
+  SCRATCH.rotation.set(pitch, 0, 0);
+  SCRATCH.updateMatrix();
+  mesh.setMatrixAt(index, SCRATCH.matrix);
 }

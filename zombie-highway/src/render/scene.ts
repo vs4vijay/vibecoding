@@ -7,10 +7,19 @@ export type GameScene = {
   renderer: THREE.WebGLRenderer;
 };
 
+/**
+ * True when the viewport is portrait-ish; drives the wider fov base in both
+ * resize paths so orientation changes reframe instead of cropping.
+ */
+const isPortrait = (aspect: number): boolean => aspect < 1;
+
 /** Renderer, dusk-lit scene with fog + gradient sky dome, and the game camera. */
 export function createGameScene(canvas: HTMLCanvasElement): GameScene {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setClearColor(new THREE.Color(CONFIG.world.duskColor), 1);
+  // Cap at DPR 2: beyond that fill-rate cost swamps phones without a
+  // visible sharpness gain.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
 
   const scene = new THREE.Scene();
@@ -48,7 +57,9 @@ export function createGameScene(canvas: HTMLCanvasElement): GameScene {
   scene.add(sun);
 
   const camera = new THREE.PerspectiveCamera(
-    CONFIG.camera.fovBase,
+    // Aspect-compensated base: portrait gets a wider lens so the road stays
+    // framed; the rig's speed kick lerps up from whatever base this returns.
+    window.innerWidth / window.innerHeight < 1 ? 74 : CONFIG.camera.fovBase,
     window.innerWidth / window.innerHeight,
     CONFIG.camera.near,
     CONFIG.camera.far,
@@ -56,12 +67,18 @@ export function createGameScene(canvas: HTMLCanvasElement): GameScene {
   camera.add(sky);
   scene.add(camera);
 
-  const resize = () => {
+  const onResize = () => {
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const aspect = window.innerWidth / window.innerHeight;
+    camera.aspect = aspect;
+    camera.fov = isPortrait(aspect) ? 74 : CONFIG.camera.fovBase;
     camera.updateProjectionMatrix();
   };
-  window.addEventListener("resize", resize);
+  // visualViewport fires on rotate/split-view where window.resize can lag or
+  // skip; listen to both and let idempotent updates absorb duplicates.
+  window.visualViewport?.addEventListener("resize", onResize);
+  window.addEventListener("resize", onResize);
 
   return { scene, camera, renderer };
 }
