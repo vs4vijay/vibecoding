@@ -6,6 +6,7 @@ import { Emitter } from "../src/core/emitter";
 import type { GameEvents } from "../src/game/session";
 import { Session } from "../src/game/session";
 import { knobsForLevel } from "../src/game/difficulty";
+import { CONFIG } from "../src/config";
 
 /** Minimal headless input double satisfying the Session input contract. */
 function fakeInput() {
@@ -47,7 +48,6 @@ describe("final review fixes", () => {
     expect(session.phase).toBe("running");
   });
 
-
   it("I2: L1 spawner spawns only walkers across a ~60s headless sim", () => {
     const seen = new Map<string, number>();
     let allWalkers = true;
@@ -67,5 +67,22 @@ describe("final review fixes", () => {
     expect(seen.get("walker") ?? 0).toBeGreaterThan(0);
     expect(allWalkers).toBe(true);
     expect(knobsForLevel(1).types).toEqual(["walker"]);
+  });
+
+  it("NB2: obstacle graze emits a scrape event (audio bed re-arm)", () => {
+    const input = fakeInput();
+    const emitter = new Emitter<GameEvents>();
+    const scrapes: string[] = [];
+    emitter.on("scrape", (side) => scrapes.push(side));
+    const session = new Session({ input, emitter, render: null, seed: 3 });
+    session.startRun();
+    // A wreck half-lapped by the car's flank: lateral offset inside the graze
+    // window (headOn + 0.55m slack) but clear of the head-on band.
+    session.spawnObstacleForTest("wreck", CONFIG.car.halfWidth + 1.1, 0);
+    for (let i = 0; i < 10 && scrapes.length === 0; i++) {
+      session.update(1 / 60);
+    }
+    expect(scrapes.length).toBeGreaterThan(0);
+    expect(session.phase).toBe("running"); // grazed, not crashed
   });
 });

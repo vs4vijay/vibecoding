@@ -441,6 +441,7 @@ export class Session {
       CONFIG.car.speedFloor,
       this.car.speed - CONFIG.car.scrapeSpeedLoss,
     );
+    this.emitter.emit("scrape", side);
     this.render?.shake?.(0.15);
     this.view?.fx.burst(
       this.car.x + (side === "left" ? -1 : 1),
