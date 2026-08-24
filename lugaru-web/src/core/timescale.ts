@@ -3,9 +3,9 @@
  *
  * update(realDtMs) returns the effective dt multiplier for THIS frame:
  * - hitstop consumes real dt first; a frame that outlasts the remaining
- *   freeze runs at full speed;
- * - slow-mo then scales the frame and decays linearly back to 1 across its
- *   remaining duration, easing out instead of snapping off.
+ *   freeze runs its leftover dt through normal scaling;
+ * - slow-mo scales that leftover dt and decays linearly back to 1 across
+ *   its remaining duration, easing out instead of snapping off.
  */
 export class Timescale {
   value = 1;
@@ -23,25 +23,29 @@ export class Timescale {
   slowmo(scale: number, durationMs: number): void {
     this.slowScale = scale;
     this.slowDurationMs = durationMs;
-    this.slowMsLeft = Math.max(this.slowMsLeft, durationMs);
+    this.slowMsLeft = durationMs; // a fresh slowmo replaces any carried state
   }
 
   /** Returns the effective dt multiplier for this frame. */
   update(realDtMs: number): number {
+    // Hitstop consumes real dt first; slow-mo decays only across the remainder.
+    let dt = realDtMs;
     if (this.hitstopMsLeft > 0) {
-      this.hitstopMsLeft = Math.max(0, this.hitstopMsLeft - realDtMs);
+      const consumed = Math.min(this.hitstopMsLeft, dt);
+      this.hitstopMsLeft -= consumed;
+      dt -= consumed;
       if (this.hitstopMsLeft > 0) {
         this.value = 0;
         return 0;
       }
-      // Expired mid-frame: this frame runs at full speed.
+      // Freeze expired mid-frame: frame continues with the leftover dt.
     }
     let multiplier = 1;
     if (this.slowMsLeft > 0) {
       const elapsed = this.slowDurationMs - this.slowMsLeft;
       const t = Math.min(elapsed / this.slowDurationMs, 1);
       multiplier = this.slowScale + (1 - this.slowScale) * t;
-      this.slowMsLeft = Math.max(0, this.slowMsLeft - realDtMs);
+      this.slowMsLeft = Math.max(0, this.slowMsLeft - dt);
     }
     this.value = multiplier;
     return multiplier;
