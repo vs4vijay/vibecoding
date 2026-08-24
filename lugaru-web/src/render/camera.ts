@@ -49,14 +49,16 @@ export class ChaseCamera {
       targetPos.z + this.offset.z,
     );
 
-    // Terrain clearance: never sink under the ground at (x, z).
-    const ground = heightAt(this.desired.x, this.desired.z) + 0.4;
-    if (this.desired.y < ground) this.desired.y = ground;
-
     // Framerate-independent follow: fraction of remaining gap closed per
     // frame is `1 - exp(-12·dt)`.
     const k = 1 - Math.exp(-12 * dtSec);
     this.camera.position.lerp(this.desired, k);
+
+    // Post-lerp clearance: smoothing overshoot can leave the real camera
+    // below the floor even when `desired` was clamped, so re-clamp here
+    // against the camera's FINAL x/z.
+    const minY = heightAt(this.camera.position.x, this.camera.position.z) + 0.4;
+    if (this.camera.position.y < minY) this.camera.position.y = minY;
 
     this.camera.lookAt(targetPos.x, headY, targetPos.z + Math.sin(targetHeading));
   }

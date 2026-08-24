@@ -77,13 +77,32 @@ describe('InputManager', () => {
     key('keyup', 'ArrowLeft');
   });
 
-  it('mousemove accumulates movementX/Y into lookDX/DY and clears on sample', () => {
+  it('mousemove accumulates movementX/Y into lookDX/DY and clears on sample (while locked)', () => {
+    lockTo(el);
     mouse('mousemove', { movementX: 12, movementY: -4 });
     mouse('mousemove', { movementX: -2, movementY: 6 });
     let f = input.sample();
     expect(f.lookDX).toBe(10);
     expect(f.lookDY).toBe(2);
     f = input.sample();
+    expect(f.lookDX).toBe(0);
+    expect(f.lookDY).toBe(0);
+    unlock();
+  });
+
+  it('unlocked mousemove produces zero look delta', () => {
+    expect(input.isLocked).toBe(false);
+    mouse('mousemove', { movementX: 50, movementY: 25 });
+    const f = input.sample();
+    expect(f.lookDX).toBe(0);
+    expect(f.lookDY).toBe(0);
+  });
+
+  it('pointer-lock loss clears pending look deltas', () => {
+    lockTo(el);
+    mouse('mousemove', { movementX: 30, movementY: -10 }); // pending
+    unlock(); // fires pointerlockchange with cleared element
+    const f = input.sample();
     expect(f.lookDX).toBe(0);
     expect(f.lookDY).toBe(0);
   });
@@ -124,6 +143,24 @@ describe('InputManager', () => {
     expect(() => document.dispatchEvent(new Event('pointerlockchange'))).not.toThrow();
     expect(input.isLocked).toBe(false);
   });
+
+  /** Simulate acquiring pointer lock on `target` (jsdom has no impl). */
+  function lockTo(target: HTMLDivElement): void {
+    Object.defineProperty(document, 'pointerLockElement', {
+      value: target,
+      configurable: true,
+    });
+    document.dispatchEvent(new Event('pointerlockchange'));
+  }
+
+  /** Simulate losing pointer lock. */
+  function unlock(): void {
+    Object.defineProperty(document, 'pointerLockElement', {
+      value: null,
+      configurable: true,
+    });
+    document.dispatchEvent(new Event('pointerlockchange'));
+  }
 
   it('requestPointerLock is safe when unsupported (jsdom)', () => {
     expect(() => input.requestPointerLock()).not.toThrow();

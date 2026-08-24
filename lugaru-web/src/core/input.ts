@@ -150,6 +150,8 @@ export class InputManager {
   }
 
   private onMouseMove(e: MouseEvent): void {
+    // Unlocked cursor movement over the page must not orbit the camera.
+    if (!this.isLocked) return;
     this.accDX += e.movementX ?? 0;
     this.accDY += e.movementY ?? 0;
   }
@@ -157,7 +159,12 @@ export class InputManager {
   private onPointerLockChange(): void {
     // State is derived (isLocked getter); nothing to do here. Loss must not
     // throw or log — the game simply keeps running unlocked.
+    if (!this.isLocked) {
+      this.accDX = 0;
+      this.accDY = 0;
+    }
   }
+
 
   /** Window blur: drop all held state so keys/buttons don't stick. */
   private blur(): void {
@@ -165,5 +172,7 @@ export class InputManager {
     this.pressedKeys.clear();
     this.pressedButtons.clear();
     this.buttons.clear();
+    this.accDX = 0;
+    this.accDY = 0;
   }
 }

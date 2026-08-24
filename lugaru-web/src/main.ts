@@ -19,7 +19,10 @@ async function boot() {
 
     const camera3d = new THREE.PerspectiveCamera(60, 1, 0.1, 300);
     const chaseCam = new ChaseCamera(camera3d);
-    const debug = new DebugStats(document.getElementById('app')!);
+    // F3 overlay is a dev-only aid; excluded from production builds.
+    const debug = import.meta.env.DEV
+      ? new DebugStats(document.getElementById('app')!)
+      : null;
 
     const input = new InputManager();
     input.attach(canvas);
@@ -47,14 +50,16 @@ async function boot() {
 
       const frame = input.sample();
       chaseCam.update(realDtMs / 1000, target, 0, frame.lookDX, frame.lookDY);
-      debug.frame(realDtMs);
+      debug?.frame(realDtMs);
       renderer.render(scene, camera3d);
     }
     requestAnimationFrame(tick);
 
-    // Verification hook: read-only handles for browser tooling (removed when
-    // the real player controller lands).
-    (window as unknown as Record<string, unknown>).__lugaru = { chaseCam, debug };
+    if (import.meta.env.DEV) {
+      // Verification hook: read-only handles for browser tooling (removed
+      // when the real player controller lands). Dev builds only.
+      (window as unknown as Record<string, unknown>).__lugaru = { chaseCam, debug };
+    }
   } catch (err) {
     errors.show('Failed to start', String(err));
   }
