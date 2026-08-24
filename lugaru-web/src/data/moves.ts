@@ -24,7 +24,7 @@ import type { MoveDef, MoveId } from '../combat/types';
 /** Reversal impact sits at the end of startup+active; counters see ±120ms. */
 const COUNTER_HALF_WIDTH_MS = 120;
 
-export const MOVES: Record<MoveId, MoveDef> = {
+export const MOVES: Record<string, MoveDef> = {
   // -------------------------------------------------------------------------
   // Attack-button moves
   // -------------------------------------------------------------------------
@@ -187,9 +187,10 @@ export const MOVES: Record<MoveId, MoveDef> = {
   },
 
   /**
-   * Mid-air flip: stuns nearby attackers ~1.5s within a 3m radius and cancels
-   * air-grabs [spec §3.1 footnote]. Timing handled by Task 14 effects; the
-   * stun duration/radius live here as data.
+   * Mid-air flip: stuns nearby attackers within a 3m radius and cancels
+   * air-grabs [spec §3.1 footnote]. Stun duration lives in tuning.ts
+   * (FLIP_STUN_MS) — Task 14's effect layer reads it from there; recoveryMs
+   * is deliberately NOT overloaded with the stun value.
    */
   flip: {
     id: 'flip',

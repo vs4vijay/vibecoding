@@ -19,6 +19,11 @@ import type {
   WorldContext,
 } from './types';
 import { MOVES } from '../data/moves';
+import {
+  LEG_CANNON_AHEAD_HALF_RAD,
+  REVERSE_PRESS_WINDOW_MS,
+  STEALTH_BEHIND_HALF_RAD,
+} from '../data/tuning';
 
 // Snapshot types re-exported so consumers import the whole resolver surface
 // from one module (types.ts remains the owning declaration).
@@ -32,17 +37,6 @@ export type {
   WorldContext,
 } from './types';
 
-/**
- * Crouch presses longer than this are held state (sneak), not a timed
- * reverse attempt [spec §3.2 "timed press = reverse"].
- */
-const REVERSE_PRESS_MAX_MS = 250;
-
-/** Facing cone for stealth kills: |relAngle| at least this = behind. */
-const BEHIND_RAD = Math.PI - 0.6;
-
-/** Facing half-cone for the leg-cannon dive: target must be ahead. */
-const AHEAD_HALF_RAD = 1.0;
 
 export function resolveAction(
   input: { button: ActionButton; heldAttack?: boolean },
@@ -66,7 +60,7 @@ export function resolveAction(
 function resolveAttack(
   input: { button: ActionButton; heldAttack?: boolean },
   a: CombatantSnapshot,
-): ResolveResult {
+): ResolveResult | null {
   const t = a.nearestTarget;
 
   // Stealth kill outranks every other attack resolution [spec §3.7].
@@ -93,9 +87,13 @@ function resolveAttack(
     return { kind: 'move', id: 'wallKick' };
   }
 
-  // Stance table.
+  // Stance table — crouched sweep and running kick are unconditional rows.
   if (a.stance === 'crouched') return { kind: 'move', id: 'legSweep' };
   if (a.isRunning || a.stance === 'running') return { kind: 'move', id: 'runningKick' };
+
+  // Standing punch needs a target in reach; bare open-field presses do
+  // nothing [spec §3.1 last row].
+  if (!t || t.dist > MOVES.punch.rangeM) return null;
   return { kind: 'move', id: 'punch' };
 }
 
@@ -110,8 +108,8 @@ function resolveJump(a: CombatantSnapshot, ctx: WorldContext): ResolveResult {
   if (
     (a.isRunning || a.stance === 'running') &&
     t &&
-    t.relAngle >= -AHEAD_HALF_RAD &&
-    t.relAngle <= AHEAD_HALF_RAD &&
+    t.relAngle >= -LEG_CANNON_AHEAD_HALF_RAD &&
+    t.relAngle <= LEG_CANNON_AHEAD_HALF_RAD &&
     t.dist <= MOVES.legCannon.rangeM
   ) {
     return { kind: 'move', id: 'legCannon' };
@@ -126,6 +124,10 @@ function resolveJump(a: CombatantSnapshot, ctx: WorldContext): ResolveResult {
 // ---------------------------------------------------------------------------
 
 function resolveCrouch(a: CombatantSnapshot, ctx: WorldContext): ResolveResult | null {
+  // Mid-air flip: both canonical triggers land here — jump-air via
+  // resolveJump, crouch-air per the plan's context table row.
+  if (ctx.airborneSelf || a.stance === 'airborne') return { kind: 'move', id: 'flip' };
+
   // Reversal: timed crouch press vs an incoming attack inside its reversal
   // window while facing back at the attacker [spec §3.2]. Long-held crouch
   // is sneak state, not a reverse attempt.
@@ -177,7 +179,7 @@ function findReversal(a: CombatantSnapshot): { kind: 'reverse'; targetId: string
 
 /** True for a timed press: fresh enough to count as a reverse attempt. */
 function isFreshCrouchPress(a: CombatantSnapshot): boolean {
-  return a.crouchHeldMs <= REVERSE_PRESS_MAX_MS;
+  return a.crouchHeldMs <= REVERSE_PRESS_WINDOW_MS;
 }
 
 /** True while the button is physically down at all (suppresses chaining). */
@@ -188,5 +190,5 @@ function isCrouchDown(a: CombatantSnapshot): boolean {
 /** True when target stands behind us (|relAngle| beyond the front cone). */
 function isBehind(t: TargetSnapshot): boolean {
   const abs = t.relAngle < 0 ? -t.relAngle : t.relAngle;
-  return abs >= BEHIND_RAD;
+  return abs >= STEALTH_BEHIND_HALF_RAD;
 }

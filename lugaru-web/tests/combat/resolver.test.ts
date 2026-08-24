@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MOVES } from '../../src/data/moves';
+import { FLIP_STUN_MS } from '../../src/data/tuning';
 import { resolveAction } from '../../src/combat/resolver';
 import type {
   CombatantSnapshot,
@@ -40,7 +41,7 @@ function makeTarget(
 ): TargetSnapshot {
   return {
     id: 'wolf1',
-    dist: 1.5, // inside every move's rangeM
+    dist: 1.2, // inside punch.rangeM (1.4), the tightest gate
     relAngle: 0, // dead ahead
     stance: 'standing',
     isDowned: false,
@@ -63,8 +64,11 @@ function expectReverse(a: ResolveResult | null, targetId: string): void {
 }
 
 describe('attack button', () => {
-  it('standing → punch', () => {
-    expectMove(resolveAction({ button: 'attack' }, makeActor(), NO_CTX), 'punch');
+  it('standing with in-range target → punch', () => {
+    expectMove(
+      resolveAction({ button: 'attack' }, makeActor({ nearestTarget: makeTarget() }), NO_CTX),
+      'punch',
+    );
   });
 
   it('running → runningKick', () => {
@@ -161,13 +165,13 @@ describe('attack button', () => {
     expectMove(a, 'punch');
   });
 
-  it('out-of-range target → whiff punch (range gate)', () => {
+  it('out-of-range standing target → nothing (punch range gate)', () => {
     const a = resolveAction(
       { button: 'attack' },
-      makeActor({ nearestTarget: makeTarget({ dist: 99, stance: 'airborne' }) }),
+      makeActor({ nearestTarget: makeTarget({ dist: 99 }) }),
       NO_CTX,
     );
-    expectMove(a, 'punch');
+    expect(a).toBeNull();
   });
 });
 
@@ -185,6 +189,10 @@ describe('jump button', () => {
       ),
       'flip',
     );
+  });
+
+  it('grounded jump does NOT flip (airborne gate, not button)', () => {
+    expectMove(resolveAction({ button: 'jump' }, makeActor(), NO_CTX), 'jump');
   });
 
   it('crouched → hop (low hop, no full jump)', () => {
@@ -376,16 +384,27 @@ describe('crouch button — reverse / context / slide-stop', () => {
     );
     expect(a).toBeNull();
   });
+
+  it('airborne + crouch pressed → flip (second canonical trigger path)', () => {
+    const a = resolveAction(
+      { button: 'crouch' },
+      makeActor({ stance: 'airborne' }),
+      { ...NO_CTX, airborneSelf: true },
+    );
+    expectMove(a, 'flip');
+  });
+
+  it('grounded crouch press does NOT flip (airborne gate)', () => {
+    // Grounded standing crouch with no context is a null duck, never a flip.
+    const a = resolveAction({ button: 'crouch' }, makeActor(), NO_CTX);
+    expect(a).toBeNull();
+  });
 });
 
 describe('resolver ordering and purity', () => {
   it('nothing applies: attack with no target/context → null (never throws)', () => {
-    const a = resolveAction(
-      { button: 'attack' },
-      makeActor({ nearestTarget: makeTarget({ dist: 99, stance: 'airborne' }) }),
-      NO_CTX,
-    );
-    expect(a).toEqual({ kind: 'move', id: 'punch' });
+    const a = resolveAction({ button: 'attack' }, makeActor(), NO_CTX);
+    expect(a).toBeNull();
   });
 
   it('stealthKill beats other attack resolutions (priority order)', () => {
@@ -434,7 +453,8 @@ describe('MOVES table integrity', () => {
       'slideStop', 'stealthKill', 'bodyThrow', 'cleanBlade',
     ];
     for (const id of emitted) expect(MOVES[id]).toBeDefined();
-    expect(MOVES['reverseAttempt' as MoveId]).toBeUndefined(); // not a table move
+    // reverseAttempt is in the union but has no table row (outcome, not clip).
+    expect(MOVES.reverseAttempt).toBeUndefined();
   });
 
   it('timing phases sum to the documented total per combat move', () => {
@@ -443,7 +463,7 @@ describe('MOVES table integrity', () => {
       soccerKick: 400, airGrab: 600, legCannon: 700, doublePunch: 500,
     };
     for (const [id, total] of Object.entries(totals)) {
-      const m = MOVES[id as MoveId]!;
+      const m = MOVES[id]!;
       expect(`${id}=${m.startupMs + m.activeMs + m.recoveryMs}`).toBe(`${id}=${total}`);
     }
   });
@@ -485,7 +505,15 @@ describe('MOVES table integrity', () => {
       soccerKick: 12, airGrab: 20, legCannon: 30, tackle: 5,
     };
     for (const [id, expected] of Object.entries(dmg)) {
-      expect(MOVES[id as MoveId]!.damage).toBe(expected);
+      expect(MOVES[id]!.damage).toBe(expected);
     }
+  });
+});
+
+describe('tuning constants', () => {
+  it('flip stun duration is the canonical 1500ms from tuning.ts', () => {
+    expect(FLIP_STUN_MS).toBe(1500);
+    // The flip table row must NOT smuggle the stun into its timing phases.
+    expect(MOVES.flip.recoveryMs).not.toBe(FLIP_STUN_MS);
   });
 });

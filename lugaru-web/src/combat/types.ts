@@ -16,10 +16,11 @@ export type Stance = 'standing' | 'running' | 'crouched' | 'airborne';
 export type ActionButton = 'attack' | 'jump' | 'crouch';
 
 /**
- * Every move the resolver can emit. `reverseAttempt` is an outcome of
- * resolveAction ({kind:'reverse'}), not a table move — hence absent from
- * MOVES. Armed moves (`slash`, `stab`, `staffVert`, `staffHoriz`) are Task
- * 13's dispatch to add to this union and the table.
+ * Every move the resolver can emit. `reverseAttempt` sits in the union for
+ * contract completeness (Task 7 state machine consumes it) but has no MOVES
+ * row — a reversal is an outcome ({kind:'reverse'}), not a played clip.
+ * Armed moves (`slash`, `stab`, `staffVert`, `staffHoriz`) are Task 13's
+ * dispatch to add to this union and the table.
  */
 export type MoveId =
   | 'punch'
@@ -38,7 +39,8 @@ export type MoveId =
   | 'slideStop'
   | 'stealthKill'
   | 'bodyThrow'
-  | 'cleanBlade';
+  | 'cleanBlade'
+  | 'reverseAttempt';
 
 /** What resolveAction decides for one button press. */
 export type ResolveResult = { kind: 'move'; id: MoveId } | { kind: 'reverse'; targetId: string };
@@ -86,6 +88,8 @@ export interface MoveDef {
    * impact moment (±120ms) [spec §3.2].
    */
   counterWindow?: TimingWindow;
+  /** Move only resolves vs a target in crouched stance (low kick). */
+  requiresCrouchedTarget?: boolean;
   /** Move only resolves vs a downed target. */
   requiresDownedTarget?: boolean;
   /** Move only resolves vs an airborne target. */
