@@ -17,24 +17,26 @@ import { MOVES } from '../data/moves';
 /** Blade weapon tiers whose hits cause bleeding [spec §3.4]. */
 const BLADE_CLASSES: ReadonlySet<string> = new Set(['knife', 'sword']);
 
+/** Unit facing vector for a heading: (−sin h, −cos h) — the one definition
+ *  shared by hitdetect, FighterSim lunge/locomotion, and target views. */
+export function forwardXZ(heading: number): { x: number; z: number } {
+  return { x: -Math.sin(heading), z: -Math.cos(heading) };
+}
+
 /**
  * Every victim inside this active swing's reach: ground-plane distance
  * ≤ rangeM AND |angle from heading| ≤ arcRad/2 (both bounds inclusive).
  */
-export function findHit(
-  attacker: FighterState,
-  victims: FighterState[],
-  _swingKey?: string,
-): HitEvent[] {
-  void _swingKey; // swing identity lives in FighterSim.swingHitSet
+export function findHit(attacker: FighterState, victims: FighterState[]): HitEvent[] {
   if (attacker.phase.t !== 'active') return [];
   const moveId = attacker.phase.moveId;
   if (moveId === undefined) return [];
   const def = MOVES[moveId];
   if (def === undefined) return [];
 
-  const fdx = -Math.sin(attacker.heading);
-  const fdz = -Math.cos(attacker.heading);
+  const f = forwardXZ(attacker.heading);
+  const fdx = f.x;
+  const fdz = f.z;
   // Tiny slack so a victim placed mathematically ON the cone edge connects
   // despite floating-point error.
   const halfArc = def.arcRad / 2 + 1e-9;
@@ -71,7 +73,14 @@ export function findHit(
  *   velY impulse KNOCKDOWN_VELY, grounded timer DOWNED_GROUND_MS;
  * - knockdown move vs crouched victim (or non-knockdown hit) → stagger:
  *   phase 'hitstun' for HITSTUN_MS, no impulse [plan Task 7 rule];
- * - blade-class weapon on the attacker flags the victim `bleeding`.
+ * - blade-class weapon on the attacker flags the victim `bleeding` (checked
+ *   before the lethal early-return, so bleeding persists through death).
+ *
+ * Over-the-ground (OTG) rules — v1 intent, pinned by tests, fix round F5:
+ * a knockdown hit on an already-downed victim REFRESHES its ground timer
+ * (phaseMsLeft resets to DOWNED_GROUND_MS) and re-applies the velY impulse
+ * (juggle); a NON-knockdown hit on a downed victim flips it back up into
+ * standing hitstun with zero impulse. Revisit only if Task 14 breaks it.
  *
  * Returns one delta per fighter touched, in application order.
  */
@@ -94,6 +103,14 @@ export function applyHit(hit: HitEvent, fighters: FighterState[]): FighterDelta[
   ];
 
   victim.hp -= dmg;
+
+  // Bleed comes from the blade itself, not the move row [spec §3.4] — and
+  // applies BEFORE the lethal early-return so bleeding persists through
+  // death (fix round F4).
+  if (attacker.weapon !== null && BLADE_CLASSES.has(attacker.weapon)) {
+    victim.flags.bleeding = true;
+  }
+
   if (victim.hp <= 0) {
     victim.hp = 0;
     victim.flags.unconscious = true;
@@ -122,10 +139,6 @@ export function applyHit(hit: HitEvent, fighters: FighterState[]): FighterDelta[
     if (victim.stance !== 'airborne') victim.stance = 'standing';
   }
 
-  // Bleed comes from the blade itself, not the move row [spec §3.4].
-  if (attacker.weapon !== null && BLADE_CLASSES.has(attacker.weapon)) {
-    victim.flags.bleeding = true;
-  }
   return deltas;
 }
 

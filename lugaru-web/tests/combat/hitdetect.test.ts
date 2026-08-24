@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { applyHit, findHit } from '../../src/combat/hitdetect';
+import { describe, expect, it } from 'vitest';
+import { applyHit, findHit, forwardXZ } from '../../src/combat/hitdetect';
 import type { FighterState, HitEvent } from '../../src/combat/stateMachine';
 import type { MoveId } from '../../src/combat/types';
 import { MOVES } from '../../src/data/moves';
@@ -41,47 +41,52 @@ function makeSwing(moveId: MoveId, victimOver: Partial<FighterState> = {}) {
   return { attacker, victim };
 }
 
-let swingKey = '';
-beforeEach(() => {
-  // Fresh per-test swing identity — mirrors one FighterSim instance per fight.
-  swingKey = 'test-swing-1';
-});
-
 describe('findHit geometry', () => {
   it('no event while the attacker is not in active frames', () => {
     const { attacker, victim } = makeSwing('punch');
     attacker.phase = { t: 'startup', moveId: 'punch', phaseMsLeft: 40 };
-    expect(findHit(attacker, [victim], swingKey)).toEqual([]);
+    expect(findHit(attacker, [victim])).toEqual([]);
   });
 
   it('out-of-range victim produces no event', () => {
     const { attacker, victim } = makeSwing('punch');
     victim.pos.x = 2.5; // punch.rangeM = 1.4
-    expect(findHit(attacker, [victim], swingKey)).toEqual([]);
+    expect(findHit(attacker, [victim])).toEqual([]);
   });
 
   it('range boundary is inclusive: exactly rangeM connects', () => {
     const { attacker, victim } = makeSwing('punch');
     victim.pos.x = MOVES.punch.rangeM;
-    expect(findHit(attacker, [victim], swingKey).length).toBe(1);
+    expect(findHit(attacker, [victim]).length).toBe(1);
   });
 
   it('victim behind the attacker (angle > arc/2) produces no event', () => {
     const { attacker, victim } = makeSwing('punch');
     victim.pos.x = -1.0; // directly behind a +x-facing attacker
-    expect(findHit(attacker, [victim], swingKey)).toEqual([]);
+    expect(findHit(attacker, [victim])).toEqual([]);
   });
 
   it('arc boundary is inclusive and off-cone angles miss', () => {
     const { attacker, victim } = makeSwing('punch'); // arc 1.0 rad → half 0.5
-    victim.pos.x = Math.cos(0.5);
-    victim.pos.z = Math.sin(0.5); // dead on the cone edge
-    expect(findHit(attacker, [victim], swingKey).length).toBe(1);
+    // Victim direction = unit facing rotated by `ang` (rotation of the facing
+    // vector, not the heading) — same convention findHit tests against.
+    const rot = (ang: number) => {
+      const f = forwardXZ(attacker.heading);
+      return {
+        x: f.x * Math.cos(ang) - f.z * Math.sin(ang),
+        z: f.x * Math.sin(ang) + f.z * Math.cos(ang),
+      };
+    };
+    const onEdge = rot(0.5);
+    victim.pos.x = onEdge.x;
+    victim.pos.z = onEdge.z; // dead on the cone edge
+    expect(findHit(attacker, [victim]).length).toBe(1);
 
     const wide = makeSwing('punch');
-    wide.victim.pos.x = Math.cos(0.9);
-    wide.victim.pos.z = Math.sin(0.9); // 0.9 rad > 0.5 half-angle
-    expect(findHit(wide.attacker, [wide.victim], swingKey)).toEqual([]);
+    const outside = rot(0.9); // 0.9 rad > 0.5 half-angle
+    wide.victim.pos.x = outside.x;
+    wide.victim.pos.z = outside.z;
+    expect(findHit(wide.attacker, [wide.victim])).toEqual([]);
   });
 
   it('two victims inside the arc are both hit exactly once', () => {
@@ -91,7 +96,7 @@ describe('findHit geometry', () => {
     v2.pos.x = Math.cos(0.4);
     v2.pos.z = Math.sin(0.4);
 
-    const events = findHit(attacker, [v1, v2], swingKey);
+    const events = findHit(attacker, [v1, v2]);
     expect(events.length).toBe(2);
     expect(new Set(events.map((e) => e.victimId))).toEqual(new Set(['wolf1', 'wolf2']));
   });
@@ -99,16 +104,9 @@ describe('findHit geometry', () => {
   it('findHit is stateless: same swing repeats events (dedup is FighterSim\'s job)', () => {
     const { attacker, victim } = makeSwing('punch');
     victim.pos.x = 1.0;
-    expect(findHit(attacker, [victim], swingKey).length).toBe(1);
-    expect(findHit(attacker, [victim], swingKey).length).toBe(1);
+    expect(findHit(attacker, [victim]).length).toBe(1);
+    expect(findHit(attacker, [victim]).length).toBe(1);
   });
-
-  it('swing-key parameter is accepted and ignored', () => {
-    const { attacker, victim } = makeSwing('punch');
-    victim.pos.x = 1.0;
-    expect(findHit(attacker, [victim], swingKey + '-b').length).toBe(1);
-  });
-
 
   it('events carry ids, moveId and a normalized direction toward the victim', () => {
     // legSweep: arcRad 1.6 → half 0.8 > the π/4 diagonal; range 1.6 covers it.
@@ -116,7 +114,7 @@ describe('findHit geometry', () => {
     victim.pos.x = 0.7;
     victim.pos.z = 0.7;
 
-    const events: HitEvent[] = findHit(attacker, [victim], swingKey);
+    const events: HitEvent[] = findHit(attacker, [victim]);
     expect(events.length).toBe(1);
     const e = events[0];
     expect(e.attackerId).toBe('player');
@@ -205,6 +203,38 @@ describe('applyHit damage and status rules', () => {
     expect(victim.hp).toBe(0);
     expect(victim.phase.t).toBe('ko');
     expect(victim.flags.unconscious).toBe(true);
+  });
+
+  it('a lethal blade hit still flags bleeding (bleed persists through death)', () => {
+    const { attacker, victim } = makeSwing('punch');
+    attacker.weapon = 'sword';
+    victim.hp = 3;
+    land({}, [attacker, victim]);
+    expect(victim.phase.t).toBe('ko');
+    expect(victim.flags.bleeding).toBe(true);
+  });
+
+  it('knockdown re-hit on a downed victim refreshes ground timer + impulse (OTG)', () => {
+    const { attacker, victim } = makeSwing('runningKick');
+    // Already on the ground, halfway through the stand-up timer.
+    victim.stance = 'downed';
+    victim.phase.t = 'downed';
+    victim.phase.phaseMsLeft = DOWNED_GROUND_MS / 2;
+    land({ moveId: 'runningKick' }, [attacker, victim]);
+    expect(victim.phase.t).toBe('downed');
+    expect(victim.phase.phaseMsLeft).toBe(DOWNED_GROUND_MS); // refreshed
+    expect(victim.velY).toBe(KNOCKDOWN_VELY); // impulse re-applied
+  });
+
+  it('non-knockdown hit on a downed victim flips to standing hitstun', () => {
+    const { attacker, victim } = makeSwing('punch');
+    victim.stance = 'downed';
+    victim.phase.t = 'downed';
+    victim.velY = 0;
+    land({}, [attacker, victim]);
+    expect(victim.phase.t).toBe('hitstun');
+    expect(victim.stance).toBe('standing'); // popped back up by the stagger
+    expect(victim.velY).toBe(0); // no impulse for plain hits
   });
 
   it('returns a delta for the victim with knockdown impulse', () => {

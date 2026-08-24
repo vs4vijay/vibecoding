@@ -4,21 +4,23 @@ import { heightAt } from '../world/terrain';
 import type { Rig } from './skeleton';
 import type { SpeciesDef } from '../data/species';
 import { ClipPlayer } from './clips';
+// Shared kinematics — single home in data/tuning.ts (fix round F2); this
+// module keeps identical behavior, importing instead of re-declaring.
+import {
+  ACCEL,
+  FRICTION,
+  GRAVITY,
+  JUMP_SPEED,
+  RUN_STANCE_SPEED,
+  TURN_RATE,
+} from '../data/tuning';
 
 export type Stance = 'standing' | 'running' | 'crouched' | 'airborne';
 
-const GRAVITY = -14;
-const JUMP_SPEED = 5.4;
-const ACCEL = 40;
-const FRICTION = 24;
-/** Speed above which stance reads as running (m/s). */
-const RUN_STANCE_SPEED = 4;
 /** Ground contact slack: within this of terrain height counts as grounded. */
 const GROUND_SLACK = 0.02;
 /** Finite-difference step for terrain slope sampling (m). */
 const SLOPE_DS = 0.35;
-/** Heading/pitch/roll smoothing rate (exp-decay constant, 1/s). */
-const TURN_RATE = 12;
 
 /**
  * Rabbit/wolf kinematics + display driver. Display and movement only — all

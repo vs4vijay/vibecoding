@@ -16,7 +16,16 @@ import type { InputFrame } from '../core/input';
 import { heightAt } from '../world/terrain';
 import { SPECIES } from '../data/species';
 import type { SpeciesDef } from '../data/species';
-import { INPUT_BUFFER_MS, RECOVERY_CHAIN_MIN_MS } from '../data/tuning';
+import {
+  ACCEL,
+  GRAVITY,
+  INPUT_BUFFER_MS,
+  JUMP_SPEED,
+  RECOVERY_CHAIN_MIN_MS,
+  RUN_STANCE_SPEED,
+  TARGET_SENSE_RADIUS_M,
+  TURN_RATE,
+} from '../data/tuning';
 import { MOVES } from '../data/moves';
 import type {
   CombatantSnapshot,
@@ -29,7 +38,7 @@ import type {
   WorldContext,
 } from './types';
 import { resolveAction } from './resolver';
-import { applyHit, findHit } from './hitdetect';
+import { applyHit, findHit, forwardXZ } from './hitdetect';
 
 // ---------------------------------------------------------------------------
 // Plain fighter state — serializable snapshot, no class instances inside.
@@ -105,19 +114,8 @@ export interface FighterSimWorld {
   weaponOnGroundNearby: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Kinematics constants — mirrored from actors/controller.ts, which owns real
-// locomotion for the player rig; FighterSim integrates a matching ballistic
-// + intent-driven model so headless sims and AI see the same physics.
-// ---------------------------------------------------------------------------
-
-const GRAVITY = -14;
-const JUMP_SPEED = 5.4;
-const ACCEL = 40;
-/** Speed above which idle stance reads as running (m/s). */
-const RUN_STANCE_SPEED = 4;
-/** Heading smoothing rate (exp-decay constant, 1/s). */
-const TURN_RATE = 12;
+// Kinematics constants live in data/tuning.ts, shared with
+// actors/controller.ts (fix round F2) so sim and rig never drift.
 
 /** Move `v` toward `target` by at most `maxDelta`. */
 function approach(v: number, target: number, maxDelta: number): number {
@@ -143,9 +141,6 @@ const NO_TARGET: TargetSnapshot = {
   facingMe: false,
   unaware: true,
 };
-
-/** Sense radius for nearest-target lookup (m); AI LOS refines this later. */
-const TARGET_SENSE_RADIUS_M = 3;
 
 // ---------------------------------------------------------------------------
 // FighterSim
@@ -239,12 +234,15 @@ export class FighterSim {
   }
 
   /**
-   * Poll attack geometry against `victims`. Call once per step per attacker:
-   * the first poll that sees active frames arms the swing, and every victim
-   * answered here stays suppressed until the next swing begins.
+   * Poll attack geometry against `victims` and return freshly landed hits.
+   * Call once per step per attacker: the first poll that sees active frames
+   * arms the swing, and every victim answered here stays suppressed until
+   * the next swing begins (no double hits).
    *
-   * Landed events are applied immediately to the victims listed (they are
-   * plain states in `victims`), keeping hp/knockdown authoritative sim-side.
+   * This method does NOT mutate victims — it only reports. The caller owns
+   * application: feed each returned event through hitdetect.applyHit with a
+   * fighter list that contains both parties (tested design; keeps hp/knock-
+   * down authority explicit at the call site).
    */
   collectHits(victims: FighterState[]): HitEvent[] {
     if (this.state.phase.t === 'active' && !this.swungThisMove) {
@@ -275,13 +273,22 @@ export class FighterSim {
     if (action === null || action.kind !== 'move') return;
 
     if (phaseAtPress === 'recovery') {
-      // Early-recovery spam is ignored; recovery's tail chains freely.
-      if (this.state.phase.phaseMsLeft > RECOVERY_CHAIN_MIN_MS) return;
-      this.startMove(action.id);
-      return;
+      // Recovery's tail chains freely into the next move; earlier presses
+      // buffer like any other busy-phase press.
+      if (this.state.phase.phaseMsLeft <= RECOVERY_CHAIN_MIN_MS) {
+        this.startMove(action.id);
+        return;
+      }
     }
-    if (phaseAtPress === 'active') {
-      this.bufferedActionId = action.id; // fires the moment the move ends
+    if (
+      phaseAtPress === 'startup' ||
+      phaseAtPress === 'active' ||
+      phaseAtPress === 'recovery'
+    ) {
+      // Real buffer: one queued action with its own expiry window. It ticks
+      // every step in applyBuffer and fires iff still alive when the running
+      // move ends.
+      this.bufferedActionId = action.id;
       this.bufferMsLeft = INPUT_BUFFER_MS;
       return;
     }
@@ -365,10 +372,9 @@ export class FighterSim {
   private applyLunge(def: MoveDef, dtMs: number): void {
     const speed = def.lungeSpeed ?? 0;
     if (speed <= 0 || dtMs <= 0) return;
-    const fdx = -Math.sin(this.state.heading);
-    const fdz = -Math.cos(this.state.heading);
-    this.state.pos.x += fdx * speed * (dtMs / 1000);
-    this.state.pos.z += fdz * speed * (dtMs / 1000);
+    const fwd = forwardXZ(this.state.heading);
+    this.state.pos.x += fwd.x * speed * (dtMs / 1000);
+    this.state.pos.z += fwd.z * speed * (dtMs / 1000);
   }
 
   /** Close the move timeline. */
@@ -380,12 +386,21 @@ export class FighterSim {
     this.state.phase.phaseMsLeft = Infinity;
   }
 
-  /** Fire the buffered follow-up the moment the running move finishes. */
-  private applyBuffer(_dt: number): void {
+  /**
+   * Tick the buffered press (F1 real-buffer semantics): its window decrements
+   * every step; when the running move ends it fires iff the window is still
+   * alive, otherwise it expires unspent.
+   */
+  private applyBuffer(dt: number): void {
     const id = this.bufferedActionId;
     if (id === null) return;
-    if (this.state.phase.t !== 'idle') return;
-    this.startMove(id); // clears the buffer itself
+    this.bufferMsLeft -= dt; // window ticks every step, busy or not
+    if (this.state.phase.t !== 'idle') {
+      if (this.bufferMsLeft <= 0) this.bufferedActionId = null; // expired waiting
+      return;
+    }
+    if (this.bufferMsLeft > 0) this.startMove(id); // still alive → fire
+    else this.bufferedActionId = null; // window spent unspent
   }
 
   // -- physics --------------------------------------------------------------
@@ -400,8 +415,9 @@ export class FighterSim {
     const cap = this.crouching ? this.def.crouchSpeed : this.def.runSpeed;
     const len = Math.hypot(moveX, moveZ);
     const wishing = len > 0 && s.phase.t !== 'downed' && s.phase.t !== 'ko' && s.phase.t !== 'hitstun';
-    const fdx0 = -Math.sin(s.heading);
-    const fdz0 = -Math.cos(s.heading);
+    const fwd0 = forwardXZ(s.heading);
+    const fdx0 = fwd0.x;
+    const fdz0 = fwd0.z;
     const rdx0 = -fdz0;
     const rdz0 = fdx0;
     const wx = wishing ? (fdx0 * -moveZ + rdx0 * moveX) * cap : 0;
@@ -527,10 +543,9 @@ function nearestTargetOf(self: FighterState, world: FighterSimWorld): TargetSnap
   const dz = best.pos.z - self.pos.z;
   const dist = Math.sqrt(bestDistSq);
   // Signed angle from heading to victim via cross/dot atan2.
-  const fdx = -Math.sin(self.heading);
-  const fdz = -Math.cos(self.heading);
-  const cross = fdx * dz - fdz * dx;
-  const dot = fdx * dx + fdz * dz;
+  const fwd = forwardXZ(self.heading);
+  const cross = fwd.x * dz - fwd.z * dx;
+  const dot = fwd.x * dx + fwd.z * dz;
   return {
     id: best.id,
     dist,
@@ -548,13 +563,12 @@ function nearestTargetOf(self: FighterState, world: FighterSimWorld): TargetSnap
 const FACING_HALF_RAD = Math.PI / 3;
 
 function facesToward(watcher: FighterState, other: FighterState): boolean {
-  const wdx = -Math.sin(watcher.heading);
-  const wdz = -Math.cos(watcher.heading);
+  const w = forwardXZ(watcher.heading);
   const tox = other.pos.x - watcher.pos.x;
   const toz = other.pos.z - watcher.pos.z;
   const len = Math.hypot(tox, toz);
   if (len < 1e-6) return true;
-  return (wdx * tox + wdz * toz) / len > Math.cos(FACING_HALF_RAD);
+  return (w.x * tox + w.z * toz) / len > Math.cos(FACING_HALF_RAD);
 }
 
 

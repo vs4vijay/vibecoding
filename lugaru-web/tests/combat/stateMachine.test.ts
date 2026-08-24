@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { FighterSim, type FighterSimWorld } from '../../src/combat/stateMachine';
 import { applyHit } from '../../src/combat/hitdetect';
 import { MOVES } from '../../src/data/moves';
@@ -75,11 +75,6 @@ function runUntil(
 function clickAttack(): InputFrame {
   return makeInput({ pressed: { attack: true, jump: false, crouch: false } });
 }
-
-beforeEach(() => {
-  // Guard against accidental nondeterminism creeping into the sim graph.
-  expect(() => {}).not.throw;
-});
 
 describe('FighterSim move phasing', () => {
   it('press attack standing → punch startup (120ms) → active → recovery → idle', () => {
@@ -195,15 +190,17 @@ describe('FighterSim input gating', () => {
     expect(player.state.phase.moveId).toBe('punch');
   });
 
-  it('a press during active frames is buffered and fires after recovery', () => {
+  it('a press during active frames is buffered and fires when the move ends', () => {
     const { player, world } = makePair();
-    run(player, 1, clickAttack(), world);
+    run(player, 1, clickAttack(), world); // punch: startup 120 + active 80
     runUntil(player, makeInput(), world, () => player.state.phase.t === 'active');
 
-    player.update(STEP_MS, clickAttack(), world); // lands mid-active → buffered
-    expect(player.state.phase.t).toBe('active');
+    // Deliberate timeline: the press lands ~1 step into active, so the move
+    // still has ≈80−16.7+150 ≈ 213ms to run — inside INPUT_BUFFER_MS (250).
+    // The buffered follow-up MUST fire when recovery completes.
+    player.update(STEP_MS, clickAttack(), world);
+    expect(player.state.phase.t).toBe('active'); // press did not interrupt
 
-    // No further presses: the buffer must open the follow-up by itself.
     const fired = runUntil(
       player,
       makeInput(),
@@ -212,6 +209,35 @@ describe('FighterSim input gating', () => {
     );
     expect(fired).toBe(true);
     expect(player.state.phase.moveId).toBe('punch');
+  });
+
+  it('a buffered press expires unspent when the move outlasts its window', () => {
+    // runningKick timeline: startup 140 + active 90 + recovery 220 = 450ms.
+    // A press buffered at active entry waits 310ms > INPUT_BUFFER_MS (250):
+    // the buffer must expire unspent and the fighter must land in idle.
+    const { player, world } = makePair();
+    const runInput = makeInput({ moveZ: -1 });
+    const sprinting = runUntil(player, runInput, world, () => player.state.stance === 'running');
+    expect(sprinting).toBe(true);
+    let kicked = false;
+    for (let i = 0; i < 60 && !kicked; i++) {
+      player.update(STEP_MS, { ...runInput, pressed: { attack: true, jump: false, crouch: false } }, world);
+      kicked = player.state.phase.moveId === 'runningKick';
+    }
+    expect(kicked).toBe(true);
+
+    // Ride to active entry with input released, then buffer ONE kick press.
+    const activeEntry = runUntil(player, makeInput(), world, () => player.state.phase.t === 'active');
+    expect(activeEntry).toBe(true);
+    player.update(STEP_MS, { ...runInput, pressed: { attack: true, jump: false, crouch: false } }, world);
+    const fired = runUntil(
+      player,
+      makeInput(),
+      world,
+      () => player.state.phase.t === 'startup',
+      60,
+    );
+    expect(fired).toBe(false); // 310ms wait > 250ms window
   });
 
   it('presses during hitstun are dropped entirely', () => {
