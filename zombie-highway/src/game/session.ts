@@ -92,8 +92,6 @@ const LEVELUP_SLOW_S = 0.5;
 /** speed01 normalization window for the chase-camera fov kick. */
 const SPEED01_MIN = 12;
 const SPEED01_MAX = 52;
-/** Graze penalty floors at the same speed the rail scrape uses. */
-const MIN_SPEED_AFTER_SCRAPE = 12;
 /** Contact scan window around the car (covers wreck halfD 2.2 + car length). */
 const CONTACT_WINDOW_M = 8;
 const FX_RED = 0xa11212;
@@ -440,10 +438,9 @@ export class Session {
     this.grazeCd.set(o, this.simTime + CONFIG.car.scrapeTickS);
     const side: CarSide = o.x < this.car.x ? "left" : "right";
     this.car.speed = Math.max(
-      MIN_SPEED_AFTER_SCRAPE,
+      CONFIG.car.speedFloor,
       this.car.speed - CONFIG.car.scrapeSpeedLoss,
     );
-    this.emitter.emit("scrape", side);
     this.render?.shake?.(0.15);
     this.view?.fx.burst(
       this.car.x + (side === "left" ? -1 : 1),

@@ -375,8 +375,8 @@ canvas {
   gap: 22px;
   background: radial-gradient(
     ellipse at 50% 38%,
-    rgba(38, 12, 48, 0.82),
-    rgba(6, 2, 10, 0.94)
+    rgba(38, 12, 48, 0.6),
+    rgba(6, 2, 10, 0.7)
   );
   pointer-events: auto;
   z-index: 10;

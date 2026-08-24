@@ -26,6 +26,7 @@ export const CONFIG = {
     tiltRate: 3,
     scrapeSpeedLoss: 3,
     scrapeTickS: 0.25,
+    speedFloor: 12,
   },
   gun: {
     magSize: 8,

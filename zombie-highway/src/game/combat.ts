@@ -1,7 +1,7 @@
 import { CONFIG } from "../config";
 import type { Zombie, ZombiePool, ZombieSide } from "./zombies";
 
-export type FireResult = { hit: boolean; killed: Zombie | null; points: number };
+export type FireResult = { hit: boolean; killed: Zombie | null };
 
 // Leaping zombies are airborne mid-approach; anything beyond this is a wasted
 // round. Clinging zombies are exempt: they are attached to the hull by
@@ -22,7 +22,7 @@ export function fireGun(
 ): FireResult {
   if (gun.mag <= 0 || gun.reloadT > 0) {
     gun.reloadT = CONFIG.gun.reloadS;
-    return { hit: false, killed: null, points: 0 };
+    return { hit: false, killed: null };
   }
   gun.mag--;
 
@@ -38,13 +38,8 @@ export function fireGun(
       bestDist = dist;
     }
   }
-  if (!best) return { hit: false, killed: null, points: 0 };
+  if (!best) return { hit: false, killed: null };
 
   const survived = zombies.hit(best, CONFIG.gun.dmg);
-  const killed = survived ? null : best;
-  const points = killed
-    ? CONFIG.zombies[killed.type].points *
-      (zombies.isRecentLeap(killed) ? CONFIG.gun.recentLeapMult : 1)
-    : 0;
-  return { hit: true, killed, points };
+  return { hit: true, killed: survived ? null : best };
 }

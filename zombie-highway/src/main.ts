@@ -185,6 +185,8 @@ export function boot(): void {
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
+  // Detached toast layer must not leak past teardown.
+  window.addEventListener("pagehide", () => hud.dispose());
 
   /** Writes the live HUD snapshot into `out` (preallocated). */
   function writeHudState(

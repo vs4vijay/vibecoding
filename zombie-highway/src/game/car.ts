@@ -63,7 +63,7 @@ export function stepCar(car: CarState, steer: number, dt: number): CarEvent[] {
     car.vx = hitSide === "right" ? -C.railBounceVx : C.railBounceVx;
     if (car.scrapeCooldown <= 0) {
       car.scrapeCooldown = C.scrapeTickS;
-      car.speed = Math.max(12, car.speed - C.scrapeSpeedLoss);
+      car.speed = Math.max(C.speedFloor, car.speed - C.scrapeSpeedLoss);
       events.push({ kind: "scrape", side: hitSide });
     }
   } else {
