@@ -36,7 +36,11 @@ export class Spawner {
       if (this.busyCount() < ctx.knobs.maxZombies) {
         const sideSign = this.rng() < 0.5 ? -1 : 1;
         const z = ctx.carZ + s.zMinAhead + this.rng() * (s.zMaxAhead - s.zMinAhead);
-        this.zombies.spawnLurker(this.pickType(), sideSign * (CONFIG.road.halfWidth + s.shoulderOffset), z);
+        this.zombies.spawnLurker(
+          this.pickType(ctx.knobs),
+          sideSign * (CONFIG.road.halfWidth + s.shoulderOffset),
+          z,
+        );
       }
     }
 
@@ -100,14 +104,16 @@ export class Spawner {
     }
     return n;
   }
-
-  private pickType(): ZombieType {
-    const roll = this.rng();
+  /** Weighted type pick restricted to the types this level has unlocked. */
+  private pickType(knobs: Knobs): ZombieType {
+    const pool = TYPE_WEIGHTS.filter(([type]) => knobs.types.includes(type));
+    if (pool.length === 0) return "walker";
+    const roll = this.rng() * pool.reduce((sum, [, w]) => sum + w, 0);
     let acc = 0;
-    for (const [type, w] of TYPE_WEIGHTS) {
+    for (const [type, w] of pool) {
       acc += w;
       if (roll < acc) return type;
     }
-    return TYPE_WEIGHTS[TYPE_WEIGHTS.length - 1][0];
+    return pool[pool.length - 1][0];
   }
 }

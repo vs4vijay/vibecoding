@@ -61,6 +61,11 @@ export class Hud {
     this.root = root;
     root.innerHTML = "";
 
+    // Center toasts live OUTSIDE #hud: game-over fires hud.toast("NEW
+    // BEST!") then hud.hide(), and display:none must not eat the toast.
+    this.toasts = el("div", "toasts");
+    document.body.append(this.toasts);
+
     this.vignette = el("div", "vignette");
     const topLeft = el("div", "hud-topleft");
     this.distEl = el("div", "hud-dist");
@@ -114,7 +119,6 @@ export class Hud {
     this.arcs = { left: leftRow.arc, right: rightRow.arc };
 
     this.streakBadge = el("div", "streak-badge");
-    this.toasts = el("div", "toasts");
 
     const ammoLeftWrap = el("div", "ammo-left-wrap");
     const ammoRightWrap = el("div", "ammo-right-wrap");
@@ -129,7 +133,6 @@ export class Hud {
       ammoLeftWrap,
       ammoRightWrap,
       this.streakBadge,
-      this.toasts,
     );
     this.hide();
   }
@@ -148,6 +151,11 @@ export class Hud {
     this.root.classList.add("hidden");
   }
 
+  /** Removes the detached toast layer (call on teardown). */
+  dispose(): void {
+    this.toasts.remove();
+  }
+
   /** Center-screen transient message (LEVEL N / NEW BEST!). */
   toast(text: string): void {
     const t = el("div", "toast");
@@ -161,7 +169,12 @@ export class Hud {
     const L = this.last;
     if (L.phase !== s.phase) {
       L.phase = s.phase;
-      this.pauseBtn.classList.toggle("visible", s.phase === "running");
+      // While paused this button is a touch user's ONLY resume affordance
+      // (no keyboard); it must stay tappable and flip to a resume glyph.
+      const paused = s.phase === "paused";
+      this.pauseBtn.classList.toggle("visible", s.phase === "running" || paused);
+      this.pauseBtn.textContent = paused ? "▶" : "⏸";
+      this.pauseBtn.setAttribute("aria-label", paused ? "Resume" : "Pause");
       this.gauge.classList.toggle("dimmed", s.phase !== "running");
     }
     const score = Math.floor(s.score);
