@@ -66,7 +66,8 @@ export const MOVES: Record<string, MoveDef> = {
     counterWindow: { from: 180 - COUNTER_HALF_WIDTH_MS, to: 180 + COUNTER_HALF_WIDTH_MS },
   },
 
-  /** Sprinting kick. First reliable knockdown tool; heavy commitment. */
+  /** Sprinting kick. First reliable knockdown tool; heavy commitment.
+   *  `lungeSpeed` (m/s) drives the forward dash during its active frames. */
   runningKick: {
     id: 'runningKick',
     clip: 'kick',
@@ -74,6 +75,7 @@ export const MOVES: Record<string, MoveDef> = {
     activeMs: 90,
     recoveryMs: 220,
     rangeM: 1.8,
+    lungeSpeed: 5,
     arcRad: 0.9,
     damage: 14,
     knockdown: true,

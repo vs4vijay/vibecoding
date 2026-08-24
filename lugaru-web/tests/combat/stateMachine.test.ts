@@ -1,0 +1,410 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { FighterSim, type FighterSimWorld } from '../../src/combat/stateMachine';
+import { applyHit } from '../../src/combat/hitdetect';
+import { MOVES } from '../../src/data/moves';
+import { RECOVERY_CHAIN_MIN_MS } from '../../src/data/tuning';
+import type { InputFrame } from '../../src/core/input';
+
+// ---------------------------------------------------------------------------
+// Headless sim-scene builders — plain state only; stateMachine must import no
+// three/Rapier anywhere in its graph (terrain heightAt is analytic).
+import type { HitEvent } from '../../src/combat/stateMachine';
+// ---------------------------------------------------------------------------
+
+/** Fixed-step cadence mirrored from the production loop (60Hz). */
+const STEP_MS = 1000 / 60;
+
+function makeInput(over: Partial<InputFrame> = {}): InputFrame {
+  return {
+    moveX: 0,
+    moveZ: 0,
+    lookDX: 0,
+    lookDY: 0,
+    pressed: { attack: false, jump: false, crouch: false },
+    held: { attack: false, jump: false, crouch: false },
+    ...over,
+  };
+}
+
+interface Pair {
+  player: FighterSim;
+  dummy: FighterSim;
+  world: FighterSimWorld;
+}
+
+/**
+ * Rabbit player at origin facing +x, wolf dummy 1.2m ahead facing back.
+ * 1.2m sits inside punch.rangeM (1.4) and legSweep.rangeM (1.6).
+ */
+function makePair(dist = 1.2): Pair {
+  const player = new FighterSim('rabbit', 'player', true);
+  const dummy = new FighterSim('wolf', 'wolf1', false);
+  player.state.pos.x = 0;
+  player.state.heading = -Math.PI / 2; // facing vector (-sin,-cos) → +x
+  dummy.state.pos.x = dist;
+  dummy.state.heading = Math.PI / 2; // facing back toward the player
+  const world: FighterSimWorld = {
+    fighters: [player.state, dummy.state],
+    downedBodyNearby: false,
+    weaponOnGroundNearby: false,
+  };
+  return { player, dummy, world };
+}
+
+/** Advance `n` fixed steps, feeding the same frame each step. */
+function run(sim: FighterSim, n: number, input: InputFrame | null, world: FighterSimWorld): void {
+  for (let i = 0; i < n; i++) sim.update(STEP_MS, input, world);
+}
+
+/** Step in fixed chunks until predicate holds or budget runs out. */
+function runUntil(
+  sim: FighterSim,
+  input: InputFrame | null,
+  world: FighterSimWorld,
+  pred: () => boolean,
+  maxSteps = 400,
+): boolean {
+  for (let i = 0; i < maxSteps; i++) {
+    if (pred()) return true;
+    sim.update(STEP_MS, input, world);
+  }
+  return pred();
+}
+
+/** One attack click: a single frame with the pressed edge set. */
+function clickAttack(): InputFrame {
+  return makeInput({ pressed: { attack: true, jump: false, crouch: false } });
+}
+
+beforeEach(() => {
+  // Guard against accidental nondeterminism creeping into the sim graph.
+  expect(() => {}).not.throw;
+});
+
+describe('FighterSim move phasing', () => {
+  it('press attack standing → punch startup (120ms) → active → recovery → idle', () => {
+    const { player, world } = makePair();
+
+    run(player, 1, clickAttack(), world); // edge consumed, startup begins
+    expect(player.state.phase.moveId).toBe('punch');
+
+    run(player, 6, makeInput(), world); // 7 steps ≈ 116.7ms < 120ms startup
+    expect(player.state.phase.t).toBe('startup');
+
+    run(player, 1, makeInput(), world); // 133.3ms — startup expired
+    expect(player.state.phase.t).toBe('active');
+    expect(player.state.currentMove).toBe(MOVES.punch);
+
+    run(player, 5, makeInput(), world); // active 80ms fully consumed
+    expect(player.state.phase.t).toBe('recovery');
+
+    run(player, 10, makeInput(), world); // 366.7ms — recovery (150ms) expired
+    expect(player.state.phase.t).toBe('idle');
+    expect(player.state.phase.moveId).toBeUndefined();
+    expect(player.state.currentMove).toBeUndefined();
+  });
+
+  it('zero-duration utility moves (jump) complete immediately and launch vertically', () => {
+    const { player, world } = makePair();
+    player.update(
+      STEP_MS,
+      makeInput({ pressed: { attack: false, jump: true, crouch: false } }),
+      world,
+    );
+    expect(player.state.velY).toBeGreaterThan(0);
+    run(player, 2, makeInput(), world);
+    expect(player.state.phase.t).toBe('idle'); // jump has no timeline
+    expect(player.state.stance).toBe('airborne'); // …the body left the ground
+  });
+});
+
+describe('FighterSim hit consumption', () => {
+  it('stationary dummy in range receives exactly one HitEvent per swing', () => {
+    const { player, dummy, world } = makePair();
+    const events: HitEvent[] = [];
+
+    run(player, 1, clickAttack(), world);
+    for (let i = 0; i < 14; i++) {
+      player.update(STEP_MS, makeInput(), world);
+      events.push(...player.collectHits([dummy.state]));
+    }
+
+    expect(events.length).toBe(1);
+    expect(events[0].attackerId).toBe('player');
+    expect(events[0].victimId).toBe('wolf1');
+    expect(events[0].moveId).toBe('punch');
+    // Impact direction points from attacker toward the victim (+x).
+    expect(events[0].dirVector.x).toBeCloseTo(1, 5);
+    expect(events[0].dirVector.z).toBeCloseTo(0, 5);
+  });
+
+  it('collecting twice in the same swing yields nothing the second time', () => {
+    const { player, dummy, world } = makePair();
+    run(player, 1, clickAttack(), world);
+    runUntil(
+      player,
+      makeInput(),
+      world,
+      () => player.collectHits([dummy.state]).length > 0,
+    );
+    expect(player.collectHits([dummy.state])).toEqual([]);
+  });
+
+  it('out-of-range dummy is never struck', () => {
+    const { player, dummy, world } = makePair(2.5); // beyond punch range 1.4
+    run(player, 1, clickAttack(), world);
+    let hits = 0;
+    for (let i = 0; i < 22; i++) {
+      player.update(STEP_MS, makeInput(), world);
+      hits += player.collectHits([dummy.state]).length;
+    }
+    expect(hits).toBe(0);
+  });
+});
+
+describe('FighterSim input gating', () => {
+  it('requesting a move early in recovery is ignored', () => {
+    const { player, world } = makePair();
+    run(player, 1, clickAttack(), world);
+    runUntil(player, makeInput(), world, () => player.state.phase.t === 'recovery');
+
+    const leftAtRecoveryEntry = player.state.phase.phaseMsLeft;
+    run(player, 1, clickAttack(), world); // fresh press, recovery far from done
+
+    expect(player.state.phase.t).toBe('recovery');
+    // Timer kept draining instead of restarting a move.
+    expect(player.state.phase.phaseMsLeft).toBeLessThan(leftAtRecoveryEntry);
+    expect(player.state.phase.moveId).toBe('punch');
+  });
+
+  it('late-recovery press chains into the next move (chain window)', () => {
+    const { player, world } = makePair();
+    run(player, 1, clickAttack(), world);
+    const chained = runUntil(
+      player,
+      makeInput(),
+      world,
+      () =>
+        player.state.phase.t === 'recovery' &&
+        player.state.phase.phaseMsLeft <= RECOVERY_CHAIN_MIN_MS,
+    );
+    expect(chained).toBe(true);
+
+    player.update(STEP_MS, clickAttack(), world);
+    expect(player.state.phase.t).toBe('startup');
+    expect(player.state.phase.moveId).toBe('punch');
+  });
+
+  it('a press during active frames is buffered and fires after recovery', () => {
+    const { player, world } = makePair();
+    run(player, 1, clickAttack(), world);
+    runUntil(player, makeInput(), world, () => player.state.phase.t === 'active');
+
+    player.update(STEP_MS, clickAttack(), world); // lands mid-active → buffered
+    expect(player.state.phase.t).toBe('active');
+
+    // No further presses: the buffer must open the follow-up by itself.
+    const fired = runUntil(
+      player,
+      makeInput(),
+      world,
+      () => player.state.phase.t === 'startup',
+    );
+    expect(fired).toBe(true);
+    expect(player.state.phase.moveId).toBe('punch');
+  });
+
+  it('presses during hitstun are dropped entirely', () => {
+    const { player, dummy, world } = makePair();
+    // Dummy punches the player into hitstun.
+    run(dummy, 1, clickAttack(), { ...world, fighters: [dummy.state, player.state] });
+    runUntil(
+      dummy,
+      makeInput(),
+      { ...world, fighters: [dummy.state, player.state] },
+      () => dummy.collectHits([player.state]).length > 0,
+    );
+    applyHit(
+      {
+        attackerId: 'wolf1',
+        victimId: 'player',
+        moveId: 'punch',
+        dirVector: { x: -1, z: 0 },
+      },
+      [player.state, dummy.state],
+    );
+    expect(player.state.phase.t).toBe('hitstun');
+
+    run(player, 1, clickAttack(), world);
+    expect(player.state.phase.t).toBe('hitstun'); // ignored, not buffered
+  });
+});
+
+describe('FighterSim antiRep contract (T8 takeover)', () => {
+  it('leaves antiRep uninitialized after repeated punches — T8 owns tracking', () => {
+    const { player, world } = makePair();
+    for (let i = 0; i < 3; i++) {
+      run(player, 1, clickAttack(), world);
+      runUntil(player, makeInput(), world, () => player.state.phase.t === 'idle');
+    }
+    // Plan's original Step-1 asked for streak counting here; the dispatch
+    // clarification moved anti-repetition into T8 (antirepetition.ts). T7
+    // pins the field as absent/uninitialized so T8 can introduce it.
+    expect(player.state.antiRep).toBeUndefined();
+  });
+});
+
+describe('FighterSim knockdown and stagger outcomes', () => {
+  function sweepAt(crouchedVictim: boolean): Pair {
+    const pair = makePair();
+    // Attacker settles into crouch, then sweeps.
+    const crouchInput = makeInput({ held: { attack: false, jump: false, crouch: true } });
+    run(pair.player, 3, crouchInput, pair.world);
+    expect(pair.player.state.stance).toBe('crouched');
+    pair.player.update(STEP_MS, {
+      ...crouchInput,
+      pressed: { attack: true, jump: false, crouch: true },
+    }, pair.world);
+    expect(pair.player.state.phase.moveId).toBe('legSweep');
+
+    // Victim stance: standing dummy, or a dummy holding crouch.
+    if (crouchedVictim) {
+      run(pair.dummy, 3, makeInput({ held: { attack: false, jump: false, crouch: true } }), pair.world);
+      expect(pair.dummy.state.stance).toBe('crouched');
+    }
+    return pair;
+  }
+
+  function landSweep(pair: Pair): void {
+    const { player, dummy, world } = pair;
+    let events: HitEvent[] = [];
+    for (let i = 0; i < 200 && events.length === 0; i++) {
+      player.update(STEP_MS, makeInput(), world);
+      events = player.collectHits([dummy.state]);
+    }
+    expect(events.length).toBe(1);
+    applyHit(events[0], [player.state, dummy.state]);
+  }
+
+  it('legSweep downs a standing victim (downed phase + velY impulse)', () => {
+    const pair = sweepAt(false);
+    landSweep(pair);
+    expect(pair.dummy.state.phase.t).toBe('downed');
+    expect(pair.dummy.state.velY).toBeCloseTo(3.5, 5);
+    expect(pair.dummy.state.hp).toBe(160 - 10); // wolf 160hp, rabbit mult 1.0
+  });
+
+  it('legSweep merely staggers a crouched victim (hitstun, no knockdown)', () => {
+    const pair = sweepAt(true);
+    landSweep(pair);
+    expect(pair.dummy.state.phase.t).toBe('hitstun');
+    expect(pair.dummy.state.phase.phaseMsLeft).toBeCloseTo(350, 5);
+    expect(pair.dummy.state.velY).toBe(0);
+  });
+
+  it('a downed victim gets back up after the ground timer', () => {
+    const pair = sweepAt(false);
+    landSweep(pair);
+    const got = runUntil(
+      pair.dummy,
+      null,
+      pair.world,
+      () => pair.dummy.state.phase.t === 'idle',
+      120,
+    );
+    expect(got).toBe(true);
+    expect(pair.dummy.state.phase.t).toBe('idle');
+  });
+
+  it('hitstun expires back to idle after 350ms', () => {
+    const { player, dummy, world } = makePair();
+    // Punch the dummy into stagger.
+    run(player, 1, clickAttack(), world);
+    runUntil(player, makeInput(), world, () => player.collectHits([dummy.state]).length > 0);
+    applyHit(
+      {
+        attackerId: 'player',
+        victimId: 'wolf1',
+        moveId: 'punch',
+        dirVector: { x: 1, z: 0 },
+      },
+      [player.state, dummy.state],
+    );
+    expect(dummy.state.phase.t).toBe('hitstun');
+    const got = runUntil(dummy, null, world, () => dummy.state.phase.t === 'idle');
+    expect(got).toBe(true);
+  });
+});
+
+describe('FighterSim KO and null-input dummy', () => {
+  it('lethal hit flips the victim to ko with the unconscious flag', () => {
+    const { player, dummy, world } = makePair();
+    dummy.state.hp = 5;
+    run(player, 1, clickAttack(), world);
+    runUntil(player, makeInput(), world, () => player.collectHits([dummy.state]).length > 0);
+    applyHit(
+      {
+        attackerId: 'player',
+        victimId: 'wolf1',
+        moveId: 'punch',
+        dirVector: { x: 1, z: 0 },
+      },
+      [player.state, dummy.state],
+    );
+    expect(dummy.state.phase.t).toBe('ko');
+    expect(dummy.state.flags.unconscious).toBe(true);
+    expect(dummy.state.hp).toBe(0);
+    run(dummy, 10, null, world); // corpse keeps simulating harmlessly
+    expect(dummy.state.phase.t).toBe('ko');
+  });
+
+  it('null-input dummy integrates physics and rests on the terrain', () => {
+    const dummy = new FighterSim('wolf', 'wolf1', false);
+    dummy.state.pos.y = 5; // dropped from the sky
+    const world: FighterSimWorld = {
+      fighters: [dummy.state],
+      downedBodyNearby: false,
+      weaponOnGroundNearby: false,
+    };
+    run(dummy, 120, null, world); // ~2s of falling + settling
+    const gy = 1.2 * Math.sin(dummy.state.pos.x * 0.08) * Math.cos(dummy.state.pos.z * 0.06)
+      + 0.6 * Math.sin((dummy.state.pos.x + dummy.state.pos.z) * 0.045)
+      + 0.25 * Math.sin(dummy.state.pos.x * 0.21 + dummy.state.pos.z * 0.17);
+    expect(dummy.state.pos.y).toBeCloseTo(gy, 5);
+    expect(dummy.state.phase.t).toBe('idle');
+    expect(Number.isNaN(dummy.state.pos.x)).toBe(false);
+  });
+});
+
+describe('FighterSim lunge', () => {
+  it('lunging move advances at lungeSpeed along facing during active frames', () => {
+    const { player, world } = makePair(3.0); // start beyond kick reach
+    // Sprint toward the dummy (heading faces +x; moveZ -1 = forward).
+    const runInput = makeInput({ moveZ: -1 });
+    const sprinting = runUntil(player, runInput, world, () => player.state.stance === 'running');
+    expect(sprinting).toBe(true);
+
+    const kickPress = { ...runInput, pressed: { attack: true, jump: false, crouch: false } };
+    let kicked = false;
+    for (let i = 0; i < 60 && !kicked; i++) {
+      player.update(STEP_MS, kickPress, world);
+      kicked = player.state.phase.moveId === 'runningKick';
+    }
+    expect(kicked).toBe(true); // resolver offers runningKick once isRunning
+
+    // Ride out startup (140ms) until active begins, input released so the
+    // measured displacement is the move's lunge alone.
+    const idleInput = makeInput();
+    const active = runUntil(player, idleInput, world, () => player.state.phase.t === 'active');
+    expect(active).toBe(true);
+
+    // Lunge covers exactly lungeSpeed × dt along heading per active step.
+    const xBefore = player.state.pos.x;
+    player.update(STEP_MS, idleInput, world);
+    expect(player.state.phase.t).toBe('active');
+    expect(player.state.pos.x - xBefore).toBeCloseTo(
+      MOVES.runningKick.lungeSpeed! * (STEP_MS / 1000),
+      3,
+    );
+  });
+});

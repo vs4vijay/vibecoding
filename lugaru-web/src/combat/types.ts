@@ -75,9 +75,15 @@ export interface MoveDef {
   rangeM: number;
   /** Half-angle of the hit cone in radians (π = all around). */
   arcRad: number;
+  /** Base damage before the attacker's species punchDmgMult. */
   damage: number;
   /** True: on-hit knockdown puts the victim on the ground. */
   knockdown: boolean;
+  /**
+   * Forward dash velocity (m/s) applied along the attacker's heading for the
+   * whole active phase; absent/0 = stationary attack.
+   */
+  lungeSpeed?: number;
   /**
    * Defender crouch-press window (ms from attacker's move start) for a
    * reversal [spec §3.2]. Sub-range of startup+active.

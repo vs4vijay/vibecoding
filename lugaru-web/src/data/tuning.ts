@@ -21,3 +21,26 @@ export const STEALTH_BEHIND_HALF_RAD = Math.PI - 0.6;
 
 /** Leg cannon dive needs the target inside this front half-cone (rad). */
 export const LEG_CANNON_AHEAD_HALF_RAD = 1.0;
+
+/** Any non-downing hit staggers the victim for this long [spec §3.2 "too late"]. */
+export const HITSTUN_MS = 350;
+
+/** Vertical impulse applied when a knockdown lands the victim on the ground. */
+export const KNOCKDOWN_VELY = 3.5;
+
+/** Time a downed fighter stays grounded before standing back up. */
+export const DOWNED_GROUND_MS = 900;
+
+/**
+ * A move may be chained from recovery once at most this much of it is left
+ * (late-recovery cancel window; earlier presses are ignored, active-phase
+ * presses are buffered into it).
+ */
+export const RECOVERY_CHAIN_MIN_MS = 100;
+
+/**
+ * Presses during startup/active fire as soon as the current move finishes —
+ * buffered input for exactly one queued action.
+ */
+export const INPUT_BUFFER_MS = 200;
+
