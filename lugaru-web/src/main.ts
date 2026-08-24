@@ -1,9 +1,14 @@
 import * as THREE from 'three';
 import { initErrorScreen } from './ui/errorScreen';
 import { InputManager } from './core/input';
+import { FixedLoop } from './core/loop';
 import { createScene } from './render/scene';
 import { ChaseCamera } from './render/camera';
 import { DebugStats } from './render/debugStats';
+import { SPECIES } from './data/species';
+import { buildRig } from './actors/skeleton';
+import { ClipPlayer } from './actors/clips';
+import { CharacterController } from './actors/controller';
 
 const errors = initErrorScreen();
 
@@ -39,8 +44,18 @@ async function boot() {
     window.addEventListener('resize', resize);
     resize();
 
-    // Fake stationary target until the simulation lands (later tasks).
-    const target = { x: 0, y: 0, z: 0 };
+    // Player rabbit: rig on the scene, kinematics on a fixed 60Hz sim loop.
+    const rig = buildRig(SPECIES.rabbit);
+    scene.add(rig.root);
+    const player = new CharacterController(rig, SPECIES.rabbit, new ClipPlayer(rig));
+
+    // One input sample per rendered frame; the fixed sim loop shares it.
+    // Edges (jump press) self-limit: the first step consumes them.
+    let frame: ReturnType<InputManager['sample']> | null = null;
+    const simLoop = new FixedLoop(1000 / 60, (stepMs) => {
+      if (frame) player.update(stepMs, frame, !input.isLocked, chaseCam.yaw);
+    });
+
     let lastMs = performance.now();
     function tick(nowMs: number) {
       requestAnimationFrame(tick);
@@ -48,17 +63,23 @@ async function boot() {
       const realDtMs = Math.min(nowMs - lastMs, 100);
       lastMs = nowMs;
 
-      const frame = input.sample();
-      chaseCam.update(realDtMs / 1000, target, 0, frame.lookDX, frame.lookDY);
+      frame = input.sample();
+      simLoop.advance(realDtMs);
+      chaseCam.update(realDtMs / 1000, rig.root.position, player.heading, frame.lookDX, frame.lookDY);
       debug?.frame(realDtMs);
       renderer.render(scene, camera3d);
     }
     requestAnimationFrame(tick);
 
     if (import.meta.env.DEV) {
-      // Verification hook: read-only handles for browser tooling (removed
-      // when the real player controller lands). Dev builds only.
-      (window as unknown as Record<string, unknown>).__lugaru = { chaseCam, debug };
+      // Verification hook: read-only handles for browser tooling. Dev
+      // builds only — tree-shaken from production.
+      (window as unknown as Record<string, unknown>).__lugaru = {
+        chaseCam,
+        debug,
+        player,
+        rig,
+      };
     }
   } catch (err) {
     errors.show('Failed to start', String(err));
