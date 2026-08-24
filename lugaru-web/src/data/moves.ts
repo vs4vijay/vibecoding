@@ -43,8 +43,9 @@ export const MOVES: Record<MoveId, MoveDef> = {
     arcRad: 1.0,
     damage: 8,
     knockdown: false,
-    reversalWindow: { from: 48, to: 200 }, // 48=40%×120; 200=120+80
-    counterWindow: { from: 80, to: 320 }, // 200±120
+    // Reversal impact = end of startup+active (120+80); counters see ±COUNTER_HALF_WIDTH_MS.
+    reversalWindow: { from: 48, to: 120 + 80 },
+    counterWindow: { from: 200 - COUNTER_HALF_WIDTH_MS, to: 200 + COUNTER_HALF_WIDTH_MS },
   },
 
   /**
@@ -61,8 +62,8 @@ export const MOVES: Record<MoveId, MoveDef> = {
     arcRad: 1.0,
     damage: 7,
     knockdown: false,
-    reversalWindow: { from: 40, to: 180 }, // 40%×100; 100+80
-    counterWindow: { from: 60, to: 300 }, // 180±120
+    reversalWindow: { from: 40, to: 100 + 80 }, // from = 40%×100
+    counterWindow: { from: 180 - COUNTER_HALF_WIDTH_MS, to: 180 + COUNTER_HALF_WIDTH_MS },
   },
 
   /** Sprinting kick. First reliable knockdown tool; heavy commitment. */
@@ -76,8 +77,8 @@ export const MOVES: Record<MoveId, MoveDef> = {
     arcRad: 0.9,
     damage: 14,
     knockdown: true,
-    reversalWindow: { from: 56, to: 230 }, // 40%×140; 140+90
-    counterWindow: { from: 110, to: 350 }, // 230±120
+    reversalWindow: { from: 56, to: 140 + 90 }, // from = 40%×140
+    counterWindow: { from: 230 - COUNTER_HALF_WIDTH_MS, to: 230 + COUNTER_HALF_WIDTH_MS },
   },
 
   /**
@@ -94,8 +95,8 @@ export const MOVES: Record<MoveId, MoveDef> = {
     arcRad: 1.6,
     damage: 10,
     knockdown: true,
-    reversalWindow: { from: 64, to: 270 }, // 40%×160; 160+110
-    counterWindow: { from: 150, to: 390 }, // 270±120
+    reversalWindow: { from: 64, to: 160 + 110 }, // from = 40%×160
+    counterWindow: { from: 270 - COUNTER_HALF_WIDTH_MS, to: 270 + COUNTER_HALF_WIDTH_MS },
   },
 
   /** Off a wall within 0.9m. Slow telegraph, huge payoff, style bonus on kill. */
@@ -280,19 +281,3 @@ export const MOVES: Record<MoveId, MoveDef> = {
     knockdown: false,
   },
 };
-
-/** Counter-reversal half-width shared by every counter-capable move. */
-export const COUNTER_WINDOW_HALF_MS = COUNTER_HALF_WIDTH_MS;
-
-/** True when `t` (ms since move start) is inside the move's reversal window. */
-export function inReversalWindow(move: MoveDef, t: number): boolean {
-  if (!move.reversalWindow) return false;
-  return t >= move.reversalWindow.from && t <= move.reversalWindow.to;
-}
-
-/** True when `t` (ms since move start) is inside the move's counter window. */
-export function inCounterWindow(move: MoveDef, t: number): boolean {
-  const w = move.counterWindow;
-  if (!w) return false;
-  return t >= w.from && t <= w.to;
-}

@@ -38,9 +38,6 @@ export type {
  */
 const REVERSE_PRESS_MAX_MS = 250;
 
-/** Crouch presses at or below this count as a fresh timed press. */
-const REVERSE_PRESS_MIN_MS = 0;
-
 /** Facing cone for stealth kills: |relAngle| at least this = behind. */
 const BEHIND_RAD = Math.PI - 0.6;
 
@@ -153,7 +150,8 @@ function resolveCrouch(a: CombatantSnapshot, ctx: WorldContext): ResolveResult |
 /**
  * The defender reverses iff the incoming attack sits inside its move's
  * `reversalWindow` (absolute ms from attacker's move start) while they face
- * us. Too early/late falls through to whatever the stance table offers [§3.2].
+ * us. A failed check is a whiffed duck — resolveCrouch falls through and
+ * returns null here; the controller just enters crouch stance [§3.2].
  */
 function findReversal(a: CombatantSnapshot): { kind: 'reverse'; targetId: string } | null {
   const t = a.nearestTarget;
