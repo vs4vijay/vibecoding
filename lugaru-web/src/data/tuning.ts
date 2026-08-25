@@ -103,3 +103,46 @@ export const TURN_RATE = 12;
 /** Nearest-target sense radius for resolver snapshots (m). */
 export const TARGET_SENSE_RADIUS_M = 3;
 
+// ---------------------------------------------------------------------------
+// Injury model [spec §3.4; Task 9] — the diegetic health layer.
+// ---------------------------------------------------------------------------
+
+/** Bleeding drains this many hp per second while flags.bleeding holds. */
+export const BLEED_DPS = 2;
+/**
+ * Bleed can never take a fighter below this hp — wounds weaken, only a
+ * real hit finishes. A fresh strike may still drop hp to ≤ 0 and KO.
+ */
+export const BLEED_HP_FLOOR = 1;
+/** Fraction of maxHp below which the fighter limps [brief: 40%]. */
+export const LIMP_HP_FRACTION = 0.4;
+
+// ---------------------------------------------------------------------------
+// Scoring [spec §3.6; Task 9] — combo chain + named bonus awards.
+// ---------------------------------------------------------------------------
+
+/** Hits inside this window since the last one keep the combo chain alive. */
+export const COMBO_WINDOW_MS = 2500;
+/** Combo chain points for hits 1–5 [spec: ×2 ×4 ×8 ×16, base 66]. */
+export const COMBO_CHAIN_POINTS: readonly number[] = [66, 133, 266, 533, 1066];
+/**
+ * Past the chain peak, each extra hit is worth COMBO_DECAY_NUMERATOR /
+ * (hits past peak + 1), rounded — 533, 355, 267, … decaying toward zero
+ * [brief: "decay past 5th: 533/355/…"].
+ */
+export const COMBO_DECAY_NUMERATOR = 1066;
+/** Reversal success award [spec §3.6: Reversal 30]. */
+export const SCORE_REVERSAL = 30;
+/** Reversal that ends in the victim's KO [spec §3.6: 100]. */
+export const SCORE_REVERSAL_KO = 100;
+/** Silent behind-kill on an unaware enemy [spec §3.7 → §3.6: 100]. */
+export const SCORE_STEALTH_KILL = 100;
+/** Running jump-kick cannon [spec §3.6: Leg cannon 100]. */
+export const SCORE_LEG_CANNON = 100;
+/** Body-thrown corpse connects with an enemy [spec §3.6: Nice Aim 150]. */
+export const SCORE_NICE_AIM = 150;
+/** Wall-kick kill style bonus [spec §3.6: Style bonus 150]. */
+export const SCORE_STYLE_WALLKICK = 150;
+/** Mid-air knife throw kill [spec §3.6: Ninja bonus 60]. */
+export const SCORE_NINJA_THROW = 60;
+

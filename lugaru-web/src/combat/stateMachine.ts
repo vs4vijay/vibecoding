@@ -53,6 +53,13 @@ import { startCounter, tryReversal } from './reversal';
 import { createAntiRepState, recordAttack } from './antirepetition';
 import type { AntiRepState } from './antirepetition';
 export type { AntiRepState };
+import { updateInjuries } from './injury';
+import type { InjuryEvent } from './injury';
+import { ScoreLedger } from './scoring';
+import type { ScoreLedger as LedgerView } from './scoring';
+
+/** Shared quiet-step value for lastInjuryEvents — see the field's doc. */
+const NO_INJURY_EVENTS: readonly InjuryEvent[] = [];
 
 // Plain fighter state — serializable snapshot, no class instances inside.
 // ---------------------------------------------------------------------------
@@ -185,6 +192,29 @@ export class FighterSim {
   private bufferedActionId: MoveId | null = null;
   private bufferMsLeft = 0;
 
+  /**
+   * Injury events from the MOST RECENT update() step [Task 9]. The renderer
+   * polls this once per frame (blood-drip FX, limp gait, KO ragdoll kick-
+   * off); each step overwrites it, so pollers must read before the next.
+   * Quiet steps share one immutable empty array — no per-step allocation.
+   */
+  lastInjuryEvents: readonly InjuryEvent[] = NO_INJURY_EVENTS;
+
+  /**
+   * Score sink [Task 9]: when set, reversal successes award SCORE_REVERSAL
+   * here. Injected via setScoreLedger; the game layer owns the ledger so
+   * results screens and persistence stay outside the sim. Other awards
+   * land where their causes happen — see docs in scoring.ts (Task 14
+   * wires LEG_CANNON/NICE_AIM/STYLE_WALLKICK, Task 13 NINJA_THROW,
+   * Task 18 STEALTH_KILL).
+   */
+  private ledger: LedgerView | null = null;
+
+  /** Attach the score sink for this fighter's awards (idempotent). */
+  setScoreLedger(ledger: LedgerView): void {
+    this.ledger = ledger;
+  }
+
   /** World view for the current step (resolver context reads it). */
   private world: FighterSimWorld = {
     fighters: [],
@@ -267,6 +297,12 @@ export class FighterSim {
     this.advancePhase(dt);
     this.applyBuffer(dt);
     this.integrate(dt, input === null ? 0 : input.moveX, input === null ? 0 : input.moveZ);
+
+    // Injury model [Task 9]: one tick per step, AFTER the phase work so a
+    // hit applied mid-step is seen by the same tick that follows it. The
+    // returned events are republished for renderer polling (documented on
+    // the field).
+    this.lastInjuryEvents = updateInjuries(this.state, dt);
   }
 
   /**
@@ -393,17 +429,22 @@ export class FighterSim {
     // SUCCESS [spec §3.2]: the incoming attack dies mid-swing. Attacker is
     // cancelled into hitstun whose duration IS the counter-reversal window
     // (startCounter reads it); defender plays the short reversal animation.
-    attacker.pendingReverseOf = s.id;
     attacker.currentMove = undefined;
     attacker.moveElapsedMs = 0;
     attacker.phase.t = 'hitstun';
     attacker.phase.moveId = undefined;
     attacker.phase.phaseMsLeft = COUNTER_WINDOW_MS;
+    attacker.pendingReverseOf = s.id;
     s.pendingReverseOf = attacker.id;
     s.phase.t = 'reverseAttempt';
     s.phase.moveId = undefined;
     s.phase.phaseMsLeft = REVERSE_ATTEMPT_MS;
     s.stance = 'standing';
+
+    // Score hook [Task 9]: every successful reversal is worth
+    // SCORE_REVERSAL; the KO variant (REVERSAL_KO) lands with Task 14's
+    // kill-attribution layer once effects can be traced to a death.
+    this.ledger?.award({ type: 'REVERSAL' });
   }
 
 

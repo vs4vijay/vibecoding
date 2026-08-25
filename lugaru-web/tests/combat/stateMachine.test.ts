@@ -3,6 +3,8 @@ import { FighterSim, type FighterSimWorld } from '../../src/combat/stateMachine'
 import { applyHit } from '../../src/combat/hitdetect';
 import { MOVES } from '../../src/data/moves';
 import { RECOVERY_CHAIN_MIN_MS } from '../../src/data/tuning';
+import { ScoreLedger } from '../../src/combat/scoring';
+import type { ScoreLedger as LedgerView } from '../../src/combat/scoring';
 import type { InputFrame } from '../../src/core/input';
 
 // ---------------------------------------------------------------------------
@@ -432,5 +434,77 @@ describe('FighterSim lunge', () => {
       MOVES.runningKick.lungeSpeed! * (STEP_MS / 1000),
       3,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 9 wiring — injury tick runs inside update(); ledger is injected.
+// ---------------------------------------------------------------------------
+
+describe('FighterSim injury wiring (T9)', () => {
+  it('update() ticks injuries: bleeding drains hp across sim steps', () => {
+    const { player, world } = makePair();
+    player.state.flags.bleeding = true;
+    const hp0 = player.state.hp;
+    run(player, 120, makeInput(), world); // 2s of bleed
+    expect(hp0 - player.state.hp).toBeCloseTo(2000 * 0.002, 4);
+    // Renderer-facing poll: whatever the LAST step emitted (a bleeding
+    // fighter emits 'bled' on every draining step — here [{type:'bled'}]).
+    expect(player.lastInjuryEvents).toEqual([{ type: 'bled' }]);
+  });
+
+  it('lastInjuryEvents exposes the transition of the most recent step', () => {
+    const { player, world } = makePair();
+    player.state.hp = 30; // below the limp threshold
+    run(player, 1, makeInput(), world);
+    expect(player.lastInjuryEvents).toEqual([{ type: 'limped' }]);
+    run(player, 1, makeInput(), world); // settled — no repeat emission
+    expect(player.lastInjuryEvents).toEqual([]);
+  });
+
+  it('bleed alone never KOs through the sim: clamps at the 1hp floor', () => {
+    const { player, world } = makePair();
+    player.state.hp = 2;
+    player.state.flags.bleeding = true;
+    run(player, 240, makeInput(), world); // 4s — would drain 8hp unclamped
+    expect(player.state.hp).toBe(1);
+    expect(player.state.phase.t).not.toBe('ko');
+  });
+
+  it('a KO from applyHit stays terminal under the injury tick', () => {
+    const { dummy, world } = makePair();
+    dummy.state.hp = 1;
+    const hit: HitEvent = {
+      attackerId: 'player',
+      victimId: 'wolf1',
+      moveId: 'punch',
+      dirVector: { x: 1, z: 0 },
+    };
+    applyHit(hit, world.fighters);
+    expect(dummy.state.phase.t).toBe('ko');
+    run(dummy, 10, null, world);
+    expect(dummy.state.phase.t).toBe('ko');
+  });
+});
+
+describe('FighterSim reversal score hook (T9)', () => {
+  it('a successful reversal awards REVERSAL into the injected ledger', () => {
+    const ledger: LedgerView = new ScoreLedger();
+    const { player, dummy, world } = makePair();
+    player.setScoreLedger(ledger);
+
+    const wolfClick = makeInput({ pressed: { attack: true, jump: false, crouch: false } });
+    run(dummy, 1, wolfClick, world); // wolf begins its punch
+    expect(dummy.state.phase.moveId).toBe('punch');
+    const pressed = runUntil(dummy, makeInput(), world, () =>
+      dummy.state.moveElapsedMs >= 48,
+    );
+    expect(pressed).toBe(true);
+
+    // Crouch press inside the window (same recipe as reversal.test.ts).
+    const crouch = makeInput({ pressed: { attack: false, jump: false, crouch: true } });
+    player.update(STEP_MS, crouch, world);
+    expect(player.state.pendingReverseOf).toBe('wolf1'); // reversal fired
+    expect(ledger.total()).toBe(30);
   });
 });
