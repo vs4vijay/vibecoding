@@ -10,6 +10,14 @@
  *
  * Hit geometry lives in hitdetect.ts; this module consumes its events and
  * tracks swing identity so no victim is struck twice by one swing.
+ *
+ * Task 8 additions [spec §3.2]: crouch presses resolving to {kind:'reverse'}
+ * dispatch through reversal.tryReversal — success cancels the attacker's
+ * move into a counterWindow-wide hitstun (the counter-reversal window),
+ * puts the defender in a short 'reverseAttempt' animation phase and marks
+ * pendingReverseOf on both parties. Every fired attack is recorded through
+ * antirepetition.recordAttack; the damage scale is read via penaltyFor at
+ * strike time.
  */
 
 import type { InputFrame } from '../core/input';
@@ -18,10 +26,12 @@ import { SPECIES } from '../data/species';
 import type { SpeciesDef } from '../data/species';
 import {
   ACCEL,
+  COUNTER_WINDOW_MS,
   GRAVITY,
   INPUT_BUFFER_MS,
   JUMP_SPEED,
   RECOVERY_CHAIN_MIN_MS,
+  REVERSE_ATTEMPT_MS,
   RUN_STANCE_SPEED,
   TARGET_SENSE_RADIUS_M,
   TURN_RATE,
@@ -39,23 +49,30 @@ import type {
 } from './types';
 import { resolveAction } from './resolver';
 import { applyHit, findHit, forwardXZ } from './hitdetect';
+import { tryReversal } from './reversal';
+import { createAntiRepState, recordAttack } from './antirepetition';
+import type { AntiRepState } from './antirepetition';
+export type { AntiRepState };
 
-// ---------------------------------------------------------------------------
 // Plain fighter state — serializable snapshot, no class instances inside.
 // ---------------------------------------------------------------------------
 
 /** One named stretch of the fighter's update loop. */
 export interface FighterPhase {
-  t: 'idle' | 'move' | 'startup' | 'active' | 'recovery' | 'hitstun' | 'downed' | 'ko';
+  t:
+    | 'idle'
+    | 'move'
+    | 'startup'
+    | 'active'
+    | 'recovery'
+    | 'hitstun'
+    | 'downed'
+    | 'ko'
+    | 'reverseAttempt';
   /** Move owning this phase (startup/active/recovery only). */
   moveId?: MoveId;
   /** ms remaining before the phase auto-transitions; Infinity while idle. */
   phaseMsLeft: number;
-}
-
-/** Anti-repetition bookkeeping — populated from Task 8 onward. */
-export interface AntiRepState {
-  lastMoveIds: string[];
 }
 
 /** Long-lived status flags; the injury model (Task 9) extends semantics. */
@@ -197,6 +214,7 @@ export class FighterSim {
         unconscious: false,
         invulnerableAirFlipMs: 0,
       },
+      antiRep: createAntiRepState(),
     };
   }
 
@@ -226,6 +244,12 @@ export class FighterSim {
       (p === 'idle' || p === 'recovery' || p === 'active')
     ) {
       this.consumeAttack(input, p);
+    }
+
+    // Crouch press: reverse attempt first [spec §3.2], then context moves.
+    // Mid-swing (startup/active) the body is committed — no crouch actions.
+    if (input !== null && input.pressed.crouch && (p === 'idle' || p === 'recovery')) {
+      this.consumeCrouch(input, p);
     }
 
     this.advancePhase(dt);
@@ -269,14 +293,24 @@ export class FighterSim {
       this.snapshot(),
       this.worldCtx(),
     );
-    // Reverse attempts route through Task 8's reversal module; ignored here.
+    // Reverse attempts route through Task 8's reversal module below.
     if (action === null || action.kind !== 'move') return;
 
+    // Anti-repetition: every FIRED attack is recorded (dispatch point).
+    recordAttack(this.state.antiRep!, action.id);
+    this.dispatchMoveAction(action.id, phaseAtPress);
+  }
+
+  /**
+   * Shared move-dispatch tail for both buttons: recovery-tail chaining,
+   * busy-phase buffering (INPUT_BUFFER_MS), or immediate start.
+   */
+  private dispatchMoveAction(id: MoveId, phaseAtPress: FighterPhase['t']): void {
     if (phaseAtPress === 'recovery') {
       // Recovery's tail chains freely into the next move; earlier presses
       // buffer like any other busy-phase press.
       if (this.state.phase.phaseMsLeft <= RECOVERY_CHAIN_MIN_MS) {
-        this.startMove(action.id);
+        this.startMove(id);
         return;
       }
     }
@@ -288,11 +322,77 @@ export class FighterSim {
       // Real buffer: one queued action with its own expiry window. It ticks
       // every step in applyBuffer and fires iff still alive when the running
       // move ends.
-      this.bufferedActionId = action.id;
+      this.bufferedActionId = id;
       this.bufferMsLeft = INPUT_BUFFER_MS;
       return;
     }
-    this.startMove(action.id);
+    this.startMove(id);
+  }
+
+  /**
+   * Crouch press dispatch [spec §3.2]: reverse attempt first, then context
+   * moves (pickup/body/clean), then slide-stop — exactly resolveCrouch's
+   * priority. The resolver answers {kind:'reverse'} only when its window +
+   * facing gates pass, so a whiffed duck falls through to null/duck.
+   */
+  private consumeCrouch(input: InputFrame, phaseAtPress: FighterPhase['t']): void {
+    const action = resolveAction(
+      { button: 'crouch' },
+      this.snapshot(),
+      this.worldCtx(),
+    );
+    if (action === null) return; // plain duck: crouch stance via integrate()
+    if (action.kind === 'reverse') {
+      this.executeReversal(action.targetId);
+      return;
+    }
+    // Context moves (pickup/body/clean/slide-stop) are crouch-button moves;
+    // route through the shared move dispatcher so anti-rep records them too.
+    this.dispatchMoveAction(action.id, phaseAtPress);
+  }
+
+  /**
+   * A resolver-approved reversal attempt against the fighter currently
+   * attacking us (`attackerId`). The attacker's absolute elapsed time is
+   * read live from its state; tryReversal classifies the timing.
+   */
+  private executeReversal(attackerId: string): void {
+    const s = this.state;
+    const fighters = this.world.fighters;
+    let attacker: FighterState | undefined;
+    for (let i = 0; i < fighters.length && attacker === undefined; i++) {
+      if (fighters[i].id === attackerId) attacker = fighters[i];
+    }
+    if (
+      attacker === undefined ||
+      attacker.currentMove === undefined ||
+      (attacker.phase.t !== 'startup' &&
+        attacker.phase.t !== 'active')
+    ) {
+      return; // target gone or not mid-move: nothing to reverse
+    }
+
+    const outcome = tryReversal(s, {
+      attacker,
+      def: attacker.currentMove,
+      elapsedMs: attacker.moveElapsedMs,
+    });
+    if (outcome !== 'success') return; // early/late/notFacing → whiffed duck
+
+    // SUCCESS [spec §3.2]: the incoming attack dies mid-swing. Attacker is
+    // cancelled into hitstun whose duration IS the counter-reversal window
+    // (startCounter reads it); defender plays the short reversal animation.
+    attacker.pendingReverseOf = s.id;
+    attacker.currentMove = undefined;
+    attacker.moveElapsedMs = 0;
+    attacker.phase.t = 'hitstun';
+    attacker.phase.moveId = undefined;
+    attacker.phase.phaseMsLeft = COUNTER_WINDOW_MS;
+    s.pendingReverseOf = attacker.id;
+    s.phase.t = 'reverseAttempt';
+    s.phase.moveId = undefined;
+    s.phase.phaseMsLeft = REVERSE_ATTEMPT_MS;
+    s.stance = 'standing';
   }
 
   /** Open the move timeline for a resolver-approved action. */
@@ -330,8 +430,13 @@ export class FighterSim {
     switch (s.phase.t) {
       case 'hitstun':
       case 'downed':
+      case 'reverseAttempt':
         s.phase.phaseMsLeft -= dt;
         if (s.phase.phaseMsLeft <= 0) {
+          // Any overlay (hitstun/downed/reverseAttempt) ending clears the
+          // reversal marker: only a reversal success ever sets it, and its
+          // story is over once the victim stands back up.
+          s.pendingReverseOf = undefined;
           s.phase.t = 'idle';
           s.phase.moveId = undefined;
           s.phase.phaseMsLeft = Infinity;
@@ -555,7 +660,21 @@ function nearestTargetOf(self: FighterState, world: FighterSimWorld): TargetSnap
     airborne: best.stance === 'airborne',
     facingMe: facesToward(best, self),
     unaware: false, // stealth awareness lands with Task 18's FSM
-    incomingAttack: undefined, // reversal wiring (Task 8) supplies real attacks
+    // Reversal wiring [spec §3.2]: expose the target's in-flight attack
+    // with its ABSOLUTE move-elapsed time so resolveCrouch's window test
+    // and reversal.tryReversal see the same clock.
+    incomingAttack:
+      best.phase.t === 'startup' || best.phase.t === 'active'
+        ? {
+            attackerId: best.id,
+            moveId: best.phase.moveId!,
+            phase: best.phase.t,
+            phaseMsElapsed:
+              best.phase.t === 'startup'
+                ? best.moveElapsedMs
+                : Math.max(0, best.moveElapsedMs - MOVES[best.phase.moveId!].startupMs),
+          }
+        : undefined,
   };
 }
 

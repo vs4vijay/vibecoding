@@ -259,6 +259,10 @@ export const MOVES: Record<string, MoveDef> = {
     knockdown: true,
   },
 
+  /**
+   * Throw a downed body as a projectile [spec §3.1]. Damage resolves when
+   * the body lands ("Nice Aim") — Task 14's effect layer, not this row.
+   */
   bodyThrow: {
     id: 'bodyThrow',
     clip: 'bodythrow',
@@ -269,6 +273,23 @@ export const MOVES: Record<string, MoveDef> = {
     arcRad: Math.PI,
     damage: 0, // projectile damage resolves when the body lands ("Nice Aim")
     knockdown: false,
+  },
+
+  /**
+   * Counter-reversal throw [spec §3.2]: the original attacker's answer to a
+   * successful reversal. Downs the reverser for REVERSE_DAMAGE (15). Never
+   * resolver-emitted — reversal.startCounter builds its HitEvent directly.
+   */
+  counterThrow: {
+    id: 'counterThrow',
+    clip: 'bodythrow', // throw animation shared with body-throw until T14 art
+    startupMs: 0, // counter window is the attacker's hitstun timer itself
+    activeMs: 0,
+    recoveryMs: 0,
+    rangeM: 1.6,
+    arcRad: Math.PI,
+    damage: 15,
+    knockdown: true,
   },
 
   /** Crouch-context with a bloody blade: stab it into the ground to clean. */

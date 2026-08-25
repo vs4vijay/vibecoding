@@ -24,6 +24,19 @@ export function forwardXZ(heading: number): { x: number; z: number } {
 }
 
 /**
+ * Absolute shortest-arc distance between two headings, in radians [0..π].
+ * The one angular-comparison primitive: reversal facing cones, stealth
+ * checks and future AI vision all read from here instead of re-rolling
+ * their own trig.
+ */
+export function angleDiff(a: number, b: number): number {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d < 0 ? -d : d;
+}
+
+/**
  * Every victim inside this active swing's reach: ground-plane distance
  * ≤ rangeM AND |angle from heading| ≤ arcRad/2 (both bounds inclusive).
  */

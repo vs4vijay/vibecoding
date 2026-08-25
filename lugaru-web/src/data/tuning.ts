@@ -14,6 +14,25 @@ export const FLIP_STUN_MS = 1500;
  * Crouch presses longer than this are held state (sneak), not a timed
  * reverse attempt [spec §3.2 "timed press = reverse"].
  */
+/** Defender's reversal facing cone half-angle (rad) [spec §3.2]. */
+export const REVERSAL_HALF_ANGLE_RAD = (100 * Math.PI) / 180;
+
+/**
+ * Counter-reversal window width (ms) — how long the reversed original
+ * attacker may answer with the 15-damage downing throw [spec §3.2].
+ */
+export const COUNTER_WINDOW_MS = 240;
+
+/** Counter-reversal throw damage dealt to the reverser [spec §3.2: 15]. */
+export const REVERSE_DAMAGE = 15;
+
+/**
+ * Defender's reversal animation length (ms) — a short committed window
+ * during which the counter-reversal remains answerable. Tuned shorter than
+ * COUNTER_WINDOW_MS so the attacker always keeps a beat to react.
+ */
+export const REVERSE_ATTEMPT_MS = 180;
+
 export const REVERSE_PRESS_WINDOW_MS = 250;
 
 /** Stealth kill needs |relAngle| at least this far behind the actor (rad). */
@@ -33,8 +52,10 @@ export const DOWNED_GROUND_MS = 900;
 
 /**
  * A move may be chained from recovery once at most this much of it is left
- * (late-recovery cancel window). Presses earlier in recovery are ignored.
- * Sanctioned Lugaru-feel choice — controller sign-off, Task 7 fix round F9
+ * (late-recovery cancel window). Presses earlier in recovery are NOT
+ * ignored — they fall into the input buffer and fire when the running
+ * move ends iff their window is still alive. Sanctioned Lugaru-feel
+ * choice — controller sign-off, Task 7 fix round F9
  * (ledger: task-7-report.md).
  */
 export const RECOVERY_CHAIN_MIN_MS = 100;

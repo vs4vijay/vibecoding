@@ -16,9 +16,11 @@ export type Stance = 'standing' | 'running' | 'crouched' | 'airborne';
 export type ActionButton = 'attack' | 'jump' | 'crouch';
 
 /**
- * Every move the resolver can emit. `reverseAttempt` sits in the union for
- * contract completeness (Task 7 state machine consumes it) but has no MOVES
- * row — a reversal is an outcome ({kind:'reverse'}), not a played clip.
+ * Every move the resolver can emit. `counterThrow` is the Task 8
+ * counter-reversal throw (never resolver-emitted — startCounter produces
+ * it); `reverseAttempt` sits in the union for contract completeness but has
+ * no MOVES row — a reversal attempt is an outcome ({kind:'reverse'}), not a
+ * played clip.
  * Armed moves (`slash`, `stab`, `staffVert`, `staffHoriz`) are Task 13's
  * dispatch to add to this union and the table.
  */
@@ -40,7 +42,8 @@ export type MoveId =
   | 'stealthKill'
   | 'bodyThrow'
   | 'cleanBlade'
-  | 'reverseAttempt';
+  | 'reverseAttempt'
+  | 'counterThrow';
 
 /** What resolveAction decides for one button press. */
 export type ResolveResult = { kind: 'move'; id: MoveId } | { kind: 'reverse'; targetId: string };

@@ -266,17 +266,17 @@ describe('FighterSim input gating', () => {
   });
 });
 
-describe('FighterSim antiRep contract (T8 takeover)', () => {
-  it('leaves antiRep uninitialized after repeated punches — T8 owns tracking', () => {
+describe('FighterSim antiRep contract (T8 live)', () => {
+  it('initializes antiRep and records every fired punch (T8 takeover complete)', () => {
     const { player, world } = makePair();
     for (let i = 0; i < 3; i++) {
       run(player, 1, clickAttack(), world);
       runUntil(player, makeInput(), world, () => player.state.phase.t === 'idle');
     }
-    // Plan's original Step-1 asked for streak counting here; the dispatch
-    // clarification moved anti-repetition into T8 (antirepetition.ts). T7
-    // pins the field as absent/uninitialized so T8 can introduce it.
-    expect(player.state.antiRep).toBeUndefined();
+    // T8's antirepetition.ts now owns tracking: the sim initializes the
+    // state and records each fired attack through recordAttack.
+    expect(player.state.antiRep).toBeDefined();
+    expect(player.state.antiRep!.lastMoveIds).toEqual(['punch', 'punch', 'punch']);
   });
 });
 
