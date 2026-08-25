@@ -14,6 +14,8 @@ export const FLIP_STUN_MS = 1500;
  * Crouch presses longer than this are held state (sneak), not a timed
  * reverse attempt [spec §3.2 "timed press = reverse"].
  */
+export const REVERSE_PRESS_WINDOW_MS = 250;
+
 /** Defender's reversal facing cone half-angle (rad) [spec §3.2]. */
 export const REVERSAL_HALF_ANGLE_RAD = (100 * Math.PI) / 180;
 
@@ -33,7 +35,16 @@ export const REVERSE_DAMAGE = 15;
  */
 export const REVERSE_ATTEMPT_MS = 180;
 
-export const REVERSE_PRESS_WINDOW_MS = 250;
+/**
+ * Anti-repetition pressure [spec §3.2]: repeating the same move grows its
+ * damage scale linearly from 1.0 to ANTIREP_PENALTY_CAP, reaching the cap
+ * at streak ANTIREP_MAX_STREAK. Any different move resets the streak.
+ */
+export const ANTIREP_MAX_STREAK = 6;
+/** Damage-multiplier ceiling for spammed moves [brief: 1.0 → 1.6]. */
+export const ANTIREP_PENALTY_CAP = 1.6;
+/** Consecutive uses of one move before the penalty ramp begins. */
+export const ANTIREP_RAMP_START = 2;
 
 /** Stealth kill needs |relAngle| at least this far behind the actor (rad). */
 export const STEALTH_BEHIND_HALF_RAD = Math.PI - 0.6;

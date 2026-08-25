@@ -1,16 +1,16 @@
-/**
- * Anti-repetition pressure [spec §3.2] — pure counters over AntiRepState.
- * Hand-crafted plain states; no sim class, no clock, no RNG.
- */
 import { describe, expect, it } from 'vitest';
 import {
-  ANTIREP_MAX_STREAK,
-  ANTIREP_PENALTY_CAP,
   createAntiRepState,
   penaltyFor,
   recordAttack,
 } from '../../src/combat/antirepetition';
 import type { AntiRepState } from '../../src/combat/antirepetition';
+import { ANTIREP_MAX_STREAK, ANTIREP_PENALTY_CAP } from '../../src/data/tuning';
+
+/**
+ * Anti-repetition pressure [spec §3.2] — pure counters over AntiRepState.
+ * Hand-crafted plain states; no sim class, no clock, no RNG.
+ */
 
 function makeState(): AntiRepState {
   return createAntiRepState();

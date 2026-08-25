@@ -131,7 +131,7 @@ export interface IncomingAttack {
   attackerId: string;
   moveId: MoveId;
   phase: MovePhase;
-  /** ms elapsed inside the current phase. */
+  /** Absolute ms elapsed since the attack's move started (not per-phase). */
   phaseMsElapsed: number;
 }
 

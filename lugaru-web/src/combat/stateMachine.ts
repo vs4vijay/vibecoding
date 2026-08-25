@@ -49,7 +49,7 @@ import type {
 } from './types';
 import { resolveAction } from './resolver';
 import { applyHit, findHit, forwardXZ } from './hitdetect';
-import { tryReversal } from './reversal';
+import { startCounter, tryReversal } from './reversal';
 import { createAntiRepState, recordAttack } from './antirepetition';
 import type { AntiRepState } from './antirepetition';
 export type { AntiRepState };
@@ -238,7 +238,19 @@ export class FighterSim {
     const p = this.state.phase.t;
     const pressedAttack = input !== null && input.pressed.attack;
     const pressedJump = input !== null && input.pressed.jump;
+
+    // Counter-reversal [spec §3.2]: an ATTACK press while sitting in the
+    // post-reversal counter-hitstun window answers with startCounter's
+    // downing throw. Outside the window (drained timer, or any other
+    // phase) presses fall through to the normal buffered path below.
     if (
+      input !== null &&
+      pressedAttack &&
+      p === 'hitstun' &&
+      this.state.pendingReverseOf !== undefined
+    ) {
+      this.consumeCounter();
+    } else if (
       input !== null &&
       (pressedAttack || pressedJump) &&
       (p === 'idle' || p === 'recovery' || p === 'active')
@@ -296,8 +308,7 @@ export class FighterSim {
     // Reverse attempts route through Task 8's reversal module below.
     if (action === null || action.kind !== 'move') return;
 
-    // Anti-repetition: every FIRED attack is recorded (dispatch point).
-    recordAttack(this.state.antiRep!, action.id);
+
     this.dispatchMoveAction(action.id, phaseAtPress);
   }
 
@@ -395,16 +406,50 @@ export class FighterSim {
     s.stance = 'standing';
   }
 
-  /** Open the move timeline for a resolver-approved action. */
+
+  /**
+   * The original attacker answers a successful reversal [spec §3.2]:
+   * startCounter validates the still-open window and returns the
+   * applyHit-ready counter throw, which lands immediately on the reverser
+   * (downs them for REVERSE_DAMAGE base). Consuming the window clears the
+   * marker; a refused call leaves state untouched (normal press rules
+   * apply on later steps).
+   */
+  private consumeCounter(): void {
+    const s = this.state;
+    const reverserId = s.pendingReverseOf!;
+    const fighters = this.world.fighters;
+    let reverser: FighterState | undefined;
+    for (let i = 0; i < fighters.length && reverser === undefined; i++) {
+      if (fighters[i].id === reverserId) reverser = fighters[i];
+    }
+    if (reverser === undefined) return; // target gone: nothing to answer
+
+    const res = startCounter(s, reverserId);
+    if (!res.granted || res.effect === undefined) return;
+    applyHit(res.effect, fighters);
+    // The throw consumes the counter opportunity.
+    s.pendingReverseOf = undefined;
+  }
+
+
+
+  /**
+   * Open the move timeline for a resolver-approved action — the single
+   * FIRE SITE shared by immediate starts, recovery-chain fires and buffer
+   * fires, so anti-repetition counts only attacks that actually began.
+   */
   private startMove(id: MoveId): void {
     const def = MOVES[id];
     if (def === undefined) return;
     this.bufferedActionId = null;
     this.bufferMsLeft = 0;
     this.swungThisMove = false;
+    recordAttack(this.state.antiRep!, id);
 
     if (!hasTimeline(def)) {
-      // Zero-duration utility rows (jump/hop): pure impulse, no animation lock.
+      // Zero-duration utility rows (jump/hop): pure impulse, no animation
+      // lock — the fire itself IS the effect.
       if (id === 'jump' || id === 'hop') {
         this.state.velY = JUMP_SPEED;
         this.grounded = false;
@@ -660,19 +705,18 @@ function nearestTargetOf(self: FighterState, world: FighterSimWorld): TargetSnap
     airborne: best.stance === 'airborne',
     facingMe: facesToward(best, self),
     unaware: false, // stealth awareness lands with Task 18's FSM
-    // Reversal wiring [spec §3.2]: expose the target's in-flight attack
-    // with its ABSOLUTE move-elapsed time so resolveCrouch's window test
-    // and reversal.tryReversal see the same clock.
+    // Reversal wiring [spec §3.2]: expose the target's in-flight attack.
+    // phaseMsElapsed is ABSOLUTE ms since the move started (moveElapsedMs
+    // in every phase) — one clock, identical to what executeReversal feeds
+    // tryReversal; the resolver's window test reads the same number.
+    // (IncomingAttack.phaseMsElapsed's per-phase doc is superseded here.)
     incomingAttack:
       best.phase.t === 'startup' || best.phase.t === 'active'
         ? {
             attackerId: best.id,
             moveId: best.phase.moveId!,
             phase: best.phase.t,
-            phaseMsElapsed:
-              best.phase.t === 'startup'
-                ? best.moveElapsedMs
-                : Math.max(0, best.moveElapsedMs - MOVES[best.phase.moveId!].startupMs),
+            phaseMsElapsed: best.moveElapsedMs,
           }
         : undefined,
   };

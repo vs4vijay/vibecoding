@@ -29,8 +29,9 @@ export type ReversalOutcome = 'success' | 'early' | 'late' | 'notFacing';
  *
  * Window semantics are INCLUSIVE on both ends: success iff
  * window.from ≤ elapsed ≤ window.to; below from → 'early'; above to →
- * 'late'. Facing uses the shared REVERSAL_HALF_ANGLE_RAD cone, inclusive at
- * the edge. A move without a reversalWindow is never reversible ('late').
+ * 'late'. Facing requires angleDiff strictly below the shared
+ * REVERSAL_HALF_ANGLE_RAD cone (exactly at the edge → 'notFacing').
+ * A move without a reversalWindow is never reversible ('late').
  */
 export function tryReversal(
   defender: FighterState,

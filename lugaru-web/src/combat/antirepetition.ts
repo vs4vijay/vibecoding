@@ -1,17 +1,17 @@
 /**
  * Anti-repetition pressure [spec §3.2] — Lugaru's answer to move spamming.
- * Every fired attack is recorded; repeating the same move grows a damage
- * scale linearly from 1.0 (fresh use) to 1.6 (six-hit streak), pinned at the
- * cap beyond. Any different move resets the streak to zero. Pure counters
- * over plain state — no clock, no RNG; allocation only when the history
- * array restarts (amortized zero on hot paths).
+ * Every FIRED attack is recorded (at the fire site, never at press time);
+ * repeating the same move grows a damage scale linearly from 1.0 to
+ * ANTIREP_PENALTY_CAP, reaching the cap by streak ANTIREP_MAX_STREAK. Any
+ * different move resets the streak. Pure counters over plain state — no
+ * clock, no RNG; allocation only when a chain restarts (amortized zero).
  */
 
-/** Streak length at which the penalty reaches its cap [brief: linear to 6]. */
-export const ANTIREP_MAX_STREAK = 6;
-
-/** Damage-multiplier ceiling for spammed moves [brief: 1.0 → 1.6]. */
-export const ANTIREP_PENALTY_CAP = 1.6;
+import {
+  ANTIREP_MAX_STREAK,
+  ANTIREP_PENALTY_CAP,
+  ANTIREP_RAMP_START,
+} from '../data/tuning';
 
 /**
  * Anti-repetition bookkeeping carried on FighterState. `lastMoveIds` holds
@@ -27,7 +27,8 @@ export function createAntiRepState(): AntiRepState {
 }
 
 /**
- * Record one FIRED attack (call at move dispatch, not press). Same move as
+ * Record one attack that ACTUALLY FIRED (immediate start, recovery-chain
+ * fire, or buffer fire — never a buffered-but-expired press). Same move as
  * the running streak extends it toward ANTIREP_MAX_STREAK; any different
  * move restarts the chain with just that id.
  */
@@ -44,19 +45,19 @@ export function recordAttack(s: AntiRepState, moveId: string): void {
 }
 
 /**
- * Damage scale for `moveId` given the recorded streak. Linear 1.0 →
- * ANTIREP_PENALTY_CAP in ANTIREP_MAX_STREAK−3 equal steps beginning at the
- * second consecutive use, so streak 3 sits exactly mid-ramp (1.4 — the
- * spec-pinned pressure point) and the cap lands at streak 5, holding
- * through the streak cap 6+. No history or a different move reads 1.0.
- * FighterSim multiplies strike damage by this before applying hits.
+ * Damage scale for `moveId` given the recorded streak: one free use, then
+ * ANTIREP_MAX_STREAK − ANTIREP_RAMP_START − 1 equal linear steps from 1.0
+ * up to ANTIREP_PENALTY_CAP (so streak 3 sits exactly mid-ramp at 1.4 —
+ * the brief's pinned pressure point — and the cap lands well inside the
+ * streak cap, holding through it). No history or a different move reads
+ * 1.0. FighterSim multiplies strike damage by this when hits are applied.
  */
- export function penaltyFor(s: AntiRepState, moveId: string): number {
+export function penaltyFor(s: AntiRepState, moveId: string): number {
   const n = s.lastMoveIds.length;
+  const steps = ANTIREP_MAX_STREAK - ANTIREP_RAMP_START - 1;
   const repeats =
     n > 0 && s.lastMoveIds[0] === moveId
-      ? Math.min(n - 1, ANTIREP_MAX_STREAK - 3)
+      ? Math.min(n - ANTIREP_RAMP_START + 1, steps)
       : 0;
-  const step = (ANTIREP_PENALTY_CAP - 1) / (ANTIREP_MAX_STREAK - 3);
-  return 1 + step * repeats;
- }
+  return 1 + ((ANTIREP_PENALTY_CAP - 1) / steps) * repeats;
+}

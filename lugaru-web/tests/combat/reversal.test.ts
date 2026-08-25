@@ -353,4 +353,48 @@ describe('FighterSim reversal wiring', () => {
   it('REVERSE_PRESS_WINDOW_MS stays the timed-press threshold (250)', () => {
     expect(REVERSE_PRESS_WINDOW_MS).toBe(250);
   });
+
+  it('F1: reversed attacker pressing attack within the counter window downs the reverser', () => {
+    const { player, dummy, world } = makePair();
+    const wolfClick = makeInput({ pressed: { attack: true, jump: false, crouch: false } });
+
+    // 1. Wolf punches; player reverses inside the window.
+    run(dummy, 1, wolfClick, world);
+    runUntil(dummy, makeInput(), world, () => dummy.state.moveElapsedMs >= 48);
+    player.update(STEP_MS, clickCrouch(), world);
+    expect(player.state.phase.t).toBe('reverseAttempt');
+    expect(dummy.state.phase.t).toBe('hitstun'); // the counter window itself
+
+    // 2. Within COUNTER_WINDOW_MS, the original attacker presses ATTACK.
+    const hpBefore = player.state.hp;
+    dummy.update(STEP_MS, wolfClick, world);
+
+    // The counter throw fired: player (reverser) is DOWN. Damage follows
+    // the shared species rule — wolf attacker scales counterThrow's base
+    // 15 by punchDmgMult 1.6 = 24.
+    expect(player.state.phase.t).toBe('downed');
+    expect(player.state.stance).toBe('downed');
+    expect(player.state.hp).toBe(hpBefore - Math.round(REVERSE_DAMAGE * 1.6));
+    expect(dummy.state.pendingReverseOf).toBeUndefined(); // window consumed
+  });
+
+  it('F1: attack press after the counter window expired behaves normally (no throw)', () => {
+    const { player, dummy, world } = makePair();
+    const wolfClick = makeInput({ pressed: { attack: true, jump: false, crouch: false } });
+    run(dummy, 1, wolfClick, world);
+    runUntil(dummy, makeInput(), world, () => dummy.state.moveElapsedMs >= 48);
+    player.update(STEP_MS, clickCrouch(), world);
+    expect(dummy.state.phase.t).toBe('hitstun');
+
+    // Let the counter window fully drain before any press.
+    const drained = runUntil(dummy, makeInput(), world, () => dummy.state.phase.t === 'idle');
+    expect(drained).toBe(true);
+    const hpBefore = player.state.hp;
+
+    // Now a normal attack press: buffered/normal behavior, no downing.
+    run(dummy, 1, wolfClick, world);
+    expect(player.state.phase.t).not.toBe('downed');
+    expect(player.state.hp).toBe(hpBefore);
+    expect(dummy.state.phase.moveId).toBe('punch'); // fresh punch started
+  });
 });
