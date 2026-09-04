@@ -14,7 +14,7 @@ import type { HitEvent } from '../../src/combat/stateMachine';
 // ---------------------------------------------------------------------------
 
 /** Fixed-step cadence mirrored from the production loop (60Hz). */
-const STEP_MS = 1000 / 60;
+export const STEP_MS = 1000 / 60;
 
 function makeInput(over: Partial<InputFrame> = {}): InputFrame {
   return {
