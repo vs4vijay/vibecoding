@@ -47,17 +47,19 @@ export function runScriptedFight(
   let enemyHits = 0;
   let maxPositionError = 0;
 
-  // Spawn player rabbit at origin facing -X (west), dummy wolf 3m ahead at +X facing back (+X/east)
+  // Spawn player rabbit at origin; enemy wolf 3m ahead at +X.
+  // forwardXZ(heading) = (-sin(h), -cos(h)); heading -PI/2 → forward (1,0) = +X toward enemy.
+  // Enemy heading +PI/2 → forward (-1,0) = -X toward player at origin.
   const player = new FighterSim('rabbit', 'player', true);
   player.state.pos.x = 0;
   player.state.pos.z = 0;
   player.state.pos.y = heightAt(0, 0);
-  player.state.heading = -Math.PI / 2; // facing -X (west) — forward is +X toward enemy
+  player.state.heading = -Math.PI / 2; // forward +X, toward enemy
   const enemy = new FighterSim('wolf', 'enemy', false);
   enemy.state.pos.x = 3;
   enemy.state.pos.z = 0;
   enemy.state.pos.y = heightAt(3, 0);
-  enemy.state.heading = Math.PI / 2; // facing +X (east) — toward player
+  enemy.state.heading = Math.PI / 2; // forward -X, toward player
 
   // Score ledgers (optional, for completeness)
   // import { ScoreLedger } from '../../src/combat/scoring';
@@ -115,21 +117,14 @@ export function runScriptedFight(
         throw new Error(`NaN detected in fighter ${f.id} at step ${i}`);
       }
     }
-
-    // Check for KO
+    // Check for KO via hp depletion
     if (player.state.hp <= 0 || enemy.state.hp <= 0) {
-      const reason = player.state.hp <= 0 && enemy.state.hp <= 0
-        ? 'hp'
-        : player.state.hp <= 0
-          ? 'hp'
-          : 'hp';
-
       return {
         playerHits,
         enemyHits,
         playerFinalHp: Math.max(0, player.state.hp),
         enemyFinalHp: Math.max(0, enemy.state.hp),
-        koReason: reason,
+        koReason: 'hp',
         stepsRun: i + 1,
         maxPositionError,
       };
