@@ -196,6 +196,77 @@ export class CharacterController {
     this.anim.play(want, this.grounded ? this.anim.fadeMs : 60);
     this.locoClip = want;
   }
+
+  // --- sim-driven rendering (Task 11) -------------------------------------
+
+  /** Combat clip override set by the sim when a move/hitstun/downed/ko phase is active. */
+  private overrideClip: string | null = null;
+  private overrideLoop = false;
+
+  /**
+   * Copy sim state into the controller for rendering (read-only: no backflow
+   * to FighterSim).  Computes terrain slope, selects the override or
+   * locomotion clip, updates the clip player, and writes the rig.
+   * `dtMs` is the render-frame delta; `camYaw` is the chase-camera yaw
+   * (unused for now but kept for symmetry with `update`).
+   */
+  updateFromSim(dtMs: number, _camYaw = 0): void {
+    const dt = Math.min(dtMs, 50) / 1000;
+
+    // Terrain-slope alignment (same code as update, but driven by sim pos).
+    const sh = Math.sin(this.heading);
+    const ch = Math.cos(this.heading);
+    const fdx = -sh;
+    const fdz = -ch;
+    const rdx = ch;
+    const rdz = -sh;
+    const px = this.pos.x;
+    const pz = this.pos.z;
+    const gradF =
+      (heightAt(px + fdx * SLOPE_DS, pz + fdz * SLOPE_DS) -
+        heightAt(px - fdx * SLOPE_DS, pz - fdz * SLOPE_DS)) /
+      (2 * SLOPE_DS);
+    const gradR =
+      (heightAt(px + rdx * SLOPE_DS, pz + rdz * SLOPE_DS) -
+        heightAt(px - rdx * SLOPE_DS, pz - rdz * SLOPE_DS)) /
+      (2 * SLOPE_DS);
+    const k = 1 - Math.exp(-TURN_RATE * dt);
+    const targetPitch = this.grounded ? Math.atan(gradF) : 0;
+    const targetRoll = this.grounded ? Math.atan(gradR) : 0;
+    this.pitchSm += (targetPitch - this.pitchSm) * k;
+    this.rollSm += (targetRoll - this.rollSm) * k;
+
+    // Clip selection: combat override takes priority; else locomotion.
+    if (this.overrideClip) {
+      if (this.anim.current !== this.overrideClip) {
+        this.anim.play(this.overrideClip, this.anim.fadeMs);
+      }
+    } else {
+      const hSpeed = Math.hypot(this.vel.x, this.vel.z);
+      this.selectClip(hSpeed);
+    }
+
+    // --- write display ---
+    this.anim.update(dtMs);
+    this.anim.applyTo(this.rig);
+    const dipTarget = this.crouching && this.grounded ? this.def.hipHeight * 0.55 : 0;
+    const kd = 1 - Math.exp(-10 * dt);
+    this.dipSm += (dipTarget - this.dipSm) * kd;
+    this.rig.root.position.set(this.pos.x, this.pos.y - this.dipSm, this.pos.z);
+    this.rig.root.rotation.set(this.pitchSm, this.heading, this.rollSm);
+  }
+
+  /** Set a combat clip override (startup/active/recovery/hitstun/downed/ko). */
+  setPhaseOverride(clip: string, loop: boolean): void {
+    this.overrideClip = clip;
+    this.overrideLoop = loop;
+  }
+
+  /** Clear the combat clip override; locomotion resumes on the next step. */
+  clearPhaseOverride(): void {
+    this.overrideClip = null;
+    this.overrideLoop = false;
+  }
 }
 
 /** Move `v` toward `target` by at most `maxDelta`. */
