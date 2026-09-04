@@ -97,6 +97,7 @@ export class Game {
     canvas.addEventListener('click', () => this.input.requestPointerLock());
     // Place dummy 3 m in front of player (player faces -Z at heading 0).
     this.dummySim.state.pos.z = -3;
+    this.dummySim.state.heading = Math.PI; // face +Z toward player
 
     // Shared world snapshot (mutated in-place each step — no allocation).
     this.world = {
