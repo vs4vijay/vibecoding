@@ -27,6 +27,7 @@ export type ActionButton = 'attack' | 'jump' | 'crouch';
 export type MoveId =
   | 'punch'
   | 'doublePunch'
+  | 'slash'
   | 'runningKick'
   | 'legSweep'
   | 'wallKick'
@@ -107,6 +108,13 @@ export interface MoveDef {
   requiresWallWithinM?: number;
   /** Move only resolves vs an unaware target we stand behind. */
   requiresBehindUnaware?: boolean;
+  /**
+   * Armed swing [Task 13]: damage and reach resolve from the wielder's
+   * WEAPONS row (src/data/weapons.ts) at swing time; this row's own
+   * rangeM/damage are the unarmed fallback (the shared `slash` row: 0 —
+   * an empty hand whiffs harmlessly).
+   */
+  armedSwing?: boolean;
   /** Weapon class required to hold for this move (`'none'` = unarmed-only). */
   weaponClass?: WeaponClass;
 }

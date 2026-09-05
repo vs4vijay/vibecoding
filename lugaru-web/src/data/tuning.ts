@@ -164,3 +164,19 @@ export const KO_SLOWMO_SCALE = 0.25;
 /** Slow-motion duration on KO (ms). */
 export const KO_SLOWMO_MS = 900;
 
+// --- Weapons [Task 13] -----------------------------------------------------
+
+/**
+ * Per-clash chance (seeded rng) that a weapon involved in a clash is knocked
+ * flying, independent of durability wear [brief Task 13: "random < 0.15"].
+ */
+export const CLASH_BREAK_CHANCE = 0.15;
+/** Durability a weapon with a WEAPONS durability loses per clash survived. */
+export const CLASH_WEAR_PER_CLASH = 1;
+/** Launch speed (m/s) of a weapon knocked loose, away from the opponent. */
+export const CLASH_KNOCK_SPEED_MPS = 4;
+/** Launch speed (m/s) the game layer hands a thrown knife's Rapier body. */
+export const THROWN_KNIFE_SPEED_MPS = 18;
+/** Fixed seed for the combat rng the game layer feeds clash rolls. */
+export const COMBAT_RNG_SEED = 20260823;
+

@@ -19,6 +19,7 @@ import type {
   WorldContext,
 } from './types';
 import { MOVES } from '../data/moves';
+import { WEAPONS } from '../data/weapons';
 import {
   LEG_CANNON_AHEAD_HALF_RAD,
   REVERSE_PRESS_WINDOW_MS,
@@ -86,10 +87,17 @@ function resolveAttack(
   if (a.wallProximityM < (MOVES.wallKick.requiresWallWithinM ?? Infinity)) {
     return { kind: 'move', id: 'wallKick' };
   }
-
   // Stance table — crouched sweep and running kick are unconditional rows.
   if (a.stance === 'crouched') return { kind: 'move', id: 'legSweep' };
   if (a.isRunning || a.stance === 'running') return { kind: 'move', id: 'runningKick' };
+
+  // Armed fighters swing their weapon; the swing's reach is the weapon's.
+  // This replaces the plain punch for any fighter with a weapon [Task 13].
+  if (a.hasWeapon !== null && a.hasWeapon !== 'none') {
+    const reach = WEAPONS[a.hasWeapon].reachM;
+    if (!t || t.dist > reach) return null;
+    return { kind: 'move', id: 'slash' };
+  }
 
   // Standing punch needs a target in reach; bare open-field presses do
   // nothing [spec §3.1 last row].

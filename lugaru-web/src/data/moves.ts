@@ -66,6 +66,30 @@ export const MOVES: Record<string, MoveDef> = {
     counterWindow: { from: 180 - COUNTER_HALF_WIDTH_MS, to: 180 + COUNTER_HALF_WIDTH_MS },
   },
 
+  /**
+   * Armed swing [Task 13] — one row serves knife, sword and staff: damage
+   * and reach resolve from the wielder's WEAPONS row at swing time
+   * (`armedSwing` flag; row damage/range are the unarmed fallback: an empty
+   * hand whiffs harmlessly). Timing and arc mirror the punch; reversible
+   * like every telegraphed strike so the disarm-on-reversal rule can fire.
+   */
+  slash: {
+    id: 'slash',
+    clip: 'slash',
+    startupMs: 120,
+    activeMs: 80,
+    recoveryMs: 150,
+    rangeM: 0, // resolved from WEAPONS[weapon].reachM
+    arcRad: 1.0,
+    damage: 0, // resolved from WEAPONS[weapon].damage
+    knockdown: false,
+    armedSwing: true,
+    // Reversal impact = end of startup+active (120+80); counters see
+    // ±COUNTER_HALF_WIDTH_MS — same rhythm as the punch row.
+    reversalWindow: { from: 48, to: 120 + 80 },
+    counterWindow: { from: 200 - COUNTER_HALF_WIDTH_MS, to: 200 + COUNTER_HALF_WIDTH_MS },
+  },
+
   /** Sprinting kick. First reliable knockdown tool; heavy commitment.
    *  `lungeSpeed` (m/s) drives the forward dash during its active frames. */
   runningKick: {

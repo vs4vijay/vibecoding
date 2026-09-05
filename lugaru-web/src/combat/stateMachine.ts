@@ -57,6 +57,11 @@ import { updateInjuries } from './injury';
 import type { InjuryEvent } from './injury';
 import { ScoreLedger } from './scoring';
 import type { ScoreLedger as LedgerView } from './scoring';
+import { onReversalVsArmed, weaponDropEvent } from './weaponsLogic';
+import type { WeaponSimEvent } from './weaponsLogic';
+
+/** Shared quiet-step value for lastCombatEvents — see the field's doc. */
+const NO_COMBAT_EVENTS: readonly WeaponSimEvent[] = [];
 
 /** Shared quiet-step value for lastInjuryEvents — see the field's doc. */
 const NO_INJURY_EVENTS: readonly InjuryEvent[] = [];
@@ -88,6 +93,11 @@ export interface FighterFlags {
   limping: boolean;
   unconscious: boolean;
   invulnerableAirFlipMs: number;
+  /**
+   * [Task 13] Body is armored: thrown knives hit for WEAPONS throwDamage
+   * instead of killing outright. Unset = unarmored (instant-killable).
+   */
+  armored?: boolean;
 }
 
 /**
@@ -109,6 +119,22 @@ export interface FighterState {
   moveElapsedMs: number;
   /** Weapon tier held right now; null = unarmed (Task 13 wires pickups). */
   weapon: WeaponClass | null;
+  /**
+   * [Task 13] Remaining wear for weapons with a WEAPONS durability (the
+   * staff). Set on pickup; tryClash decrements it per clash; at 0 the blade
+   * breaks loose. Undefined = the weapon cannot break by wear.
+   */
+  durability?: number;
+  /**
+   * [Task 13] True after this fighter lands a hit with a bleeding blade;
+   * the resolver's cleanBlade context move and cleanBlade() read/clear it.
+   */
+  bloodiedWeapon?: boolean;
+  /**
+   * [Task 13] A thrown knife is lodged in this body (thrownKnifeHit). Task
+   * 18's roll-over prompt reads mere presence to offer a knife pickup.
+   */
+  stuckIn?: boolean;
   flags: FighterFlags;
   /**
    * Anti-repetition tracking — deliberately UNINITIALIZED in Task 7; Task 8's
@@ -202,9 +228,19 @@ export class FighterSim {
    * Injury events from the MOST RECENT update() step [Task 9]. The renderer
    * polls this once per frame (blood-drip FX, limp gait, KO ragdoll kick-
    * off); each step overwrites it, so pollers must read before the next.
-   * Quiet steps share one immutable empty array — no per-step allocation.
    */
   lastInjuryEvents: readonly InjuryEvent[] = NO_INJURY_EVENTS;
+
+  /**
+   * Combat events produced during the most recent update(): plain drop /
+   * throw data the game layer bridges to Rapier (WeaponDrops, Projectiles).
+   * Re-published (or reset to a shared empty array) every step; quiet steps
+   * share NO_COMBAT_EVENTS so no per-frame allocation happens.
+   */
+  lastCombatEvents: readonly WeaponSimEvent[] = NO_COMBAT_EVENTS;
+
+  /** Event accumulator for the current step; published at update() end. */
+  private combatEvents: WeaponSimEvent[] = [];
 
   /**
    * Score sink [Task 9]: when set, reversal successes award SCORE_REVERSAL
@@ -309,6 +345,24 @@ export class FighterSim {
     // returned events are republished for renderer polling (documented on
     // the field).
     this.lastInjuryEvents = updateInjuries(this.state, dt);
+
+    // Weapon housekeeping [Task 13]: a fighter who goes down loses their
+    // weapon — it clatters beside the body (bridge drops it as a physical
+    // box). Runs here so every KO path (applyHit, thrownKnifeHit, stealth)
+    // is covered; clearing the weapon makes it fire exactly once.
+    if (this.state.phase.t === 'ko' && this.state.weapon !== null) {
+      this.combatEvents.push(weaponDropEvent(this.state, null, 'ko'));
+      this.state.weapon = null;
+      this.state.durability = undefined;
+    }
+
+    // Publish or reuse the shared quiet-step list (no per-frame alloc).
+    if (this.combatEvents.length > 0) {
+      this.lastCombatEvents = this.combatEvents;
+      this.combatEvents = [];
+    } else {
+      this.lastCombatEvents = NO_COMBAT_EVENTS;
+    }
   }
 
   /**
@@ -401,13 +455,15 @@ export class FighterSim {
     }
     // Context moves (pickup/body/clean/slide-stop) are crouch-button moves;
     // route through the shared move dispatcher so anti-rep records them too.
-    this.dispatchMoveAction(action.id, phaseAtPress);
+    if (action.kind === 'move') this.dispatchMoveAction(action.id, phaseAtPress);
   }
 
   /**
-   * A resolver-approved reversal attempt against the fighter currently
-   * attacking us (`attackerId`). The attacker's absolute elapsed time is
-   * read live from its state; tryReversal classifies the timing.
+   * Reversal resolution [spec §3.2]: the crouch press became {reverse}; if
+   * the attacker is mid-move and within the window, the hit dies. On
+   * success the attacker is cancelled into hitstun (duration = the counter
+   * window) and the defender plays the short reverseAttempt pose. Vs an
+   * armed attacker, the reversal always disarms them [brief Task 13].
    */
   private executeReversal(attackerId: string): void {
     const s = this.state;
@@ -446,6 +502,13 @@ export class FighterSim {
     s.phase.moveId = undefined;
     s.phase.phaseMsLeft = REVERSE_ATTEMPT_MS;
     s.stance = 'standing';
+
+    // A successful reversal vs an armed attacker ALWAYS disarms them
+    // [brief Task 13]: mutates the attacker, emits a bridge event.
+    {
+      const ev = onReversalVsArmed(s, attacker);
+      if (ev !== null) this.combatEvents.push(ev);
+    }
 
     // Score hook [Task 9]: every successful reversal is worth
     // SCORE_REVERSAL; the KO variant (REVERSAL_KO) lands with Task 14's
@@ -678,7 +741,7 @@ export class FighterSim {
       crouchHeldMs: this.crouchHeldMs, // accumulated under the kinematics dt clamp
       pos: s.pos,
       heading: s.heading,
-      hasWeapon: null,
+      hasWeapon: s.weapon,
       wallProximityM: Infinity,
       nearestTarget: nearestTargetOf(s, this.world),
       currentMove:

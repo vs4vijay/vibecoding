@@ -13,9 +13,7 @@ import { SPECIES } from '../data/species';
 import { DOWNED_GROUND_MS, HITSTUN_MS, KNOCKDOWN_VELY } from '../data/tuning';
 import type { FighterState, HitEvent } from './stateMachine';
 import { MOVES } from '../data/moves';
-
-/** Blade weapon tiers whose hits cause bleeding [spec §3.4]. */
-const BLADE_CLASSES: ReadonlySet<string> = new Set(['knife', 'sword']);
+import { WEAPONS } from '../data/weapons';
 
 /** Unit facing vector for a heading: (−sin h, −cos h) — the one definition
  *  shared by hitdetect, FighterSim lunge/locomotion, and target views. */
@@ -53,13 +51,21 @@ export function findHit(attacker: FighterState, victims: FighterState[]): HitEve
   // Tiny slack so a victim placed mathematically ON the cone edge connects
   // despite floating-point error.
   const halfArc = def.arcRad / 2 + 1e-9;
+  // Armed swings reach as far as the held blade [Task 13]: the row's own
+  // rangeM is the unarmed fallback (the shared `slash` row: 0).
+  let rangeM = def.rangeM;
+  if (def.armedSwing === true) {
+    const w = attacker.weapon;
+    if (w !== null && w !== 'none') rangeM = WEAPONS[w].reachM;
+  }
+  const maxDistSq = (rangeM + 1e-9) * (rangeM + 1e-9);
   const events: HitEvent[] = [];
   for (let i = 0; i < victims.length; i++) {
     const v = victims[i];
     const dx = v.pos.x - attacker.pos.x;
     const dz = v.pos.z - attacker.pos.z;
     const distSq = dx * dx + dz * dz;
-    if (distSq > (def.rangeM + 1e-9) * (def.rangeM + 1e-9)) continue; // out of reach
+    if (distSq > maxDistSq) continue; // out of reach
     // Signed angle between heading and target direction via cross/dot.
     const cross = fdx * dz - fdz * dx;
     const dot = fdx * dx + fdz * dz;
@@ -88,14 +94,6 @@ export function findHit(attacker: FighterState, victims: FighterState[]): HitEve
  *   phase 'hitstun' for HITSTUN_MS, no impulse [plan Task 7 rule];
  * - blade-class weapon on the attacker flags the victim `bleeding` (checked
  *   before the lethal early-return, so bleeding persists through death).
- *
- * Over-the-ground (OTG) rules — v1 intent, pinned by tests, fix round F5:
- * a knockdown hit on an already-downed victim REFRESHES its ground timer
- * (phaseMsLeft resets to DOWNED_GROUND_MS) and re-applies the velY impulse
- * (juggle); a NON-knockdown hit on a downed victim flips it back up into
- * standing hitstun with zero impulse. Revisit only if Task 14 breaks it.
- *
- * Returns one delta per fighter touched, in application order.
  */
 export function applyHit(hit: HitEvent, fighters: FighterState[]): FighterDelta[] {
   let attacker: FighterState | undefined;
@@ -109,7 +107,15 @@ export function applyHit(hit: HitEvent, fighters: FighterState[]): FighterDelta[
 
   const mult = SPECIES[attacker.species].punchDmgMult;
   const def = MOVES[hit.moveId];
-  const dmg = Math.round((def?.damage ?? 0) * mult);
+
+  // Armed swings deal the held weapon's damage [Task 13]: the row's own
+  // damage is the unarmed fallback (slash: 0).
+  let base = def?.damage ?? 0;
+  if (def?.armedSwing === true) {
+    const w = attacker.weapon;
+    if (w !== null && w !== 'none') base = WEAPONS[w].damage;
+  }
+  const dmg = Math.round(base * mult);
 
   const deltas: FighterDelta[] = [
     { id: victim.id, hp: -dmg, velY: 0, pushVelX: 0, pushVelZ: 0 },
@@ -119,9 +125,11 @@ export function applyHit(hit: HitEvent, fighters: FighterState[]): FighterDelta[
 
   // Bleed comes from the blade itself, not the move row [spec §3.4] — and
   // applies BEFORE the lethal early-return so bleeding persists through
-  // death (fix round F4).
-  if (attacker.weapon !== null && BLADE_CLASSES.has(attacker.weapon)) {
+  // death (fix round F4). bloodiedWeapon flags the wielder for cleanBlade.
+  const w = attacker.weapon;
+  if (w !== null && w !== 'none' && WEAPONS[w].bleedOnHit) {
     victim.flags.bleeding = true;
+    attacker.bloodiedWeapon = true;
   }
 
   if (victim.hp <= 0) {
