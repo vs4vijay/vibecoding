@@ -430,7 +430,10 @@ export class Game {
   private rustleFor(state: FighterSim['state'], prev: { x: number; z: number }, dtMs: number): void {
     const speed = Math.hypot(state.pos.x - prev.x, state.pos.z - prev.z) / (dtMs / 1000);
     const event = this.bushField.rustleCheck(state.pos, prev, speed > RUN_STANCE_SPEED);
-    if (event !== null) emitHearing(this.heardEvents, event);
+    if (event !== null) {
+      event.sourceId = state.id; // emitters must not hear themselves
+      emitHearing(this.heardEvents, event);
+    }
   }
 
   /**

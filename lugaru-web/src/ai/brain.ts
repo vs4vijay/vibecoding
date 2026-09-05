@@ -197,6 +197,7 @@ export class Brain {
     // Hear events: a loud sound within radius becomes an investigate memory.
     const listener = { pos: solar.pos, species: solar.species };
     for (const e of senses.heard) {
+      if (e.sourceId !== undefined && e.sourceId === solar.id) continue;
       if (hear(listener, e)) {
         this.lastHeardPos = { x: e.pos.x, z: e.pos.z };
         this.memory = { pos: { x: e.pos.x, z: e.pos.z }, t: this.simMs };

@@ -106,6 +106,12 @@ export interface HearingEvent {
   kind: HearingKind;
   pos: { x: number; z: number };
   loudness: number;
+  /**
+   * Emitter's fighter id, when the sound has one (rustles). A brain must
+   * ignore its own emissions — hearing yourself rustle overwrites your
+   * investigate memory with your own position.
+   */
+  sourceId?: string;
 }
 
 /** A listening body; `lastHeardPos` is written when a sound is heard. */
