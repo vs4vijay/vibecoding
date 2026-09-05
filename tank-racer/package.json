@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "bun test"
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.1",
     "@types/three": "^0.185.4",
     "typescript": "~6.0.2",
     "vite": "^8.2.0"

@@ -2,11 +2,12 @@
 
 A 3D tank racing game for the browser — a homage to *Tank Racer* (1997). Race
 three AI tanks over three laps of a closed circuit — pick from **DUST BOWL**
-(desert), **CANYON RUN** (mesa country) or **GLACIER LOOP** (an icy,
-extra-wide circuit with slippery ice patches): blast rivals with your cannon,
-dodge incoming shells, grab power-up crates, and hit the boost pads on the
-straights. Low-poly PS1-era look, pure client-side TypeScript + Three.js, no
-assets (all audio is synthesized with WebAudio oscillators).
+(desert), **CANYON RUN** (mesa country), **GLACIER LOOP** (an icy, extra-wide
+circuit with slippery ice patches) or **METRO RUSH** (a night-city circuit):
+blast rivals with your cannon, dodge incoming shells, grab power-up crates, and
+hit the boost pads on the straights. Low-poly PS1-era look, pure client-side
+TypeScript + Three.js, no assets (all audio is synthesized with WebAudio
+oscillators).
 
 ![Tank Racer — racing Dust Bowl against three AI tanks](public/screenshot.png)
 
@@ -23,6 +24,8 @@ assets (all audio is synthesized with WebAudio oscillators).
 | `P` / `Esc`    | Pause / resume (race) |
 | `M`            | Mute / unmute       |
 | `C`            | Toggle 1 PLAYER / 2 PLAYERS (title) |
+| `V`            | Toggle SINGLE RACE / CHAMPIONSHIP (title) |
+| `G`            | Toggle ghost-car replay (title) |
 
 ### 2-Player split-screen
 
@@ -66,9 +69,27 @@ and touch still work — last input wins each frame.
   for sliding, and three pale-blue **ice patches**: while you're on one,
   lateral grip drops to ×0.35 and acceleration to ×0.6, so ease off before
   the sweepers. The AI reads local grip and slows down too.
+- **METRO RUSH** — a night-city circuit: dark asphalt under a deep navy
+  sky/fog, lit by neon window-box buildings and streetlight glows. The
+  tightest layout of the four — short straights and quick direction changes.
 
 Cycle tracks with `←`/`→`, tanks with `↑`/`↓` on the title screen; best lap
 and total times are saved per track in localStorage.
+
+## Championship
+
+Press `V` on the title screen to switch SINGLE RACE → CHAMPIONSHIP: all four
+tracks in a fixed order against three AI, scoring 10 / 7 / 5 / 3 points by
+finishing position. Standings are shown after each race and a podium closes
+the series after race 4 — ties are broken by total time, then wins. Series
+progress survives a reload; `Esc` on the between-race screen abandons it.
+
+## Ghost car
+
+Beat your best lap on a track and that line is saved locally; the next race
+on the same track sends a translucent ghost around it as you drive. `G` on
+the title screen toggles the replay. Ghosts are per-track, purely cosmetic
+(no collisions), and in 2P the ghost follows P1's line.
 
 ## Pause
 

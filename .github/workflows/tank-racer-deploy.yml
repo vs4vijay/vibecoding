@@ -3,7 +3,8 @@
 # Builds tank-racer/ with bun and publishes dist/ to GitHub Pages whenever a
 # push to main touches anything under tank-racer/. The game lives in a
 # subdirectory of this monorepo, so it builds with BASE_PATH set to its
-# Pages URL prefix and is uploaded from tank-racer/dist.
+# Pages URL prefix, then dist/ is staged into site/tank-racer/ and the site/
+# directory is uploaded as the Pages artifact.
 
 name: Deploy Tank Racer to Pages
 
