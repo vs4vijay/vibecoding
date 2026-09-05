@@ -192,6 +192,12 @@ export class FighterSim {
   private bufferedActionId: MoveId | null = null;
   private bufferMsLeft = 0;
 
+  /** Horizontal velocity for renderer (read-only). */
+  get horizontalVelX(): number { return this.locoVelX; }
+  get horizontalVelZ(): number { return this.locoVelZ; }
+  /** Crouch state for renderer (read-only). */
+  get isCrouching(): boolean { return this.crouching; }
+
   /**
    * Injury events from the MOST RECENT update() step [Task 9]. The renderer
    * polls this once per frame (blood-drip FX, limp gait, KO ragdoll kick-

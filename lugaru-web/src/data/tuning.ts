@@ -146,3 +146,12 @@ export const SCORE_STYLE_WALLKICK = 150;
 /** Mid-air knife throw kill [spec §3.6: Ninja bonus 60]. */
 export const SCORE_NINJA_THROW = 60;
 
+// --- Render/sim integration timing [Task 11] ---
+
+/** Hitstop freeze duration on landing a hit (ms). [spec §3.5] */
+export const HITSTOP_MS = 90;
+/** Slow-motion scale factor on KO. */
+export const KO_SLOWMO_SCALE = 0.25;
+/** Slow-motion duration on KO (ms). */
+export const KO_SLOWMO_MS = 900;
+

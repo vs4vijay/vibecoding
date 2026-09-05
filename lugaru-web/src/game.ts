@@ -11,22 +11,27 @@ import { ClipPlayer } from './actors/clips';
 import { CharacterController } from './actors/controller';
 import { FighterSim, type FighterSimWorld } from './combat/stateMachine';
 import { applyHit } from './combat/hitdetect';
+import { HITSTOP_MS, KO_SLOWMO_SCALE, KO_SLOWMO_MS } from './data/tuning';
+
 /**
- * Map a move's clip name to the CLIPS key actually available in clipsData.
- * The move table uses generic names ('punch', 'kick') while the animation
- * library has specific variants ('punchR', 'kickFront').  This lookup falls
- * back to 'idle' for unmapped clips so the rig never freezes on an unknown
- * pose.
+ * MoveIds that don't have a matching CLIPS entry fall back to 'idle'.
+ * 'legSweep' → 'sweep'; 'runningKick' → 'kickFront'; 'punch'/'doublePunch'
+ * → 'punchR'/'punchL'; 'bodyThrow'/'counterThrow'/'flip'/'tackle' → 'hurt'
+ * (reversal/stun animations share the hurt pose as placeholder).
  */
+const MOVE_CLIP: Record<string, string> = {
+  punch: 'punchR',
+  doublePunch: 'punchL',
+  runningKick: 'kickFront',
+  legSweep: 'sweep',
+  bodyThrow: 'hurt',
+  counterThrow: 'hurt',
+  flip: 'hurt',
+  tackle: 'hurt',
+};
+
 function moveClipKey(moveId: string): string {
-  const m: Record<string, string> = {
-    punch: 'punchR',
-    doublePunch: 'punchL',
-    kick: 'kickFront',
-    runningKick: 'kickFront',
-    sweep: 'sweep',
-  };
-  return m[moveId] ?? 'idle';
+  return MOVE_CLIP[moveId] ?? 'idle';
 }
 
 /**
@@ -52,13 +57,17 @@ export class Game {
   private readonly simLoop: FixedLoop;
   private readonly timescale: Timescale;
   private readonly world: FighterSimWorld;
+  // Reusable hit-victim arrays to avoid per-step allocation.
+  private readonly playerVictims: [FighterSim['state']];
+  private readonly dummyVictims: [FighterSim['state']];
 
   private frame: ReturnType<InputManager['sample']>;
-  private lastMs = 0;
-  private running = false;
+  private clickHandler: (() => void) | null = null;
   private animationId = 0;
   private resizeHandler: (() => void) | null = null;
 
+  private lastMs = 0;
+  private running = false;
   // Track previous KO state to fire slow-mo once per transition.
   private dummyWasKO = false;
 
@@ -92,9 +101,9 @@ export class Game {
     const dummyClip = new ClipPlayer(dummyRig);
     this.dummyCtrl = new CharacterController(dummyRig, SPECIES.wolf, dummyClip);
     this.dummySim = new FighterSim('wolf', 'dummy', false);
-
     // Pointer lock on click — Game owns its canvas.
-    canvas.addEventListener('click', () => this.input.requestPointerLock());
+    this.clickHandler = () => this.input.requestPointerLock();
+    canvas.addEventListener('click', this.clickHandler);
     // Place dummy 3 m in front of player (player faces -Z at heading 0).
     this.dummySim.state.pos.z = -3;
     this.dummySim.state.heading = Math.PI; // face +Z toward player
@@ -105,8 +114,9 @@ export class Game {
       downedBodyNearby: false,
       weaponOnGroundNearby: false,
     };
-
-    // --- Sim loop (60 Hz fixed) ---
+    // Reusable hit-victim arrays (no per-step allocation).
+    this.playerVictims = [this.dummySim.state];
+    this.dummyVictims = [this.playerSim.state];
     this.simLoop = new FixedLoop(1000 / 60, (dt) => this.simStep(dt));
     this.timescale = new Timescale();
     this.frame = this.input.sample();
@@ -126,8 +136,8 @@ export class Game {
     this.camera3d.updateProjectionMatrix();
   }
 
-  /** Start the game loop. */
-  start(): void {
+  /** Start the game loop. `mode` reserved for future use (sandbox/arena). */
+  start(_mode: 'sandbox' = 'sandbox'): void {
     if (this.running) return;
     this.running = true;
     this.lastMs = performance.now();
@@ -141,6 +151,10 @@ export class Game {
     if (this.resizeHandler) {
       window.removeEventListener('resize', this.resizeHandler);
       this.resizeHandler = null;
+    }
+    if (this.clickHandler) {
+      this.canvas.removeEventListener('click', this.clickHandler);
+      this.clickHandler = null;
     }
     this.input.detach();
     this.sceneBundle.renderer.dispose();
@@ -164,8 +178,9 @@ export class Game {
     const scale = this.timescale.update(realDtMs);
     this.simLoop.advance(realDtMs * scale);
 
-    // Render: copy sim → controller → rig (read-only).
-    this.updateRender(realDtMs);
+    // Render: copy sim → controller → rig (read-only), scaled by timescale
+    // so hitstop freezes animation and slow-mo slows it.
+    this.updateRender(realDtMs * scale);
 
     this.debug?.frame(realDtMs);
     this.sceneBundle.renderer.render(this.sceneBundle.scene, this.camera3d);
@@ -178,23 +193,23 @@ export class Game {
     this.playerSim.update(dtMs, this.frame, this.world);
     this.dummySim.update(dtMs, null, this.world);
 
-    // Collect + apply hits (player → dummy).
-    const pHits = this.playerSim.collectHits([this.dummySim.state]);
+    // Collect + apply hits (player → dummy) using pre-allocated arrays.
+    const pHits = this.playerSim.collectHits(this.playerVictims);
     for (const hit of pHits) {
-      applyHit(hit, [this.playerSim.state, this.dummySim.state]);
-      this.timescale.hitstop(90);
+      applyHit(hit, this.world.fighters);
+      this.timescale.hitstop(HITSTOP_MS);
     }
 
     // Collect + apply hits (dummy → player — usually empty for a null-input dummy).
-    const dHits = this.dummySim.collectHits([this.playerSim.state]);
+    const dHits = this.dummySim.collectHits(this.dummyVictims);
     for (const hit of dHits) {
-      applyHit(hit, [this.playerSim.state, this.dummySim.state]);
-      this.timescale.hitstop(90);
+      applyHit(hit, this.world.fighters);
+      this.timescale.hitstop(HITSTOP_MS);
     }
 
     // KO slow-mo: fire once per transition into KO.
     if (!this.dummyWasKO && this.dummySim.state.phase.t === 'ko') {
-      this.timescale.slowmo(0.25, 900);
+      this.timescale.slowmo(KO_SLOWMO_SCALE, KO_SLOWMO_MS);
       this.dummyWasKO = true;
     }
   }
@@ -203,7 +218,7 @@ export class Game {
 
   private updateRender(dtMs: number): void {
     // Player
-    this.copySimToCtrl(this.playerSim.state, this.playerCtrl);
+    this.copySimToCtrl(this.playerSim.state, this.playerCtrl, this.playerSim);
     this.applyPhaseClip(this.playerSim.state, this.playerCtrl);
     this.playerCtrl.updateFromSim(dtMs, this.chaseCam.yaw);
     this.chaseCam.update(
@@ -215,18 +230,21 @@ export class Game {
     );
 
     // Dummy
-    this.copySimToCtrl(this.dummySim.state, this.dummyCtrl);
+    this.copySimToCtrl(this.dummySim.state, this.dummyCtrl, this.dummySim);
     this.applyPhaseClip(this.dummySim.state, this.dummyCtrl);
     this.dummyCtrl.updateFromSim(dtMs, 0);
   }
 
   /** Copy FighterSim state into CharacterController for rendering (read-only). */
-  private copySimToCtrl(sim: FighterSim['state'], ctrl: CharacterController): void {
+  private copySimToCtrl(sim: FighterSim['state'], ctrl: CharacterController, simRef: FighterSim): void {
     ctrl.pos.set(sim.pos.x, sim.pos.y, sim.pos.z);
-    ctrl.vel.set(0, sim.velY, 0);
+    // Horizontal velocity from sim for locomotion clip selection (run vs idle).
+    ctrl.vel.set(simRef.horizontalVelX, sim.velY, simRef.horizontalVelZ);
     ctrl.heading = sim.heading;
-  ctrl.stance = sim.stance === 'downed' ? 'standing' : sim.stance;
+    ctrl.stance = sim.stance === 'downed' ? 'standing' : sim.stance;
     ctrl.grounded = sim.stance !== 'airborne' && sim.stance !== 'downed';
+    ctrl.crouching = simRef.isCrouching;
+    ctrl.downed = sim.phase.t === 'downed';
   }
 
   /** Map FighterSim phase → combat clip override on the controller. */
@@ -238,20 +256,18 @@ export class Game {
       case 'startup':
       case 'active':
       case 'recovery':
-        if (moveId) ctrl.setPhaseOverride(moveClipKey(moveId), false);
+        if (moveId) ctrl.setPhaseOverride(moveClipKey(moveId));
         else ctrl.clearPhaseOverride();
         break;
       case 'hitstun':
-        ctrl.setPhaseOverride('hurt', false);
-        break;
       case 'downed':
-        ctrl.setPhaseOverride('hurt', false);
+        ctrl.setPhaseOverride('hurt');
         break;
       case 'ko':
-        ctrl.setPhaseOverride('koFlail', true);
+        ctrl.setPhaseOverride('koFlail');
         break;
       case 'reverseAttempt':
-        ctrl.setPhaseOverride('hurt', false);
+        ctrl.setPhaseOverride('hurt');
         break;
       default: // idle, move
         ctrl.clearPhaseOverride();

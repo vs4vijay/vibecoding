@@ -44,7 +44,7 @@ export class CharacterController {
   private readonly rig: Rig;
   private readonly def: SpeciesDef;
 
-  private crouching = false;
+  crouching = false;
   /** Currently dominant animation clip ('' before the first update). */
   private locoClip = '';
   private pitchSm = 0;
@@ -201,7 +201,8 @@ export class CharacterController {
 
   /** Combat clip override set by the sim when a move/hitstun/downed/ko phase is active. */
   private overrideClip: string | null = null;
-  private overrideLoop = false;
+  /** True when the sim reports a downed fighter — lowers rig to lying pose. */
+  downed = false;
 
   /**
    * Copy sim state into the controller for rendering (read-only: no backflow
@@ -249,23 +250,30 @@ export class CharacterController {
     // --- write display ---
     this.anim.update(dtMs);
     this.anim.applyTo(this.rig);
-    const dipTarget = this.crouching && this.grounded ? this.def.hipHeight * 0.55 : 0;
-    const kd = 1 - Math.exp(-10 * dt);
-    this.dipSm += (dipTarget - this.dipSm) * kd;
-    this.rig.root.position.set(this.pos.x, this.pos.y - this.dipSm, this.pos.z);
-    this.rig.root.rotation.set(this.pitchSm, this.heading, this.rollSm);
+
+    if (this.downed) {
+      // Lying pose: root on the ground, body rotated ~80° to simulate falling.
+      // Full ragdoll is Task 14's job; this is a visual placeholder.
+      const gy = heightAt(this.pos.x, this.pos.z);
+      this.rig.root.position.set(this.pos.x, gy + 0.05, this.pos.z);
+      this.rig.root.rotation.set(Math.PI * 0.45, this.heading, 0);
+    } else {
+      const dipTarget = this.crouching && this.grounded ? this.def.hipHeight * 0.55 : 0;
+      const kd = 1 - Math.exp(-10 * dt);
+      this.dipSm += (dipTarget - this.dipSm) * kd;
+      this.rig.root.position.set(this.pos.x, this.pos.y - this.dipSm, this.pos.z);
+      this.rig.root.rotation.set(this.pitchSm, this.heading, this.rollSm);
+    }
   }
 
   /** Set a combat clip override (startup/active/recovery/hitstun/downed/ko). */
-  setPhaseOverride(clip: string, loop: boolean): void {
+  setPhaseOverride(clip: string): void {
     this.overrideClip = clip;
-    this.overrideLoop = loop;
   }
 
   /** Clear the combat clip override; locomotion resumes on the next step. */
   clearPhaseOverride(): void {
     this.overrideClip = null;
-    this.overrideLoop = false;
   }
 }
 
