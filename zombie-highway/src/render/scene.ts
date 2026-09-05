@@ -20,7 +20,10 @@ export function createGameScene(canvas: HTMLCanvasElement): GameScene {
   // Cap at DPR 2: beyond that fill-rate cost swamps phones without a
   // visible sharpness gain.
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  // updateStyle MUST stay true: the buffer is width*dpr, and without an
+  // explicit CSS size the canvas lays out at buffer size — on retina (dpr 2)
+  // that's 2x the window, showing a zoomed top-left crop of the frame.
+  renderer.setSize(window.innerWidth, window.innerHeight, true);
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x2a160c, 60, 160);
@@ -69,7 +72,7 @@ export function createGameScene(canvas: HTMLCanvasElement): GameScene {
 
   const onResize = () => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    renderer.setSize(window.innerWidth, window.innerHeight, true);
     const aspect = window.innerWidth / window.innerHeight;
     camera.aspect = aspect;
     camera.fov = isPortrait(aspect) ? 74 : CONFIG.camera.fovBase;

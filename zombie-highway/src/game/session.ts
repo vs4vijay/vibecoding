@@ -192,7 +192,11 @@ export class Session {
     if (this.depsInput) {
       this.offs.push(
         this.depsInput.onFire((side) => {
-          if (this.phase === "running") this.pendingShots.push(side);
+          // Fire sides are screen-space (tap half / Comma = screen left).
+          // The chase cam mirrors x, so the screen-left gun is gun.right in
+          // world coords.
+          const worldSide: "left" | "right" = side === "left" ? "right" : "left";
+          if (this.phase === "running") this.pendingShots.push(worldSide);
         }),
       );
       this.offs.push(this.depsInput.onPause(() => this.togglePause()));
@@ -358,7 +362,10 @@ export class Session {
     }
 
     // 1) car
-    const events = stepCar(this.car, this.depsInput?.steer ?? 0, dt);
+    // Input steer is screen-space (+1 = player's right). The chase cam looks
+    // along +z, which mirrors x on screen (screen-right = world -x), so the
+    // world-frame steer fed to the sim is negated.
+    const events = stepCar(this.car, -(this.depsInput?.steer ?? 0), dt);
     for (const ev of events) {
       if (ev.kind === "flipped") {
         this.gameOver("flip");

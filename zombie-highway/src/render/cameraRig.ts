@@ -22,10 +22,7 @@ export class CameraRig {
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
-    // Start settled at the car so the first frames don't swoop in from origin;
-    // same mirrored-z convention as follow() (behind the car, looking forward).
-    this.camera.position.set(0, C.offset.y, -C.offset.z);
-    this.camera.lookAt(C.lookAt.x, C.lookAt.y, -C.lookAt.z);
+    this.resetDeathCam();
   }
 
   /**
@@ -60,7 +57,9 @@ export class CameraRig {
   }
 
   tick(dt: number): void {
-    if (this.deathPull < 1) {
+    // Advance only while armed (deathPull > 0 sentinel from armDeathCam);
+    // an unarmed rig must stay at 0 or the death cam would engage every run.
+    if (this.deathPull > 0 && this.deathPull < 1) {
       this.deathPull = Math.min(1, this.deathPull + dt / DEATH_PULL_S);
     }
     this.shakeAmp *= Math.exp(-dt * 4);
@@ -78,8 +77,13 @@ export class CameraRig {
     if (this.deathPull === 0) this.deathPull = 1e-6;
   }
 
-  /** Clears the death-cam pull; call when a new run starts. */
+  /** Clears the death-cam pull and snaps the camera to the run-start chase
+   * pose (car spawns at z=0). Called when a new run starts — without the snap
+   * the rig would swoop in from the previous run's death position, flying
+   * over/past the freshly respawned car for ~1 s. */
   resetDeathCam(): void {
     this.deathPull = 0;
+    this.camera.position.set(0, C.offset.y, -C.offset.z);
+    this.camera.lookAt(C.lookAt.x, C.lookAt.y, -C.lookAt.z);
   }
 }

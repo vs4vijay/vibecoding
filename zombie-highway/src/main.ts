@@ -208,16 +208,17 @@ export function boot(): void {
     out.distanceM = s.scoring.distanceM;
     out.level = lvl;
     out.levelProgress = Number.isFinite(progress) ? progress : 1;
-    out.tilt = s.car.tilt;
+    out.tilt = -s.car.tilt; // gauge is screen-space; world tilt mirrors on screen
     out.imbalance = imbalance;
-    out.mag.left = s.gun.left.mag;
-    out.mag.right = s.gun.right.mag;
+    // Ammo rows are screen-space: the on-screen-left gun is gun.right (world).
+    out.mag.left = s.gun.right.mag;
+    out.mag.right = s.gun.left.mag;
     out.reload01.left =
-      s.gun.left.reloadT <= 0 ? 1 : 1 - s.gun.left.reloadT / CONFIG.gun.reloadS;
+      s.gun.right.reloadT <= 0 ? 1 : 1 - s.gun.right.reloadT / CONFIG.gun.reloadS;
     out.reload01.right =
-      s.gun.right.reloadT <= 0
+      s.gun.left.reloadT <= 0
         ? 1
-        : 1 - s.gun.right.reloadT / CONFIG.gun.reloadS;
+        : 1 - s.gun.left.reloadT / CONFIG.gun.reloadS;
     out.multiplier = s.scoring.multiplier;
   }
 }

@@ -8,13 +8,18 @@ export type Segment = { id: number; z: number };
 export type RecycleMove = { id: number; newZ: number };
 
 /**
- * Pure streaming plan: any segment whose far edge (anchor z minus segLen) has
- * fallen more than 30 m behind the car is re-z'd to the front of the window.
- * The landing spot is max(currentFront + segLen, carZ - 30): identical to a
- * plain front-of-window hop in steady state, but on a large forward teleport
- * it lifts the whole window up to the car instead of stranding segments
- * hundreds of meters back. Applying the returned moves keeps every anchor
- * inside [carZ - 30, carZ + count * segLen].
+ * Pure streaming plan: any segment whose FRONT edge (anchor z plus segLen/2 —
+ * anchors are segment centers) has fallen behind carZ - 30 is re-z'd to the
+ * front of the window. The landing spot is max(currentFront + segLen,
+ * carZ - 30): identical to a plain front-of-window hop in steady state, but on
+ * a large forward teleport it lifts the whole window up to the car instead of
+ * stranding segments hundreds of meters back. Recycling on the front edge (not
+ * the anchor) is what keeps ground under and behind the camera: recycling as
+ * soon as the anchor passes the car would strip up to ~30 m of road around it
+ * and leave the chase cam staring at bare sky. A large BACKWARD teleport
+ * (retry resets carZ to 0) slides the whole window back to the car — without
+ * it the road stays stranded at the previous run's distance. Applying the
+ * returned moves keeps ground covering [carZ - 30, carZ + count * segLen - 30].
  */
 export function planSegmentRecycle(
   segs: Segment[],
@@ -22,12 +27,23 @@ export function planSegmentRecycle(
   segLen: number,
 ): RecycleMove[] {
   const moves: RecycleMove[] = [];
+  let minZ = Infinity;
   let maxZ = -Infinity;
-  for (const s of segs) if (s.z > maxZ) maxZ = s.z;
-  let next = Math.max(maxZ + segLen, carZ - 30);
-  const keepBehind = carZ - 30;
   for (const s of segs) {
-    if (s.z - segLen < keepBehind) {
+    if (s.z < minZ) minZ = s.z;
+    if (s.z > maxZ) maxZ = s.z;
+  }
+  const keepBehind = carZ - 30;
+  // Backward teleport: the whole window sits ahead of the keep line, so slide
+  // it back wholesale (spacing preserved) until it covers the car again.
+  if (minZ - segLen / 2 > keepBehind) {
+    const delta = keepBehind + segLen / 2 - minZ;
+    for (const s of segs) moves.push({ id: s.id, newZ: s.z + delta });
+    return moves;
+  }
+  let next = Math.max(maxZ + segLen, carZ - 30);
+  for (const s of segs) {
+    if (s.z + segLen / 2 < keepBehind) {
       moves.push({ id: s.id, newZ: next });
       next += segLen;
     }
@@ -145,9 +161,12 @@ export class World {
     const headGeo = boxAt(1.1, 0.22, 0.5, 0, 5.9, 0);
 
     // --- Skyline: one InstancedMesh of dark silhouette boxes ---
+    // Unit-sized base: scale (skyW, skyH, skyW) must yield 4-8 m wide slabs.
+    // (A 10-wide base made them 40-80 m mega-slabs whose inner faces reached
+    // the road corridor and wallled off the camera's view.)
     const skylineMat = new THREE.MeshBasicMaterial({ color: 0x120a12 });
     this.skyline = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(10, 1, 10),
+      new THREE.BoxGeometry(1, 1, 1),
       skylineMat,
       SKY_COUNT,
     );
@@ -189,35 +208,50 @@ export class World {
     scene.add(this.skyline);
   }
 
-  /** Recycle segments so road covers [carZ - 30, carZ + visibleSegments*segLen]; zero per-frame allocation. */
+  /** Recycle segments so ground covers [carZ - 30, carZ + visibleSegments*segLen - 30]; zero per-frame allocation. */
   update(carZ: number): void {
     // Same invariant as planSegmentRecycle (pinned by tests/worldStream.test.ts),
     // inlined over pooled entries so no arrays or objects are built per frame.
+    let minZ = Infinity;
     let maxZ = -Infinity;
-    for (const s of this.segs) if (s.z > maxZ) maxZ = s.z;
-    let next = Math.max(maxZ + SEG_LEN, carZ - 30);
-    const keepBehind = carZ - 30;
     for (const s of this.segs) {
-      if (s.z - SEG_LEN < keepBehind) {
-        s.z = next;
-        s.mesh.position.z = next;
-        next += SEG_LEN;
+      if (s.z < minZ) minZ = s.z;
+      if (s.z > maxZ) maxZ = s.z;
+    }
+    const keepBehind = carZ - 30;
+    if (minZ - SEG_LEN / 2 > keepBehind) {
+      // Backward teleport (retry): slide the whole window back to the car.
+      const delta = keepBehind + SEG_LEN / 2 - minZ;
+      for (const s of this.segs) {
+        s.z += delta;
+        s.mesh.position.z = s.z;
+      }
+    } else {
+      let next = Math.max(maxZ + SEG_LEN, carZ - 30);
+      for (const s of this.segs) {
+        if (s.z + SEG_LEN / 2 < keepBehind) {
+          s.z = next;
+          s.mesh.position.z = next;
+          next += SEG_LEN;
+        }
       }
     }
 
-    // Wrap any skyline instance that fell behind back to the front of the band.
+    // Wrap any skyline instance that fell outside the band around the car back
+    // inside it — forward (normal driving) and backward (retry teleport).
     let dirty = false;
+    const bandFront = carZ - SKY_BEHIND + SKY_COUNT * SKY_SPACING;
     for (let i = 0; i < SKY_COUNT; i++) {
-      while (this.skyZ[i] < carZ - SKY_BEHIND) {
-        this.skyZ[i] += SKY_COUNT * SKY_SPACING;
+      let z = this.skyZ[i];
+      while (z < carZ - SKY_BEHIND) z += SKY_COUNT * SKY_SPACING;
+      while (z > bandFront) z -= SKY_COUNT * SKY_SPACING;
+      if (z !== this.skyZ[i]) {
+        this.skyZ[i] = z;
+        this.placeSkyBox(i);
         dirty = true;
       }
-      if (dirty) {
-        this.placeSkyBox(i);
-        this.skyline.instanceMatrix.needsUpdate = true;
-        dirty = false;
-      }
     }
+    if (dirty) this.skyline.instanceMatrix.needsUpdate = true;
   }
 
   /** Recompose instance i's matrix from its stored base params + current z. */

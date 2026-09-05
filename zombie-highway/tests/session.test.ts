@@ -130,27 +130,29 @@ describe("Session", () => {
     session.startRun();
     const cdSteps = Math.ceil(CONFIG.gun.fireIntervalS / CONFIG.sim.dt);
 
-    // First pull fires immediately and spends one round.
+    // Fire sides are screen-space: a screen-left pull fires the world-RIGHT
+    // gun (the chase cam mirrors x), so gun.right spends the round.
     input.fire("left");
     session.update(1 / 60);
     expect(shots).toHaveBeenCalledTimes(1);
-    expect(session.gun.left.mag).toBe(CONFIG.gun.magSize - 1);
+    expect(session.gun.right.mag).toBe(CONFIG.gun.magSize - 1);
+    expect(session.gun.left.mag).toBe(CONFIG.gun.magSize);
 
     // Edges inside the refire window are dropped without spending ammo.
     input.fire("left");
     input.fire("left");
     session.update(1 / 60);
     expect(shots).toHaveBeenCalledTimes(1);
-    expect(session.gun.left.mag).toBe(CONFIG.gun.magSize - 1);
+    expect(session.gun.right.mag).toBe(CONFIG.gun.magSize - 1);
 
     // Drain the mag with spaced pulls; every landed pull emits a shot.
     shots.mockClear();
     let guard = 200;
-    while (session.gun.left.mag > 0 && guard-- > 0) {
+    while (session.gun.right.mag > 0 && guard-- > 0) {
       input.fire("left");
       for (let i = 0; i < cdSteps; i++) session.update(1 / 60);
     }
-    expect(session.gun.left.mag).toBe(0);
+    expect(session.gun.right.mag).toBe(0);
     expect(shots).toHaveBeenCalledTimes(CONFIG.gun.magSize - 1);
 
     // Empty mag: fireGun arms reloadT and no shot event fires.
@@ -158,7 +160,7 @@ describe("Session", () => {
     input.fire("left");
     session.update(1 / 60);
     expect(shots).not.toHaveBeenCalled();
-    expect(session.gun.left.reloadT).toBeGreaterThan(0);
+    expect(session.gun.right.reloadT).toBeGreaterThan(0);
   });
 
   it("magazine refills to full after the auto-reload completes", () => {
@@ -168,25 +170,42 @@ describe("Session", () => {
 
     // Drain the mag with spaced pulls.
     let guard = 200;
-    while (session.gun.left.mag > 0 && guard-- > 0) {
+    while (session.gun.right.mag > 0 && guard-- > 0) {
       input.fire("left");
       for (let i = 0; i < cdSteps; i++) session.update(1 / 60);
     }
-    expect(session.gun.left.mag).toBe(0);
+    expect(session.gun.right.mag).toBe(0);
 
     // One more pull arms the reload; after reloadS elapses the mag is full.
     input.fire("left");
     session.update(1 / 60);
-    expect(session.gun.left.reloadT).toBeGreaterThan(0);
+    expect(session.gun.right.reloadT).toBeGreaterThan(0);
     for (
       let t = 0;
-      t < CONFIG.gun.reloadS + 0.25 && session.gun.left.mag === 0;
+      t < CONFIG.gun.reloadS + 0.25 && session.gun.right.mag === 0;
       t += 1 / 60
     ) {
       session.update(1 / 60);
     }
-    expect(session.gun.left.mag).toBe(CONFIG.gun.magSize);
-    expect(session.gun.left.reloadT).toBeLessThanOrEqual(0);
+    expect(session.gun.right.mag).toBe(CONFIG.gun.magSize);
+    expect(session.gun.right.reloadT).toBeLessThanOrEqual(0);
+  });
+
+  it("screen-right steer moves the car toward world -x (camera mirrors x)", () => {
+    // Regression: input steer was fed to the sim unconverted, so pressing
+    // right moved the car left on screen (the chase cam looks along +z,
+    // which flips x).
+    const { session, input } = makeSession(42);
+    session.startRun();
+    input.steer = 1; // player's right
+    const x0 = session.car.x;
+    session.update(1 / 60);
+    session.update(1 / 60);
+    expect(session.car.x).toBeLessThan(x0);
+    const xRight = session.car.x;
+    input.steer = -1; // player's left
+    for (let i = 0; i < 30; i++) session.update(1 / 60);
+    expect(session.car.x).toBeGreaterThan(xRight);
   });
 
   it("fixed-step accumulator is deterministic for equal wall time", () => {
