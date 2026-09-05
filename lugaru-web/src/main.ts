@@ -12,7 +12,9 @@ async function boot() {
 
     const canvas = document.getElementById('game') as HTMLCanvasElement;
     const game = new Game(canvas);
-    game.start();
+    // start() awaits Rapier WASM init — outside the try below, so surface
+    // async failures on the error screen explicitly.
+    game.start().catch((err: unknown) => errors.show('Physics init failed', String(err)));
 
     if (import.meta.env.DEV) {
       // Verification hook: read-only handles for browser tooling. Dev

@@ -6,18 +6,21 @@ import { ChaseCamera } from './render/camera';
 import { createScene } from './render/scene';
 import { DebugStats } from './render/debugStats';
 import { SPECIES } from './data/species';
-import { buildRig } from './actors/skeleton';
+import { buildRig, type Rig } from './actors/skeleton';
 import { ClipPlayer } from './actors/clips';
 import { CharacterController } from './actors/controller';
 import { FighterSim, type FighterSimWorld } from './combat/stateMachine';
 import { applyHit } from './combat/hitdetect';
 import { HITSTOP_MS, KO_SLOWMO_SCALE, KO_SLOWMO_MS } from './data/tuning';
+import { heightAt } from './world/terrain';
+import { PhysicsWorld } from './world/physics';
+import { spawnRagdoll, type RagdollHandle } from './actors/ragdoll';
 
 /**
- * MoveIds that don't have a matching CLIPS entry fall back to 'idle'.
- * 'legSweep' → 'sweep'; 'runningKick' → 'kickFront'; 'punch'/'doublePunch'
- * → 'punchR'/'punchL'; 'bodyThrow'/'counterThrow'/'flip'/'tackle' → 'hurt'
- * (reversal/stun animations share the hurt pose as placeholder).
+ * MoveId → CLIPS key. MoveIds without a matching CLIPS entry fall back to
+ * 'idle'. 'legSweep' → 'sweep'; 'runningKick' → 'kickFront'; 'punch'/
+ * 'doublePunch' → 'punchR'/'punchL'; reversal/stun animations share the
+ * 'hurt' pose as a placeholder.
  */
 const MOVE_CLIP: Record<string, string> = {
   punch: 'punchR',
@@ -39,7 +42,10 @@ function moveClipKey(moveId: string): string {
  *
  * The renderer is read-only over sim state: FighterSim owns positions,
  * headings, stances, and phases; Game copies them into CharacterController
- * for display each frame.  No backflow from renderer → FighterSim.
+ * for display each frame. No backflow from renderer → FighterSim.
+ *
+ * Rapier (Task 12) provides cosmetic dynamics only — KO ragdolls. It is
+ * initialised asynchronously in start() before the first frame renders.
  */
 export class Game {
   private readonly canvas: HTMLCanvasElement;
@@ -53,6 +59,7 @@ export class Game {
   private readonly dummySim: FighterSim;
   private readonly playerCtrl: CharacterController;
   private readonly dummyCtrl: CharacterController;
+  private readonly dummyRig: Rig;
 
   private readonly simLoop: FixedLoop;
   private readonly timescale: Timescale;
@@ -61,6 +68,13 @@ export class Game {
   private readonly playerVictims: [FighterSim['state']];
   private readonly dummyVictims: [FighterSim['state']];
 
+  // Rapier cosmetic dynamics. Created async in start() because Rapier WASM
+  // initialisation is asynchronous.
+  private physics: PhysicsWorld | null = null;
+  private readonly ragdolls: RagdollHandle[] = [];
+  /** Direction of the most recent landed hit — ragdoll impulse uses it. */
+  private lastHitDir = { x: 0, y: 0.4, z: -1 };
+
   private frame: ReturnType<InputManager['sample']>;
   private clickHandler: (() => void) | null = null;
   private animationId = 0;
@@ -68,7 +82,7 @@ export class Game {
 
   private lastMs = 0;
   private running = false;
-  // Track previous KO state to fire slow-mo once per transition.
+  // Track previous KO state to fire slow-mo + ragdoll once per transition.
   private dummyWasKO = false;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -87,6 +101,9 @@ export class Game {
     // --- Input ---
     this.input = new InputManager();
     this.input.attach(canvas);
+    // Pointer lock on click — Game owns its canvas.
+    this.clickHandler = () => this.input.requestPointerLock();
+    canvas.addEventListener('click', this.clickHandler);
 
     // --- Player (rabbit) ---
     const playerRig = buildRig(SPECIES.rabbit);
@@ -97,13 +114,11 @@ export class Game {
 
     // --- Dummy (wolf) — static, null input ---
     const dummyRig = buildRig(SPECIES.wolf);
+    this.dummyRig = dummyRig;
     this.sceneBundle.scene.add(dummyRig.root);
     const dummyClip = new ClipPlayer(dummyRig);
     this.dummyCtrl = new CharacterController(dummyRig, SPECIES.wolf, dummyClip);
     this.dummySim = new FighterSim('wolf', 'dummy', false);
-    // Pointer lock on click — Game owns its canvas.
-    this.clickHandler = () => this.input.requestPointerLock();
-    canvas.addEventListener('click', this.clickHandler);
     // Place dummy 3 m in front of player (player faces -Z at heading 0).
     this.dummySim.state.pos.z = -3;
     this.dummySim.state.heading = Math.PI; // face +Z toward player
@@ -136,9 +151,14 @@ export class Game {
     this.camera3d.updateProjectionMatrix();
   }
 
-  /** Start the game loop. `mode` reserved for future use (sandbox/arena). */
-  start(_mode: 'sandbox' = 'sandbox'): void {
+  /**
+   * Start the game loop. `mode` reserved for future use (sandbox/arena).
+   * Async because Rapier WASM must initialise before the first frame; the
+   * physics world powers KO ragdolls (cosmetic dynamics only).
+   */
+  async start(_mode: 'sandbox' = 'sandbox'): Promise<void> {
     if (this.running) return;
+    this.physics = await PhysicsWorld.create(heightAt);
     this.running = true;
     this.lastMs = performance.now();
     this.tick();
@@ -178,6 +198,14 @@ export class Game {
     const scale = this.timescale.update(realDtMs);
     this.simLoop.advance(realDtMs * scale);
 
+    // Step cosmetic physics with the same scaled time so ragdolls slow-mo
+    // with the rest of the world.
+    const dtSec = (realDtMs * scale) / 1000;
+    if (this.physics && dtSec > 0) {
+      this.physics.step(dtSec);
+      for (const rd of this.ragdolls) rd.update();
+    }
+
     // Render: copy sim → controller → rig (read-only), scaled by timescale
     // so hitstop freezes animation and slow-mo slows it.
     this.updateRender(realDtMs * scale);
@@ -197,6 +225,7 @@ export class Game {
     const pHits = this.playerSim.collectHits(this.playerVictims);
     for (const hit of pHits) {
       applyHit(hit, this.world.fighters);
+      this.lastHitDir = { x: hit.dirVector.x, y: 0, z: hit.dirVector.z };
       this.timescale.hitstop(HITSTOP_MS);
     }
 
@@ -204,13 +233,23 @@ export class Game {
     const dHits = this.dummySim.collectHits(this.dummyVictims);
     for (const hit of dHits) {
       applyHit(hit, this.world.fighters);
+      this.lastHitDir = { x: hit.dirVector.x, y: 0, z: hit.dirVector.z };
       this.timescale.hitstop(HITSTOP_MS);
     }
 
-    // KO slow-mo: fire once per transition into KO.
+    // KO: slow-mo once per transition, then hand the body to a ragdoll so
+    // it flops along the killing-blow direction.
     if (!this.dummyWasKO && this.dummySim.state.phase.t === 'ko') {
       this.timescale.slowmo(KO_SLOWMO_SCALE, KO_SLOWMO_MS);
       this.dummyWasKO = true;
+      if (this.physics) {
+        const dir = this.lastHitDir;
+        const rd = spawnRagdoll(this.physics, this.dummyRig, {
+          dir: { x: dir.x, y: 0.45, z: dir.z },
+          force: SPECIES.wolf.massKg * 1.5,
+        });
+        this.ragdolls.push(rd);
+      }
     }
   }
 
@@ -229,10 +268,13 @@ export class Game {
       this.frame.lookDY,
     );
 
-    // Dummy
-    this.copySimToCtrl(this.dummySim.state, this.dummyCtrl, this.dummySim);
-    this.applyPhaseClip(this.dummySim.state, this.dummyCtrl);
-    this.dummyCtrl.updateFromSim(dtMs, 0);
+    // Dummy — once ragdolled, the physics owns its bone matrices; skip the
+    // controller/clip path so it doesn't fight the ragdoll for the rig.
+    if (this.ragdolls.length === 0) {
+      this.copySimToCtrl(this.dummySim.state, this.dummyCtrl, this.dummySim);
+      this.applyPhaseClip(this.dummySim.state, this.dummyCtrl);
+      this.dummyCtrl.updateFromSim(dtMs, 0);
+    }
   }
 
   /** Copy FighterSim state into CharacterController for rendering (read-only). */
@@ -261,13 +303,11 @@ export class Game {
         break;
       case 'hitstun':
       case 'downed':
+      case 'reverseAttempt':
         ctrl.setPhaseOverride('hurt');
         break;
       case 'ko':
         ctrl.setPhaseOverride('koFlail');
-        break;
-      case 'reverseAttempt':
-        ctrl.setPhaseOverride('hurt');
         break;
       default: // idle, move
         ctrl.clearPhaseOverride();
@@ -281,12 +321,14 @@ export class Game {
     playerSim: FighterSim;
     dummySim: FighterSim;
     timescale: Timescale;
+    ragdolls: readonly RagdollHandle[];
   } {
     return {
       chaseCam: this.chaseCam,
       playerSim: this.playerSim,
       dummySim: this.dummySim,
       timescale: this.timescale,
+      ragdolls: this.ragdolls,
     };
   }
 }
