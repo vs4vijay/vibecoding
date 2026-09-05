@@ -242,3 +242,40 @@ export const HEARING_BASE_RABBIT_M = 18;
 export const WIND_TURN_MS = 20000;
 /** Max direction drift per wind step, half-amplitude (rad, ±30°). */
 export const WIND_MAX_TURN_RAD = (30 * Math.PI) / 180;
+
+// ---------------------------------------------------------------------------
+// Enemy brain [Task 16] — FSM thresholds, difficulty presets, engagement.
+// ---------------------------------------------------------------------------
+
+/** Brain enters `engage` once the target is within this range (m). */
+export const AI_ENGAGE_RANGE_M = 2.2;
+/** `circle` orbit band: the brain keeps the target between these radii (m). */
+export const AI_CIRCLE_MIN_M = 4;
+export const AI_CIRCLE_MAX_M = 6;
+/** The brain flees below this fraction of maxHp. */
+export const AI_FLEE_HP_FRACTION = 0.25;
+/** `circle` strafe direction flips at random intervals in this window (ms). */
+export const AI_STRAFE_FLIP_MIN_MS = 1000;
+export const AI_STRAFE_FLIP_MAX_MS = 3000;
+/** Hard anti-repetition cap: a move used this many times consecutively is banned. */
+export const AI_MOVE_HARD_CAP = 3;
+/** `patrol` waypoints are picked within this radius of the spawn point (m). */
+export const AI_PATROL_RADIUS_M = 6;
+/** `patrol` pauses this long at each waypoint before wandering on (ms). */
+export const AI_PATROL_PAUSE_MS = 800;
+/** Min gap between brain attack presses (ms) — avoids frame-0 spam. */
+export const AI_ATTACK_COOLDOWN_MS = 250;
+/** A heard/seen target stays "known" for at most this long before re-sneaking (ms). */
+export const AI_MEMORY_TIMEOUT_MS = 4000;
+/** Brains beyond this range from a visible target engage directly (chase, m). */
+export const AI_CHASE_RANGE_M = 12;
+
+/**
+ * Per-difficulty tuning [Task 16 brief]. House of truth for the difficulty
+ * numbers — difficulty.ts re-exports these as the `DIFFICULTY` record.
+ */
+export const DIFFICULTY_PRESETS = {
+  easy: { reactionMs: 550, reversalChance: 0.15, aggression: 0.5, memoryLen: 2, engageLimit: 1 },
+  normal: { reactionMs: 320, reversalChance: 0.35, aggression: 0.75, memoryLen: 4, engageLimit: 2 },
+  hard: { reactionMs: 170, reversalChance: 0.6, aggression: 1.0, memoryLen: 6, engageLimit: 3 },
+} as const;

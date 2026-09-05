@@ -212,3 +212,101 @@ describe('Headless scripted-fight harness (Task 10)', () => {
     console.log('Fight Summary:', summary);
   }, 30000); // 30s timeout for 20k steps
 });
+// ---------------------------------------------------------------------------
+// Task 16 — AI vs player: a Brain-driven wolf fights a scripted player.
+// The fight must terminate (someone KOs) within 90 s of sim time across
+// 5 seeds, with no NaN in any tracked quantity.
+// ---------------------------------------------------------------------------
+
+import { Brain } from '../../src/ai/brain';
+import { DIFFICULTY } from '../../src/ai/difficulty';
+import { mulberry32 } from '../../src/core/rng';
+
+describe('AI vs player harness (Task 16)', () => {
+  for (const seed of [1, 2, 3, 4, 5]) {
+    it(`seed ${seed}: brain-driven wolf vs scripted player reaches KO within 90s, no NaN`, () => {
+      const rng = mulberry32(seed);
+      const player = new FighterSim('rabbit', 'player', true);
+      const wolf = new FighterSim('wolf', 'wolf', false);
+      player.state.pos.z = -6;
+      wolf.state.pos.z = 0;
+      wolf.state.heading = Math.PI; // face the player
+      const brain = new Brain(wolf, DIFFICULTY.normal, rng);
+
+      const world: FighterSimWorld = {
+        fighters: [player.state, wolf.state],
+        downedBodyNearby: false,
+        weaponOnGroundNearby: false,
+      };
+      const brainWorld = {
+        enemies: [player.state],
+        allies: [] as FighterState[],
+        bushes: [],
+      };
+      const senses = { heard: [], wind: { vector: { x: 0, z: 0 } }, scent: null };
+
+      const maxSteps = Math.ceil(90_000 / STEP_MS); // 90 s of sim time
+      let koReason: 'hp' | 'timeout' = 'timeout';
+      let stepsRun = 0;
+      let cooldown = 0;
+
+      for (let i = 0; i < maxSteps; i++) {
+        stepsRun = i + 1;
+
+        // Scripted player: face + approach the wolf, press attack on a
+        // seeded cadence when within punch range.
+        const dx = wolf.state.pos.x - player.state.pos.x;
+        const dz = wolf.state.pos.z - player.state.pos.z;
+        const dist = Math.hypot(dx, dz);
+        const input = makeFrame();
+        if (dist > 1.2) {
+          // Steer toward the wolf: invert the sim's heading-relative input
+          // mapping (fwd = (-sin h, -cos h), right = (-fwd.z, fwd.x)) so the
+          // world-space direction (dx, dz) becomes local move inputs.
+          const h = player.state.heading;
+          const fx = -Math.sin(h);
+          const fz = -Math.cos(h);
+          const rx = -fz;
+          const rz = fx;
+          const nx = dx / (dist || 1);
+          const nz = dz / (dist || 1);
+          input.moveZ = -(nx * fx + nz * fz);
+          input.moveX = nx * rx + nz * rz;
+        } else if (cooldown <= 0) {
+          input.pressed.attack = true;
+          cooldown = 20; // ~0.33 s between presses
+        }
+        cooldown -= 1;
+
+        player.update(STEP_MS, input, world);
+        const aiFrame = brain.update(STEP_MS, senses, brainWorld);
+        wolf.update(STEP_MS, aiFrame, world);
+
+        // Hit application both directions.
+        for (const hit of player.collectHits([wolf.state])) {
+          applyHit(hit, world.fighters);
+        }
+        for (const hit of wolf.collectHits([player.state])) {
+          applyHit(hit, world.fighters);
+        }
+
+        // No NaN anywhere, every step.
+        for (const f of world.fighters) {
+          expect(Number.isNaN(f.pos.x)).toBe(false);
+          expect(Number.isNaN(f.pos.y)).toBe(false);
+          expect(Number.isNaN(f.pos.z)).toBe(false);
+          expect(Number.isNaN(f.velY)).toBe(false);
+          expect(Number.isNaN(f.heading)).toBe(false);
+        }
+
+        if (player.state.hp <= 0 || wolf.state.hp <= 0) {
+          koReason = 'hp';
+          break;
+        }
+      }
+
+      expect(koReason).toBe('hp'); // fight actually terminated
+      expect(stepsRun).toBeLessThanOrEqual(maxSteps);
+    }, 30_000);
+  }
+});
