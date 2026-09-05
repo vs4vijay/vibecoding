@@ -6,7 +6,29 @@ A collection of AI-assisted projects built with vibe coding - the art of coding 
 
 ## AI Coding Agents, Skills, and Tools uses
 
-These projects were built using various coding harnesses:
+My Current Tooling:
+- claude
+- codex
+- opencode
+- pi / omp
+- omniroute
+- rtk
+- context-mode
+- playwright cli
+- cmux
+- Superset.sh
+- herdr
+- cmux
+- Skills
+  - Playwright CLI Skills
+  - Superpowers
+  - hyperframes
+- MCPs:
+  - https://mcp.deepwiki.com/mcp
+  - https://mcp.excalidraw.com
+  - https://mcp.firecrawl.dev/v2/mcp
+
+These projects were built using various coding harnesses, and skills:
 
 ### OpenCode
 
@@ -24,10 +46,11 @@ OPENCODE_SERVER_USERNAME=viz OPENCODE_SERVER_PASSWORD=VerySecurePasswordHere ope
 
 ### Oh My OpenAgent
 
-https://github.com/code-yeongyu/oh-my-opencode
 https://github.com/code-yeongyu/oh-my-openagent
 
 The best agent harness - a plugin that transforms OpenCode into a powerful multi-agent orchestration system with specialized agents (Sisyphus, Oracle, Librarian, etc.), MCP support, and parallel execution capabilities.
+
+bunx oh-my-openagent install
 
 
 ### Pi Coding Agent
@@ -38,18 +61,28 @@ bun add -g --ignore-scripts @earendil-works/pi-coding-agent
 
 pi install npm:pi-llama-cpp
 pi install npm:pi-web-access
+pi install npm:pi-subagents
+pi install npm:pi-context-view
+pi install npm:pi-mcp-adapter
 pi install npm:context-mode
+pi install npm:@narumitw/pi-chrome-devtools
+pi install npm:@narumitw/pi-statusline
+pi install npm:@narumitw/pi-btw
+pi install git:github.com/obra/superpowers
+pi install git:github.com/cathrynlavery/diagram-design
 
 
-export LLAMA_SERVER_URL=http://127.0.0.1:1100 # or change in ~/.pi/agents/settings.json
+export LLAMA_SERVER_URL=http://127.0.0.1:11000 # or change in ~/.pi/agents/settings.json
 ```
 
-### Oh-my-Pi
+### Oh-my-pi
 
 - https://omp.sh/
 
 ```bash
 bun install -g @oh-my-pi/pi-coding-agent
+
+omp plugin install context-mode
 
 # export AZURE_OPENAI_BASE_URL="..../v1"
 # export AZURE_OPENAI_API_KEY="YOUR_AZURE_OPENAI_API_KEY"
@@ -68,9 +101,11 @@ providers:
 ### Tools used
 
 - rtk-ai - `brew install rtk-ai/tap/rtk`
-- gnhf - `bun add -g gnhf`
-- gsd - `bun x @opengsd/gsd-core@latest` https://github.com/open-gsd/gsd-core
+- context-mode `bun add -g context-mode`
 - omniroute - `bun add -g omniroute`
+- gnhf - `bun add -g gnhf`
+- gsd - `bunx @opengsd/gsd-core@latest` https://github.com/open-gsd/gsd-core
+- playwright-cli - `bun add -g playwright-cli`
 - android-cli - https://developer.android.com/tools/agents/android-cli
 
 ### Skills used
@@ -79,7 +114,9 @@ providers:
 - playwright-cli Skills
 - agent-browser
 - superpowers Skills - https://github.com/obra/superpowers
+
 ```bash
+
 # List Skills
 bun x skills ls -g
 
@@ -114,15 +151,20 @@ bun x skills@latest add mattpocock/skills --full-depth
 android init
 android skills add --skill base
 
-bun install -g @openai/codex
-
 # OLD
 bun x skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
 ```
 
 ## MCP used
 
+https://mcp.deepwiki.com/mcp
 https://mcp.excalidraw.com
+https://mcp.firecrawl.dev/v2/mcp
+https://mcp.context7.com/mcp
+https://mcp.notion.com/mcp
+https://cloud.comfy.org/mcp
+https://search.parallel.ai/mcp
+https://api.githubcopilot.com/mcp
 
 ```bash
 claude mcp add --transport http excalidraw https://mcp.excalidraw.com
@@ -139,15 +181,23 @@ codex mcp add plane --url https://mcp.plane.so/http/mcp
 
 codex mcp add deepwiki --url https://mcp.deepwiki.com/mcp
 
+codex mcp add context-mode -- npx -y context-mode
+
+pip install comfy-mcp
+
 ```
 
 ## Experiments
 
 ```
+bun install -g @openai/codex
 alias vcodex="CODEX_HOME=~/.codex-vijay codex"
 
 herdr
 curl -fsSL https://herdr.dev/install.sh | sh
+
+paseo
+bun install -g @getpaseo/cli
 
 GSD
 
@@ -156,9 +206,20 @@ BMAD
 OpenSpec
 https://github.com/Fission-AI/OpenSpec
 
+https://github.com/Priivacy-ai/spec-kitty
+
 Superpowers
 
-https://github.com/Priivacy-ai/spec-kitty
+ECC
+https://github.com/affaan-m/ecc
+
+https://github.com/zebbern/claude-code-guide
+
+Context Mode
+bun install -g context-mode
+https://github.com/mksglu/context-mode
+
+gnhf
 
 Mnemosyne
 
@@ -207,9 +268,24 @@ bunx skills@latest add obra/superpowers
 bunx skills add https://github.com/nextlevelbuilder/ui-ux-pro-max-skill --skill ui-ux-pro-max
 
 
-pi install git:github.com/obra/superpowers
 
 Gauntlet Loop
+
+Claude Squad
+
+https://github.com/gemini-cli-extensions/conductor
+
+https://github.com/affaan-m/ecc
+
+https://github.com/edgehero/pi-dispatch
+
+context7
+
+chrome-devtools-mcp
+
+codeburn
+
+https://github.com/cathrynlavery/diagram-design
 
 ```
 
@@ -225,8 +301,6 @@ Core workflow:
 2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
 3. `agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
 4. Re-snapshot after page changes
-
-
 
 ---
 
