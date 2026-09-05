@@ -4,7 +4,6 @@
  * Returns a closure; EACH CALL ADVANCES INTERNAL STATE, so successive calls
  * yield the next number of the sequence. Same seed -> identical sequence;
  * deterministic across platforms (pure 32-bit int math, no Math.random()).
- *
  * @param seed any 32-bit unsigned integer
  * @returns uniform float in [0, 1)
  */
@@ -18,3 +17,6 @@ export function mulberry32(seed: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+/** A seeded PRNG closure: each call returns the next uniform value in [0,1). */
+export type Rng = () => number;

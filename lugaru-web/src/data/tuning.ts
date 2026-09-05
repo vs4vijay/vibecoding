@@ -203,3 +203,42 @@ export const BODY_THROW_IMPACT_DAMAGE = 40;
 
 /** Fall speed (m/s) at ground contact that kicks up a dust ring. */
 export const HEAVY_LAND_MIN_FALL_MPS = 3;
+
+
+// --- Perception [Task 15] — sight, hearing, wind, scent field --------------
+
+/** Square arena side length (m); terrain plane is 120×120 centered on origin. */
+export const ARENA_SIZE_M = 120;
+/** ScentField grid is this many cells per side; cell edge = ARENA/Cells. */
+export const SCENT_GRID_CELLS = 48;
+/** Constant-hold scalar diffusion coefficient for scent (m²/s). */
+export const SCENT_DIFFUSION_D = 0.1;
+/** Emission rate (intensity units/s) of an ordinary (unbloodied) emitter. */
+export const SCENT_EMIT_RATE_BASE = 0.3;
+/** Emission rate (intensity units/s) of a bloodied emitter. */
+export const SCENT_EMIT_RATE_BLOODIED = 1.0;
+/** Scent intensity a hunting wolf needs to start investigating. */
+export const SCENT_DETECT_THRESHOLD = 0.15;
+
+/** Clear-sky visual range (m) for a wolf observer. */
+export const SIGHT_RANGE_WOLF_M = 18;
+/** Clear-sky visual range (m) for a rabbit observer. */
+export const SIGHT_RANGE_RABBIT_M = 14;
+/** Total horizontal field of view (rad) shared by all species. */
+export const SIGHT_FOV_RAD = (120 * Math.PI) / 180;
+/** A crouched target's effective sight range is range × this factor. */
+export const CROUCH_SIGHT_MULT = 0.5;
+/** A bush's blocking radius (m) for the sight segment test. */
+export const BUSH_RADIUS_M = 1;
+/** Sight segment must intersect at least this many bushes to be blocked. */
+export const BUSHES_BLOCK_COUNT = 2;
+
+/** Hearing reach (m) of a wolf listener (radius = loudness × this). */
+export const HEARING_BASE_WOLF_M = 14;
+/** Hearing reach (m) of a rabbit listener (radius = loudness × this). */
+export const HEARING_BASE_RABBIT_M = 18;
+
+/** How long between wind direction/strength random-walk steps (ms). */
+export const WIND_TURN_MS = 20000;
+/** Max direction drift per wind step, half-amplitude (rad, ±30°). */
+export const WIND_MAX_TURN_RAD = (30 * Math.PI) / 180;
