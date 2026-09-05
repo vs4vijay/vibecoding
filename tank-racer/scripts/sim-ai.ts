@@ -19,6 +19,10 @@ import { AI_PERSONALITIES, createAIController } from "../src/ai";
 import type { World } from "../src/game";
 import type { TankState } from "../src/tank";
 
+// Bun runtime globals are not typed here (no @types/node in this project) —
+// only the argument vector and exit are needed.
+declare const process: { argv: string[]; exit(code?: number): void };
+
 const START_T = 0.005;
 const DT = 1 / 60;
 const MAX_SIM_TIME = 480; // s
@@ -66,6 +70,7 @@ function simulateTrack(def: (typeof TRACK_DEFS)[number]): void {
   const racers = tanks.map((tk, i) => ({
     tank: tk,
     progress: createTankProgress(grid[i].t),
+    finishTime: null, // Racer shape (unused by the sim, required by the type)
   }));
 
   const world = {

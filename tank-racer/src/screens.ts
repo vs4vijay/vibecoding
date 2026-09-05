@@ -106,16 +106,6 @@ export interface Screens {
   hidePaused(): void;
 }
 
-const SECONDS_PER_MINUTE = 60;
-
-/** m:ss.t formatting shared by results + HUD callers. */
-export function formatRaceTime(seconds: number): string {
-  const m = Math.floor(seconds / SECONDS_PER_MINUTE);
-  const s = Math.floor(seconds % SECONDS_PER_MINUTE);
-  const t = Math.floor((seconds * 10) % 10);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${t}`;
-}
-
 export function createScreens(rootId = "screens"): Screens {
   const rootEl = document.getElementById(rootId);
   if (!rootEl) throw new Error(`#${rootId} missing from index.html`);
@@ -145,7 +135,9 @@ export function createScreens(rootId = "screens"): Screens {
     h1.textContent = "TANK RACER";
     const sub = document.createElement("p");
     sub.className = "subtitle";
-    sub.textContent = "THREE CIRCUITS · 3 LAPS · 4 TANKS";
+    // Base line only — game.ts replaces it at boot with the dynamic
+    // "<n> CIRCUITS · <laps> LAPS · <tanks> TANKS" subtitle (showTitle).
+    sub.textContent = "3 LAPS · 3 TANKS";
     card.appendChild(h1);
     card.appendChild(sub);
 
@@ -415,7 +407,9 @@ export function createScreens(rootId = "screens"): Screens {
       const card = ensureTitle();
       if (subtitle) {
         const sub = card.querySelector<HTMLElement>(".subtitle");
-        if (sub) sub.textContent = `${subtitle} · ${sub.textContent}`;
+        // Replace (never prepend) so the circuit/lap/tank counts stay exact
+        // no matter how often the title is shown.
+        if (sub) sub.textContent = subtitle;
       }
       card.style.display = "";
     },

@@ -1,8 +1,12 @@
 // Phase 15: championship series data model.
 //
-// Pure data + localStorage persistence — no DOM, no three.js, no game state,
-// so the points math and resume logic stay testable in isolation. game.ts owns
-// the flow (when races happen); this module owns what a championship IS.
+// Pure data + localStorage persistence — no DOM, no game state, so the points
+// math and resume logic stay testable in isolation. game.ts owns the flow
+// (when races happen); this module owns what a championship IS. The only
+// cross-module import is the data-only track roster, which defines the
+// series length (one race per circuit).
+
+import { TRACK_DEFS } from "./track";
 
 /** Points by finishing position: 1st=10, 2nd=7, 3rd=5, 4th=3 (spec). */
 export const CHAMP_POINTS = [10, 7, 5, 3];
@@ -91,7 +95,7 @@ export function loadChamp(): ChampState | null {
       typeof p.raceIndex !== "number" ||
       !Number.isInteger(p.raceIndex) ||
       p.raceIndex < 0 ||
-      p.raceIndex > 4 || // 4 = all races done, podium not yet seen
+      p.raceIndex > TRACK_DEFS.length || // all races done, podium not yet seen
       typeof p.twoPlayer !== "boolean" ||
       !Array.isArray(p.entrants) ||
       p.entrants.length !== 4

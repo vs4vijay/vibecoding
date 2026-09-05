@@ -33,7 +33,7 @@ const CURV_SAMPLES = 7; // ≈42u of forward planning
 const BRAKE_DECEL_EST = 26; // conservative braking capability for corner planning
 
 const RUBBER_GAP = 0.06; // fraction-of-lap gap that maps to full rubber-band
-const RUBBER_AMOUNT = 0.18; // ±18% effective max speed — keeps avg players mid-pack
+const RUBBER_AMOUNT = 0.15; // ±15% effective max speed (spec Phase 4) — keeps avg players mid-pack
 /** Gap (same fraction-of-lap units) behind which AI fire more aggressively. */
 const DESPERATE_GAP = -RUBBER_GAP * 0.5;
 const DESPERATE_FIRE_MULT = 1.5; // fire-clock speedup when far behind the player

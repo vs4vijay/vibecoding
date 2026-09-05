@@ -210,9 +210,8 @@ export const TRACK_DEFS: TrackDef[] = [
 
 export const ROAD_HALF_WIDTH = 7; // road is ~14 units wide (per-track default)
 export const WALL_HEIGHT = 1.2;
-/** Legacy default collide offset — runtime value is now per-track
- * (`track.halfWidth - 0.5`) to support the wider GLACIER LOOP road. */
-export const WALL_COLLIDE_DIST = 6.5;
+// Wall collision clamps to `track.halfWidth - 0.5` at runtime (see
+// collideWithWalls) so the wider GLACIER LOOP road is supported.
 
 /** Default checkpoint gates per lap (t values) — tracks may override. */
 export const DEFAULT_GATES = [0, 0.25, 0.5, 0.75];

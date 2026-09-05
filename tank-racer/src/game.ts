@@ -34,12 +34,12 @@ import { createPowerups, type Powerups } from "./powerups";
 import { AI_PERSONALITIES, createAIController, type AIController } from "./ai";
 import {
   createScreens,
-  formatRaceTime,
   type ChampPodiumView,
   type ChampResultsView,
   type NewBest,
   type TankStatsView,
 } from "./screens";
+import { formatRaceTime } from "./format";
 import { initAudio, resumeAudio, startMusic, stopMusic, sfx, suspendAudio, toggleMute, updateEngine } from "./audio";
 import { createJuice } from "./juice";
 import {
@@ -757,8 +757,17 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   // Phase 8: touch controls — same TankInput shape, merged in readPlayerInput().
   // attach() happens further down, after `world` exists (a synchronous
   // coarse-pointer enable would otherwise read world.phase too early).
+  // Phase 13: the first touchstart is refused while a 2P race is live —
+  // enabling auto-throttle then would hijack P1's inputs mid-race — with the
+  // same toast the 2P toggle shows. Touch is not consumed: it re-arms so
+  // touch mode still activates on a later tap back in 1P.
   const touchInput = new TouchInput({
     onEnable: updateTouchControlsVisibility,
+    activationBlocked: () => {
+      if (!world.twoPlayer) return false;
+      screens.toast("TOUCH CONTROLS ACTIVE — 1P ONLY");
+      return true;
+    },
   });
 
   // Phase 10: gamepad — same TankInput merge shape; menus via drained actions.
@@ -828,7 +837,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   // Build the persisted track, seat all tanks, wire crates + AI brains
   loadTrack(trackIndex);
 
-  screens.showTitle(`${TRACK_DEFS.length} CIRCUITS`);
+  screens.showTitle(
+    `${TRACK_DEFS.length} CIRCUITS · ${TOTAL_LAPS} LAPS · ${TANK_DEFS.length} TANKS`,
+  );
   setPhase("title"); // hoisted function decl; hides the HUD behind the title card
   selectTank(tankIndex); // applies livery/stats + title-screen stats card
   screens.setGhost(ghostEnabled); // Phase 14: ghost pill reflects the toggle
@@ -1364,8 +1375,11 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       updateStandings(world);
     }
     // Phase 14: cosmetic replay — advances only while the sim runs, so pause
-    // freezes it too. No physics interaction: the mesh is never a TankState.
-    ghostPlayer.update(dt);
+    // freezes it too. It stops once P1 has finished: the ghost replays P1's
+    // best lap, so it must not keep lapping behind the results card (in 2P it
+    // freezes at P1's finish while P2 races on). No physics interaction: the
+    // mesh is never a TankState.
+    if (racers[0].finishTime === null) ghostPlayer.update(dt);
     updateBoostPads(track, dt);
     // Shell movement/hits + wreck timers → respawn
     weapons.update(world, dt);

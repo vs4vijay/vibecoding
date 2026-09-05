@@ -12,6 +12,14 @@ import type { TankInput } from "./tank";
 export interface TouchCallbacks {
   /** Called once when touch mode activates (coarse pointer / first touch). */
   onEnable?: () => void;
+  /**
+   * Gate on the first touchstart (Phase 13): return true to refuse activation.
+   * While a 2P race is running, touching the screen must not enable touch
+   * controls (auto-throttle would hijack P1 mid-race) — game.ts shows the
+   * toast from here. The listener re-arms so a later touch, once back in 1P,
+   * can still activate touch mode.
+   */
+  activationBlocked?: () => boolean;
 }
 
 export class TouchInput {
@@ -30,9 +38,11 @@ export class TouchInput {
   private readonly btnFire: HTMLDivElement;
 
   private readonly onEnable?: () => void;
+  private readonly activationBlocked?: () => boolean;
 
   constructor(callbacks: TouchCallbacks = {}) {
     this.onEnable = callbacks.onEnable;
+    this.activationBlocked = callbacks.activationBlocked;
     this.root = document.createElement("div");
     this.root.id = "touch-controls";
 
@@ -59,14 +69,17 @@ export class TouchInput {
       this.enable();
       return;
     }
-    window.addEventListener(
-      "touchstart",
-      () => {
-        this.enable();
-        this.onEnable?.();
-      },
-      { once: true },
-    );
+    const onFirstTouch = () => {
+      if (this.activationBlocked?.()) {
+        // Blocked (e.g. mid-2P race): stay in keyboard mode and listen for
+        // the NEXT first touch instead of consuming the one-shot listener.
+        window.addEventListener("touchstart", onFirstTouch, { once: true });
+        return;
+      }
+      this.enable();
+      this.onEnable?.();
+    };
+    window.addEventListener("touchstart", onFirstTouch, { once: true });
   }
 
   enable(): void {

@@ -1,6 +1,7 @@
 import type { World } from "./game";
 import type { TankState } from "./tank";
 import { TOTAL_LAPS } from "./track";
+import { formatRaceTime } from "./format";
 
 /** Boost pads use ×1.5; pickup boost is ×1.4 — used to distinguish the slot text. */
 const PICKUP_BOOST_MULT = 1.4;
@@ -15,6 +16,7 @@ interface PanelRefs {
   lap: HTMLDivElement;
   pos: HTMLDivElement;
   time: HTMLDivElement;
+  best: HTMLDivElement;
   healthFill: HTMLDivElement;
   power: HTMLDivElement;
 }
@@ -25,6 +27,7 @@ interface PanelCache {
   lap: string;
   pos: string;
   time: string;
+  best: string;
   hpPct: number;
   hpColor: string;
   power: string | null;
@@ -63,6 +66,25 @@ export function initHud(world: World): Hud {
   let outlinePts: [number, number][] = [];
   let hudTrack = world.track;
 
+  // --- Best-lap readout (spec: HUD shows current/best lap time) ---------------
+  // Shows the fastest human lap completed this race, falling back to the
+  // stored per-track record — the same `tankracer.best.<trackId>` blob the
+  // title screen reads (game.ts owns writing it at the results screen).
+  // Records are per-track across humans, so both 2P halves share one value.
+  let storedBestLap = loadStoredBestLap(world.track.def.id);
+  let displayBestLap: number | null = storedBestLap;
+
+  function loadStoredBestLap(trackId: string): number | null {
+    try {
+      const raw = localStorage.getItem(`tankracer.best.${trackId}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { lap?: unknown };
+      return typeof parsed.lap === "number" ? parsed.lap : null;
+    } catch {
+      return null; // private mode etc. — the readout just shows this race's laps
+    }
+  }
+
   function recomputeMinimap(): void {
     minX = Infinity; maxX = -Infinity; minZ = Infinity; maxZ = -Infinity;
     for (const p of world.track.outline) {
@@ -77,6 +99,9 @@ export function initHud(world: World): Hud {
     );
     outlinePts = world.track.outline.map(toCanvas);
     hudTrack = world.track;
+    // Track switched on the title screen → pick up the new circuit's record
+    storedBestLap = loadStoredBestLap(world.track.def.id);
+    displayBestLap = storedBestLap;
   }
 
   const toCanvas = (p: { x: number; z: number }): [number, number] => [
@@ -108,7 +133,7 @@ export function initHud(world: World): Hud {
       posOf,
       refs,
       cache: {
-        speed: -1, lap: "", pos: "", time: "",
+        speed: -1, lap: "", pos: "", time: "", best: "",
         hpPct: -1, hpColor: "", power: null,
       },
     };
@@ -120,7 +145,8 @@ export function initHud(world: World): Hud {
     const lap = div(undefined, `hud-lap ${accentClass}`);
     const pos = div(undefined, `hud-pos ${accentClass}`);
     const time = div(undefined, "hud-time");
-    raceBlock.append(lap, pos, time);
+    const best = div(undefined, "hud-best");
+    raceBlock.append(lap, pos, time, best);
 
     const speed = div(undefined, "hud-speed");
     const power = div(undefined, "hud-power");
@@ -134,7 +160,7 @@ export function initHud(world: World): Hud {
     label.textContent = tag;
 
     half.append(label, power, healthBlock, speed, raceBlock);
-    panels.push(mkPanel(tank, posOf, { speed, lap, pos, time, healthFill, power }));
+    panels.push(mkPanel(tank, posOf, { speed, lap, pos, time, best, healthFill, power }));
   }
 
   /** Build the whole HUD for the active mode; wipes whatever existed. */
@@ -161,14 +187,15 @@ export function initHud(world: World): Hud {
       const lap = div("hud-lap");
       const pos = div("hud-pos");
       const time = div("hud-time");
-      raceBlock.append(lap, pos, time);
+      const best = div("hud-best");
+      raceBlock.append(lap, pos, time, best);
       root.appendChild(raceBlock);
 
       makeMinimap();
 
       panels.push(
         mkPanel(world.player, () => world.playerPosition, {
-          speed, lap, pos, time, healthFill, power,
+          speed, lap, pos, time, best, healthFill, power,
         }),
       );
       return;
@@ -209,10 +236,17 @@ export function initHud(world: World): Hud {
         c.lap = lapText;
         p.refs.lap.textContent = lapText;
       }
-      const timeText = formatLapTime(prog.lapTime);
+      const timeText = formatRaceTime(prog.lapTime);
       if (timeText !== c.time) {
         c.time = timeText;
         p.refs.time.textContent = timeText;
+      }
+      const bestText = `BEST ${
+        displayBestLap !== null ? formatRaceTime(displayBestLap) : "--:--.-"
+      }`;
+      if (bestText !== c.best) {
+        c.best = bestText;
+        p.refs.best.textContent = bestText;
       }
     }
 
@@ -302,6 +336,21 @@ export function initHud(world: World): Hud {
     // Track switched on the title screen → recompute minimap geometry once
     // (also covers the very first frames, before any recompute has run).
     if (world.track !== hudTrack || outlinePts.length === 0) recomputeMinimap();
+    // Best-lap readout value: the fastest lap completed by a HUMAN this race
+    // (panels are exactly the human tanks; AI laps are never eligible for the
+    // per-track records), falling back to the stored record between races.
+    // Live-updates the moment a lap event lowers a racer's bestLap.
+    let raceBestLap: number | null = null;
+    for (const p of panels) {
+      const lap = world.racers.find((r) => r.tank === p.tank)?.progress.bestLap;
+      if (
+        lap !== null && lap !== undefined &&
+        (raceBestLap === null || lap < raceBestLap)
+      ) {
+        raceBestLap = lap;
+      }
+    }
+    displayBestLap = raceBestLap ?? storedBestLap;
     for (const p of panels) updatePanel(p);
     drawMinimap();
     requestAnimationFrame(update);
@@ -321,11 +370,4 @@ export function initHud(world: World): Hud {
       buildHud(twoPlayer);
     },
   };
-}
-
-function formatLapTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  const t = Math.floor((seconds * 10) % 10);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${t}`;
 }

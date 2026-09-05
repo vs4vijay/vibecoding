@@ -62,6 +62,12 @@ body {
   opacity: 0.9;
 }
 
+#hud-best {
+  font-size: 14px;
+  letter-spacing: 1px;
+  opacity: 0.75;
+}
+
 #hud-minimap {
   position: absolute;
   top: 16px;
@@ -737,6 +743,11 @@ body {
   font-size: 15px;
 }
 
+.hud-half .hud-best {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
 .hud-half .hud-speed {
   right: 14px;
   bottom: 14px;
@@ -871,6 +882,10 @@ body {
   #hud-pos,
   #hud-time {
     font-size: clamp(13px, 3vw, 20px);
+  }
+
+  #hud-best {
+    font-size: clamp(11px, 2.6vw, 14px);
   }
 
   #hud-power {
