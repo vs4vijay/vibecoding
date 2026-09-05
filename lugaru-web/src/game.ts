@@ -293,11 +293,15 @@ export class Game {
     }
     if (victim === undefined) return;
     const wasBleeding = victim.flags.bleeding;
+    let applied = true;
     if (isSpecialMove(hit.moveId)) {
-      attackerSim.applySpecialStrike(hit, this.world.fighters);
+      // A gate-rejected special (target left range/state mid-swing) is a
+      // whiff: no hitstop, no camera kick, no blood.
+      applied = attackerSim.applySpecialStrike(hit, this.world.fighters) !== null;
     } else {
       applyHit(hit, this.world.fighters);
     }
+    if (!applied) return;
     this.lastHitDir = { x: hit.dirVector.x, y: 0, z: hit.dirVector.z };
     this.timescale.hitstop(HITSTOP_MS);
     if (victim.flags.bleeding && !wasBleeding) this.fx.spawnBloodPuff(victim.pos);

@@ -162,6 +162,7 @@ export function applySpecial(
     // ------------------------------------------------------------------
     case 'soccerKick': {
       if (target === null || !isCorpse(target)) return null;
+      if (distXZ(attacker, target) > def.rangeM) return null;
       return { damage: def.damage };
     }
 
@@ -174,6 +175,7 @@ export function applySpecial(
       if (target === null) return null;
       if (target.stance !== 'airborne') return null;
       if (target.flags.invulnerableAirFlipMs > 0) return null;
+      if (distXZ(attacker, target) > def.rangeM) return null;
       return {
         damage: def.damage,
         knockdown: true,

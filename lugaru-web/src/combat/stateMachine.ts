@@ -439,8 +439,6 @@ export class FighterSim {
       this.swingHitSet.add(e.victimId);
       landed.push(e);
     }
-    // [Task 14] The leg cannon reads this when its active window ends.
-    this.hitsLandedThisMove += landed.length;
     return landed;
   }
 
@@ -463,7 +461,10 @@ export class FighterSim {
     }
     if (victim === undefined) return null;
     const effect = applySpecial(hit.moveId, this.state, victim, this.specialCtx());
-    if (effect === null) return null;
+    if (effect === null) return null; // gate-rejected: a whiff, not a hit
+    // [Task 14] Count APPLIED strikes only — the leg cannon's whiff rule
+    // reads this at active-window end, and a gate-rejected strike is a whiff.
+    this.hitsLandedThisMove += 1;
     this.applyEffect(effect, this.state, victim, hit.dirVector);
     return effect;
   }
@@ -563,16 +564,11 @@ export class FighterSim {
     if (effect.selfKnockdown === true) this.selfKnockdown();
   }
 
-  /** [Task 14] The attacker goes prone: whiffed leg cannon, air-grab commit. */
+  /** [Task 14] The attacker goes prone: whiffed leg cannon, air-grab commit.
+   *  Delegates to hitdetect.downFighter so hit-caused and self-caused
+   *  knockdowns can never drift apart. */
   private selfKnockdown(): void {
-    const s = this.state;
-    s.currentMove = undefined;
-    s.moveElapsedMs = 0;
-    s.phase.t = 'downed';
-    s.phase.moveId = undefined;
-    s.phase.phaseMsLeft = DOWNED_GROUND_MS;
-    s.velY = KNOCKDOWN_VELY;
-    s.stance = 'downed';
+    downFighter(this.state);
   }
 
   /** [Task 14] Stun overlay: interrupts whatever ran, ticks out to idle. */

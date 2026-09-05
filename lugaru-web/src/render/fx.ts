@@ -11,13 +11,14 @@
  */
 
 import * as THREE from 'three';
+import { HEAVY_LAND_MIN_FALL_MPS } from '../data/tuning';
+export { HEAVY_LAND_MIN_FALL_MPS };
 
 /**
  * Fall speed (m/s) below which touching down counts as a HEAVY landing —
  * the game layer compares pre-step velY against this to spawn dust rings.
  * Above per-step ground noise (~0.25), just under the jump apex (~5.4).
  */
-export const HEAVY_LAND_MIN_FALL_MPS = 3;
 
 const BLOOD_PUFF_SLOTS = 96;
 const DUST_RING_SLOTS = 6;

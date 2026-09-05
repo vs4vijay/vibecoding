@@ -198,3 +198,8 @@ export const BODY_THROW_SPEED_MPS = 8;
  */
 export const BODY_THROW_IMPACT_DAMAGE = 40;
 
+
+// --- Render feedback thresholds [Task 14] ---
+
+/** Fall speed (m/s) at ground contact that kicks up a dust ring. */
+export const HEAVY_LAND_MIN_FALL_MPS = 3;
