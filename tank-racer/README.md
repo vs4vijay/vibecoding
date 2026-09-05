@@ -8,7 +8,7 @@ dodge incoming shells, grab power-up crates, and hit the boost pads on the
 straights. Low-poly PS1-era look, pure client-side TypeScript + Three.js, no
 assets (all audio is synthesized with WebAudio oscillators).
 
-![screenshot placeholder — run `bun run dev` and take one!](public/screenshot-placeholder.png)
+![Tank Racer — racing Dust Bowl against three AI tanks](public/screenshot.png)
 
 ## Controls
 
