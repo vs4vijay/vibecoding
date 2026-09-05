@@ -448,6 +448,12 @@ describe('resolver armed attack', () => {
         unaware: false,
       },
     });
+    for (const weapon of ['sword', 'knife', 'staff'] as const) {
+      expect(resolveAction({ button: 'attack' }, { ...base, hasWeapon: weapon }, ctx)).toEqual({
+        kind: 'move',
+        id: 'slash',
+      });
+    }
   });
 
   it('out of the weapon reach an armed press does nothing', () => {

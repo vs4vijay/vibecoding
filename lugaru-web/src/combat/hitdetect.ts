@@ -94,6 +94,12 @@ export function findHit(attacker: FighterState, victims: FighterState[]): HitEve
  *   phase 'hitstun' for HITSTUN_MS, no impulse [plan Task 7 rule];
  * - blade-class weapon on the attacker flags the victim `bleeding` (checked
  *   before the lethal early-return, so bleeding persists through death).
+ * - a knockdown hit on an already-downed victim REFRESHES its ground timer
+ *   and re-applies the impulse; a non-knockdown hit flips it to standing
+ *   hitstun. Both behaviors pinned by tests, fix round F5. Revisit only if
+ *   Task 14 breaks it.
+ *
+ * Returns one delta per fighter touched, in application order.
  */
 export function applyHit(hit: HitEvent, fighters: FighterState[]): FighterDelta[] {
   let attacker: FighterState | undefined;

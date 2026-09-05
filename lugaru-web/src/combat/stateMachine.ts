@@ -229,6 +229,9 @@ export class FighterSim {
    * polls this once per frame (blood-drip FX, limp gait, KO ragdoll kick-
    * off); each step overwrites it, so pollers must read before the next.
    */
+  /**
+   * Quiet steps share one immutable empty array — no per-step allocation.
+   */
   lastInjuryEvents: readonly InjuryEvent[] = NO_INJURY_EVENTS;
 
   /**

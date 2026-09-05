@@ -167,9 +167,9 @@ export function weaponDropEvent(
 /** Strip a fighter of their held weapon (drop events are the caller's job). */
 function stripWeapon(f: FighterState, keepWear: boolean): void {
   f.weapon = null;
-  // A weapon that broke at 0 keeps its wear count; any other strip (disarm,
-  // KO drop, unlucky roll) clears it — the pickup layer (game.ts) resets it
-  // from WEAPONS on re-arm either way.
+  // ONLY a weapon that broke by reaching durability 0 keeps its wear count;
+  // every other strip (disarm, KO drop, unlucky roll) clears it — the pickup
+  // layer (game.ts) resets it from WEAPONS on re-arm either way.
   if (!keepWear) f.durability = undefined;
 }
 
@@ -229,14 +229,20 @@ export function tryClash(a: ArmedSwing, b: ArmedSwing, rng: () => number): Clash
     const weapon = heldWeapon(f)!;
     const durability = WEAPONS[weapon].durability;
     let broke = false;
+    let brokeByWear = false;
     if (durability !== undefined) {
       f.durability = (f.durability ?? durability) - CLASH_WEAR_PER_CLASH;
-      if (f.durability <= 0) broke = true;
+      if (f.durability <= 0) {
+        broke = true;
+        brokeByWear = true;
+      }
     }
     if (!broke && rng() < CLASH_BREAK_CHANCE) broke = true;
     if (broke) {
       drops.push(weaponDropEvent(f, opponent, 'clash'));
-      stripWeapon(f, durability !== undefined);
+      // keepWear only when wear (not the rng roll) caused the break; the
+      // short-circuit above preserves one rng() call per surviving weapon.
+      stripWeapon(f, brokeByWear);
     }
   }
 
