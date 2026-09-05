@@ -146,6 +146,15 @@ export const SCORE_STYLE_WALLKICK = 150;
 /** Mid-air knife throw kill [spec §3.6: Ninja bonus 60]. */
 export const SCORE_NINJA_THROW = 60;
 
+// --- Thrown knife hit geometry [Task 12] ---
+
+/** Minimum travel distance (m) before a knife's flight ray is cast. */
+export const KNIFE_HIT_MIN_TRAVEL_M = 0.05;
+/** Distance (m) from a fighter's chest point within which a knife impact hits. */
+export const KNIFE_HIT_RADIUS_M = 0.7;
+/** Chest offset (m) above a fighter's root position used for knife hits. */
+export const KNIFE_HIT_CHEST_Y_M = 0.4;
+
 // --- Render/sim integration timing [Task 11] ---
 
 /** Hitstop freeze duration on landing a hit (ms). [spec §3.5] */

@@ -39,6 +39,10 @@ interface ProjectileBody {
 }
 
 // ---------------------------------------------------------------------------
+
+import { KNIFE_HIT_CHEST_Y_M, KNIFE_HIT_MIN_TRAVEL_M, KNIFE_HIT_RADIUS_M } from '../data/tuning';
+
+// ---------------------------------------------------------------------------
 // Knife parameters
 // ---------------------------------------------------------------------------
 
@@ -127,7 +131,7 @@ export class Projectiles {
       const travelZ = vel.z * dtSec;
       const travelDist = Math.hypot(travelX, travelY, travelZ);
 
-      if (travelDist > 0.05 && fighters.length > 0) {
+      if (travelDist > KNIFE_HIT_MIN_TRAVEL_M && fighters.length > 0) {
         const rayDir = {
           x: travelX / travelDist,
           y: travelY / travelDist,
@@ -148,8 +152,12 @@ export class Projectiles {
           let victim: FighterState | undefined;
           for (const f of fighters) {
             // Chest at pos.x, pos.y + torsoLen*0.8, pos.z approx.
-            const dist = Math.hypot(f.pos.x - ix, f.pos.y + 0.4 - iy, f.pos.z - iz);
-            if (dist < 0.7) {
+            const dist = Math.hypot(
+              f.pos.x - ix,
+              f.pos.y + KNIFE_HIT_CHEST_Y_M - iy,
+              f.pos.z - iz,
+            );
+            if (dist < KNIFE_HIT_RADIUS_M) {
               victim = f;
               break;
             }
