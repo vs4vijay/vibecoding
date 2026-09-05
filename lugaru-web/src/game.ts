@@ -10,7 +10,12 @@ import { SPECIES } from './data/species';
 import { buildRig, type Rig } from './actors/skeleton';
 import { ClipPlayer } from './actors/clips';
 import { CharacterController } from './actors/controller';
-import { FighterSim, type FighterSimWorld, type HitEvent } from './combat/stateMachine';
+import {
+  FighterSim,
+  type FighterSimWorld,
+  type FighterState,
+  type HitEvent,
+} from './combat/stateMachine';
 import { isSpecialMove } from './combat/bodymoves';
 import { applyHit } from './combat/hitdetect';
 import { ScoreLedger } from './combat/scoring';
@@ -45,6 +50,9 @@ const MOVE_CLIP: Record<string, string> = {
   counterThrow: 'hurt',
   flip: 'hurt',
   tackle: 'hurt',
+  // [Task 18] No stealthkill clip yet — the punch reads as the spine-
+  // crusher strike during the 400 ms kill-animation lock.
+  stealthKill: 'punchR',
 };
 
 function moveClipKey(moveId: string): string {
@@ -61,6 +69,25 @@ function moveClipKey(moveId: string): string {
  * Rapier (Task 12) provides cosmetic dynamics only — KO ragdolls. It is
  * initialised asynchronously in start() before the first frame renders.
  */
+
+/**
+ * [Task 18] One brain-driven pack wolf: sim + render bridge + brain plus
+ * the per-wolf scratch state the sim step swaps around (wall probe, rustle
+ * segment, KO/ragdoll handoff).
+ */
+interface WolfActor {
+  sim: FighterSim;
+  ctrl: CharacterController;
+  rig: Rig;
+  brain: Brain;
+  /** Persistent nearest-wall probe swapped into world.wall for this wolf. */
+  wall: WallProbe;
+  /** Last-step position for the rustle segment check. */
+  prev: { x: number; z: number };
+  /** KO transition consumed (slow-mo + ragdoll fired once). */
+  koHandled: boolean;
+}
+
 export class Game {
   private readonly canvas: HTMLCanvasElement;
   private readonly input: InputManager;
@@ -73,17 +100,15 @@ export class Game {
   private readonly fx: FxParticles;
 
   private readonly playerSim: FighterSim;
-  private readonly dummySim: FighterSim;
+  private readonly wolves: WolfActor[];
   private readonly playerCtrl: CharacterController;
-  private readonly dummyCtrl: CharacterController;
-  private readonly dummyRig: Rig;
 
   private readonly simLoop: FixedLoop;
   private readonly timescale: Timescale;
   private readonly world: FighterSimWorld;
   // Reusable hit-victim arrays to avoid per-step allocation.
-  private readonly playerVictims: [FighterSim['state']];
-  private readonly dummyVictims: [FighterSim['state']];
+  private readonly playerVictims: [FighterState, ...FighterState[]];
+  private readonly wolfVictims: readonly [FighterState][];
 
   // Rapier cosmetic dynamics. Created async in start() because Rapier WASM
   // initialisation is asynchronous.
@@ -99,16 +124,13 @@ export class Game {
 
   private lastMs = 0;
   private running = false;
-  // Track previous KO state to fire slow-mo + ragdoll once per transition.
-  private dummyWasKO = false;
 
   // --- [Task 17] Arena dressing + senses ---------------------------------
   /** Slow random-walk wind — drives drift particles, sway, and AI scent. */
   private readonly wind: WindSystem;
   /** Sight-blocking, rustle-emitting bush scatter. */
   readonly bushField: BushField;
-  /** The dummy's brain — hears rustles through senses.heard. */
-  private readonly brain: Brain;
+  /** Per-wolf brains live in `wolves`; senses/heard buffers are shared. */
   /** Weapon drops (physics-backed, created in start() after Rapier init). */
   private drops: WeaponDrops | null = null;
 
@@ -122,10 +144,8 @@ export class Game {
   // objects mutated in place by nearestWall, swapped into world.wall per
   // consumer phase — zero per-step allocation.
   private readonly wallPlayer: WallProbe = { proximityM: Infinity, awayX: 1, awayZ: 0 };
-  private readonly wallDummy: WallProbe = { proximityM: Infinity, awayX: 1, awayZ: 0 };
-  /** Last-step positions for the fighters' rustle segments. */
+  /** Last-step position for the player's rustle segment. */
   private readonly prevPlayerPos = { x: 0, z: 0 };
-  private readonly prevDummyPos = { x: 0, z: -3 };
   /** Scratch for the per-step nearest-drop probe. */
   private readonly dropProbe: {
     id: number;
@@ -166,7 +186,8 @@ export class Game {
     this.wind = new WindSystem(mulberry32(WORLD_RNG_SEED));
     const spawns: SpawnPoint[] = [
       { x: 0, z: 0 }, // player spawn
-      { x: 0, z: -3 }, // dummy spawn
+      { x: 0, z: -3 }, // wolf 1 spawn
+      { x: -6, z: -3 }, // wolf 2 spawn [Task 18 second patroller]
     ];
     this.bushField = new BushField(mulberry32(WORLD_RNG_SEED + 1), spawns);
     addBoulders(this.sceneBundle.scene);
@@ -204,37 +225,59 @@ export class Game {
     // cannon/ninja/nice-aim) lands here; F3 shows the running total.
     this.playerSim.setScoreLedger(new ScoreLedger());
 
-    // --- Dummy (wolf) — brain-driven [Task 17] ---
-    const dummyRig = buildRig(SPECIES.wolf);
-    this.dummyRig = dummyRig;
-    this.sceneBundle.scene.add(dummyRig.root);
-    const dummyClip = new ClipPlayer(dummyRig);
-    this.dummyCtrl = new CharacterController(dummyRig, SPECIES.wolf, dummyClip);
-    this.dummySim = new FighterSim('wolf', 'dummy', false);
-    // Place dummy 3 m in front of player (player faces -Z at heading 0).
-    this.dummySim.state.pos.z = -3;
-    this.dummySim.state.heading = Math.PI; // face +Z toward player
-
-    // [Task 17] The wolf's brain: rustles/noises reach it through
-    // senses.heard; bushes block its sight. Its RNG stream is offset from
-    // the scatter streams so consumers stay independent.
-    this.brain = new Brain(this.dummySim, DIFFICULTY.normal, mulberry32(WORLD_RNG_SEED + 2));
+    // --- Wolf pack — brain-driven [Task 17/18] ---
+    // Two patrolling wolves so the group gate has a real pack: wolf 1 keeps
+    // the Task 17 spawn + rng stream (seed+2); wolf 2 takes the next free
+    // offset (+5) so adding it never reshuffles existing streams.
+    const wolfSpawns: Array<{ x: number; z: number }> = [
+      { x: 0, z: -3 },
+      { x: -6, z: -3 },
+    ];
+    this.wolves = wolfSpawns.map((spawn, i) => {
+      const rig = buildRig(SPECIES.wolf);
+      this.sceneBundle.scene.add(rig.root);
+      const clip = new ClipPlayer(rig);
+      const ctrl = new CharacterController(rig, SPECIES.wolf, clip);
+      const sim = new FighterSim('wolf', i === 0 ? 'dummy' : `wolf${i + 1}`, false);
+      sim.state.pos.x = spawn.x;
+      sim.state.pos.z = spawn.z;
+      sim.state.pos.y = heightAt(spawn.x, spawn.z);
+      sim.state.heading = Math.PI; // face +Z toward the player
+      const brain = new Brain(
+        sim,
+        DIFFICULTY.normal,
+        mulberry32(WORLD_RNG_SEED + (i === 0 ? 2 : 5)),
+      );
+      return {
+        sim,
+        ctrl,
+        rig,
+        brain,
+        wall: { proximityM: Infinity, awayX: 1, awayZ: 0 },
+        prev: { x: spawn.x, z: spawn.z },
+        koHandled: false,
+      };
+    });
+    // [Task 18] Shared senses + world the pack brains read. allyEngageCount
+    // is recomputed per brain immediately before its update (simStep).
     this.senses = { heard: this.heardEvents, wind: this.wind, scent: null };
     this.brainWorld = {
       enemies: [this.playerSim.state],
-      allies: [],
+      allies: this.wolves.map((w) => w.sim.state),
       bushes: this.bushField.bushes,
+      allyEngageCount: 0,
     };
 
     // Shared world snapshot (mutated in-place each step — no allocation).
     this.world = {
-      fighters: [this.playerSim.state, this.dummySim.state],
+      fighters: [this.playerSim.state, ...this.wolves.map((w) => w.sim.state)],
       downedBodyNearby: false,
       weaponOnGroundNearby: false,
     };
-    // Reusable hit-victim arrays (no per-step allocation).
-    this.playerVictims = [this.dummySim.state];
-    this.dummyVictims = [this.playerSim.state];
+    // Reusable hit-victim arrays (no per-step allocation): the player can
+    // strike either wolf; each wolf only ever targets the player.
+    this.playerVictims = this.wolves.map((w) => w.sim.state) as [FighterState, ...FighterState[]];
+    this.wolfVictims = this.wolves.map(() => [this.playerSim.state] as [FighterState]);
     this.simLoop = new FixedLoop(1000 / 60, (dt) => this.simStep(dt));
     this.timescale = new Timescale();
     this.frame = this.input.sample();
@@ -345,17 +388,32 @@ export class Game {
     // Capture pre-step velocities: a fighter whose fast fall the ground
     // eats this step just HEAVY-LANDED (Task 14 dust ring).
     const playerVy = this.playerSim.state.velY;
-    const dummyVy = this.dummySim.state.velY;
+    const wolfVy = this.wolves.map((w) => w.sim.state.velY);
+
+    // [Task 18] The player is human-controlled — never 'unaware'. Pack
+    // brains are therefore never offered a stealth kill on them.
+    this.playerSim.state.alerted = true;
 
     // [Task 17] Wind random-walk (sim state: seeded, drives dressing + AI).
     this.wind.update(dtMs);
 
     // [Task 17] Bush rustles: this step checks the movement the fighters
     // made LAST step (prevPos → pos segment), then rolls prevPos forward
-    // at the end. Events land in the reused buffer the brain reads below.
+    // at the end. Events land in the reused buffer the brains read below.
     this.heardEvents.length = 0;
     this.rustleFor(this.playerSim.state, this.prevPlayerPos, dtMs);
-    this.rustleFor(this.dummySim.state, this.prevDummyPos, dtMs);
+    for (const w of this.wolves) this.rustleFor(w.sim.state, w.prev, dtMs);
+
+    // [Task 18] Pack screams/flee events from earlier steps join this
+    // frame's heard buffer, source-tagged so the emitter skips its own —
+    // multi-AI hearing. Collected BEFORE any brain updates: an event is
+    // heard one step after it is emitted (same latency as rustles).
+    for (const w of this.wolves) {
+      for (const e of w.brain.collectEvents()) {
+        e.sourceId = w.sim.state.id;
+        emitHearing(this.heardEvents, e);
+      }
+    }
 
     // [Task 14-P1 hard carry] Populate the shared snapshot's wall probe
     // per consumer: each sim, and each attacker's hit application, must
@@ -365,24 +423,34 @@ export class Game {
     this.world.wall = this.probeWall(this.playerSim.state.pos, this.wallPlayer);
     this.playerSim.update(dtMs, this.playerInput(dtMs), this.world);
 
-    // [Task 17] Dummy input comes from its brain (hears the rustle
-    // buffer; investigates). Emitted screams are drained — the player has
-    // no hearing consumer yet (Task 18 owns multi-AI hearing).
-    this.brain.drainEvents();
-    const aiFrame = this.brain.update(dtMs, this.senses, this.brainWorld);
-    this.world.wall = this.probeWall(this.dummySim.state.pos, this.wallDummy);
-    this.dummySim.update(dtMs, aiFrame, this.world);
+    // [Task 18] Pack step, in fixed order: per brain, count the OTHER
+    // brains currently in 'engage' (greedy first-come slot allocation for
+    // the group gate), update, then annotate the fighter with its brain's
+    // alert state — unaware ⇔ patrol — for the sim's stealth row.
+    for (const w of this.wolves) {
+      let engaged = 0;
+      for (const o of this.wolves) {
+        if (o !== w && o.brain.state === 'engage') engaged++;
+      }
+      this.brainWorld.allyEngageCount = engaged;
+      const aiFrame = w.brain.update(dtMs, this.senses, this.brainWorld);
+      w.sim.state.alerted = w.brain.state !== 'patrol';
+      this.world.wall = this.probeWall(w.sim.state.pos, w.wall);
+      w.sim.update(dtMs, aiFrame, this.world);
+    }
 
-    // Collect + apply hits (player → dummy) using pre-allocated arrays.
-    // world.wall points at the ATTACKER's probe here — applySpecialStrike
-    // reads it lazily (wallKick gate + away-direction launch).
+    // Collect + apply hits (player → pack, pack → player) using
+    // pre-allocated arrays. world.wall points at the ATTACKER's probe
+    // here — applySpecialStrike reads it lazily (wallKick gate + launch).
     this.world.wall = this.probeWall(this.playerSim.state.pos, this.wallPlayer);
     const pHits = this.playerSim.collectHits(this.playerVictims);
     for (const hit of pHits) this.landHit(hit, this.playerSim);
-
-    this.world.wall = this.probeWall(this.dummySim.state.pos, this.wallDummy);
-    const dHits = this.dummySim.collectHits(this.dummyVictims);
-    for (const hit of dHits) this.landHit(hit, this.dummySim);
+    for (let i = 0; i < this.wolves.length; i++) {
+      const w = this.wolves[i];
+      this.world.wall = this.probeWall(w.sim.state.pos, w.wall);
+      const hits = w.sim.collectHits(this.wolfVictims[i]);
+      for (const hit of hits) this.landHit(hit, w.sim);
+    }
 
     // [Task 17] Crouch-pickup bridge: the nearest-drop probe drives
     // weaponOnGroundNearby (resolver's pickupOrContext row) and consumes
@@ -393,32 +461,36 @@ export class Game {
     const pp = this.playerSim.state.pos;
     this.prevPlayerPos.x = pp.x;
     this.prevPlayerPos.z = pp.z;
-    const dp = this.dummySim.state.pos;
-    this.prevDummyPos.x = dp.x;
-    this.prevDummyPos.z = dp.z;
+    for (const w of this.wolves) {
+      w.prev.x = w.sim.state.pos.x;
+      w.prev.z = w.sim.state.pos.z;
+    }
 
     // [Task 14] Heavy land: downward velocity just eaten by the ground —
     // knockdown arcs and KO pops kick up a dust ring at the impact point.
     if (playerVy <= -HEAVY_LAND_MIN_FALL_MPS && this.playerSim.state.velY === 0) {
       this.fx.spawnDustRing(this.playerSim.state.pos);
     }
-    if (dummyVy <= -HEAVY_LAND_MIN_FALL_MPS && this.dummySim.state.velY === 0) {
-      this.fx.spawnDustRing(this.dummySim.state.pos);
+    for (let i = 0; i < this.wolves.length; i++) {
+      if (wolfVy[i] <= -HEAVY_LAND_MIN_FALL_MPS && this.wolves[i].sim.state.velY === 0) {
+        this.fx.spawnDustRing(this.wolves[i].sim.state.pos);
+      }
     }
 
     // KO: slow-mo once per transition, then hand the body to a ragdoll so
-    // it flops along the killing-blow direction.
-    if (!this.dummyWasKO && this.dummySim.state.phase.t === 'ko') {
+    // it flops along the killing-blow direction. Per wolf [Task 18].
+    for (const w of this.wolves) {
+      if (w.koHandled || w.sim.state.phase.t !== 'ko') continue;
+      w.koHandled = true;
       this.timescale.slowmo(KO_SLOWMO_SCALE, KO_SLOWMO_MS);
-      this.dummyWasKO = true;
       if (this.physics) {
         const dir = this.lastHitDir;
-        const rd = spawnRagdoll(this.physics, this.dummyRig, {
+        const rd = spawnRagdoll(this.physics, w.rig, {
           dir: { x: dir.x, y: 0.45, z: dir.z },
           force: SPECIES.wolf.massKg * 1.5,
         });
         this.ragdolls.push(rd);
-        this.fx.spawnDustRing(this.dummySim.state.pos);
+        this.fx.spawnDustRing(w.sim.state.pos);
       }
     }
   }
@@ -515,23 +587,26 @@ export class Game {
     this.crouchContextArmed = false;
     return s;
   }
-  /** F3 dev lines: wind, wall probe, brain state, last-heard marker. */
+  /** F3 dev lines: wind, wall probe, pack brain states, last-heard marker. */
   private debugInfo(): string {
     const w = this.wind.vector;
     const deg = ((Math.atan2(w.z, w.x) * 180) / Math.PI + 360) % 360;
     // The persistent player probe (the shared world.wall swaps per phase —
-    // reading it here would show the dummy's values half the time).
+    // reading it here would show the wolves' values half the time).
     const wall = this.wallPlayer;
-    const heard = this.brain.lastHeard;
     const wallLine =
       wall !== undefined
         ? `${wall.proximityM.toFixed(2)}m away(${wall.awayX.toFixed(2)}, ${wall.awayZ.toFixed(2)})`
         : 'open';
+    const heard = this.wolves[0].brain.lastHeard;
     const heardLine = heard !== null ? ` heard(${heard.x.toFixed(1)}, ${heard.z.toFixed(1)})` : '';
+    const aiLine = this.wolves
+      .map((w) => `${w.sim.state.id}=${w.brain.state}${w.sim.state.alerted ? '!' : ''}`)
+      .join(' ');
     return [
       `wind: ${deg.toFixed(0)}deg str ${this.wind.strength.toFixed(2)} vec(${w.x.toFixed(2)}, ${w.z.toFixed(2)})`,
       `wall(player): ${wallLine}`,
-      `ai: ${this.brain.state}${heardLine}`,
+      `ai: ${aiLine}${heardLine}`,
       `bushes: ${this.bushField.bushes.length}  pickups(on ground): ${this.world.weaponOnGroundNearby ? 'yes' : 'no'}`,
     ].join('\n');
   }
@@ -581,12 +656,13 @@ export class Game {
       this.frame.lookDY,
     );
 
-    // Dummy — once ragdolled, the physics owns its bone matrices; skip the
-    // controller/clip path so it doesn't fight the ragdoll for the rig.
-    if (this.ragdolls.length === 0) {
-      this.copySimToCtrl(this.dummySim.state, this.dummyCtrl, this.dummySim);
-      this.applyPhaseClip(this.dummySim.state, this.dummyCtrl);
-      this.dummyCtrl.updateFromSim(dtMs, 0);
+    // Pack wolves — once ragdolled, the physics owns the bone matrices;
+    // skip the controller/clip path so it doesn't fight the ragdoll.
+    for (const w of this.wolves) {
+      if (w.koHandled) continue;
+      this.copySimToCtrl(w.sim.state, w.ctrl, w.sim);
+      this.applyPhaseClip(w.sim.state, w.ctrl);
+      w.ctrl.updateFromSim(dtMs, 0);
     }
   }
 
@@ -643,19 +719,22 @@ export class Game {
     bushField: BushField;
     brain: Brain;
     drops: WeaponDrops | null;
+    /** [Task 18] The whole pack — per-wolf sim/brain for group verification. */
+    wolves: readonly WolfActor[];
   } {
     return {
       chaseCam: this.chaseCam,
       playerSim: this.playerSim,
-      dummySim: this.dummySim,
+      dummySim: this.wolves[0].sim,
       timescale: this.timescale,
       ragdolls: this.ragdolls,
       world: this.world,
       fx: this.fx,
       wind: this.wind,
       bushField: this.bushField,
-      brain: this.brain,
+      brain: this.wolves[0].brain,
       drops: this.drops,
+      wolves: this.wolves,
     };
   }
 }

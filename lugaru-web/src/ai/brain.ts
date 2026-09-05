@@ -59,6 +59,14 @@ export interface BrainWorld {
   enemies: FighterState[];
   allies: FighterState[];
   bushes: Bush[];
+  /**
+   * [Task 18] Group engagement gate input: how many of this brain's ALLIES
+   * are currently in 'engage'. The game layer computes it immediately
+   * before each brain's update, EXCLUDING the brain itself — a greedy
+   * first-come slot allocation (the first brain under engageLimit takes
+   * the slot, the rest circle). Tests replicate the same loop.
+   */
+  allyEngageCount: number;
 }
 
 /** A remembered target position (seen, heard, or scented). */
@@ -243,8 +251,15 @@ export class Brain {
       };
     }
 
-    // Engage when a visible target is inside the melee threshold.
+    // Engage when a visible target is inside the melee threshold — unless
+    // the pack's engagement slots are used up [Task 18 group gate]: at the
+    // difficulty's engageLimit this brain stays in 'circle' instead
+    // (spec §7: circle members never attack in v1).
     if (visible && target !== null && dist <= AI_ENGAGE_RANGE_M) {
+      if (world.allyEngageCount >= this.difficulty.engageLimit) {
+        this.aistate = 'circle';
+        return this.circleInput(target, dist);
+      }
       this.aistate = 'engage';
       return this.engageInput(target, dist);
     }
@@ -283,16 +298,18 @@ export class Brain {
   /** Run to the nearest ally; fall back to backing away from the target. */
   private fleeInput(allies: FighterState[], target: FighterState | null, _dist: number): InputFrame {
     const s = this.fighter.state;
-    if (allies.length > 0) {
-      let ally = allies[0];
-      let best = Infinity;
-      for (const a of allies) {
-        const d = Math.hypot(a.pos.x - s.pos.x, a.pos.z - s.pos.z);
-        if (d < best) {
-          best = d;
-          ally = a;
-        }
+    // [Task 18] Multi-wolf worlds list every ally — never flee to yourself.
+    let ally: FighterState | null = null;
+    let best = Infinity;
+    for (const a of allies) {
+      if (a.id === s.id) continue;
+      const d = Math.hypot(a.pos.x - s.pos.x, a.pos.z - s.pos.z);
+      if (d < best) {
+        best = d;
+        ally = a;
       }
+    }
+    if (ally !== null) {
       return steerFrame(s, { x: ally.pos.x, z: ally.pos.z });
     }
     // No ally: back away from the threat.

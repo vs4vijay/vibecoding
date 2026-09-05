@@ -54,6 +54,7 @@ function world(enemies: FighterSim[], allies: FighterSim[] = []): BrainWorld {
     enemies: enemies.map((e) => e.state),
     allies: allies.map((a) => a.state),
     bushes: [],
+    allyEngageCount: 0,
   };
 }
 

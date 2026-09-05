@@ -19,8 +19,12 @@ export interface DifficultyDef {
   /** How many memory ticks the brain keeps of the target before forgetting
    *  (scales the base memory timeout; normal = 4 → the flat timeout). */
   memoryLen: number;
-  // engageLimit (per-plan) intentionally cut: group attack-coordination has
-  // no consumer until Task 18's group AI — reintroduce there with a reader.
+  /**
+   * [Task 18] Group engagement gate: how many packmates (ally brains) may
+   * be in 'engage' simultaneously. At the limit the brain stays in
+   * 'circle' instead of engaging — easy 1, normal 2, hard 3.
+   */
+  engageLimit: number;
 }
 
 /** Canonical difficulty presets — easy / normal / hard. */

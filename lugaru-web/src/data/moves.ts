@@ -270,14 +270,18 @@ export const MOVES: Record<string, MoveDef> = {
     knockdown: false,
   },
 
-  /** Instant silent kill behind an unaware enemy [spec §3.7]; 100 pts. */
+  /**
+   * Instant silent kill behind an unaware enemy [spec §3.7]; 100 pts.
+   * rangeM 1.1 = the T18 sneak-up reach; the weapon-shaped outcome lives
+   * in combat/stealth.ts (tryStealthKill), applied at fire time.
+   */
   stealthKill: {
     id: 'stealthKill',
     clip: 'stealthkill',
     startupMs: 0,
     activeMs: 0,
     recoveryMs: 400, // kill animation lock
-    rangeM: 1.2,
+    rangeM: 1.1,
     arcRad: Math.PI,
     damage: 9999,
     knockdown: true,

@@ -23,7 +23,6 @@ import { WEAPONS } from '../data/weapons';
 import {
   LEG_CANNON_AHEAD_HALF_RAD,
   REVERSE_PRESS_WINDOW_MS,
-  STEALTH_BEHIND_HALF_RAD,
 } from '../data/tuning';
 
 // Snapshot types re-exported so consumers import the whole resolver surface
@@ -65,10 +64,21 @@ function resolveAttack(
   const t = a.nearestTarget;
 
   // Stealth kill outranks every other attack resolution [spec §3.7].
-  if (t && t.unaware && isBehind(t) && t.dist <= MOVES.stealthKill.rangeM) {
+  // Behind = the attacker stands in the TARGET's rear cone: the target does
+  // not face us (TargetSnapshot.facingMe is the victim-facing view; the
+  // exact ±60° rear geometry is re-gated at fire time by tryStealthKill
+  // [Task 18]). Standing attacker, LIVING target — grounded meat is
+  // soccerKick's job; offering the kill on a body would just whiff-lock.
+  if (
+    a.stance === 'standing' &&
+    t &&
+    t.unaware &&
+    !t.isDowned &&
+    !t.facingMe &&
+    t.dist <= MOVES.stealthKill.rangeM
+  ) {
     return { kind: 'move', id: 'stealthKill' };
   }
-
   // Held attack chains doublePunch during the first punch's recovery.
   // A crouched fighter keeps sweep intent instead of chaining.
   if (
@@ -195,8 +205,3 @@ function isCrouchDown(a: CombatantSnapshot): boolean {
   return a.crouchHeldMs > 0;
 }
 
-/** True when target stands behind us (|relAngle| beyond the front cone). */
-function isBehind(t: TargetSnapshot): boolean {
-  const abs = t.relAngle < 0 ? -t.relAngle : t.relAngle;
-  return abs >= STEALTH_BEHIND_HALF_RAD;
-}

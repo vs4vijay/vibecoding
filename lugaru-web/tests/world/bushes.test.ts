@@ -128,7 +128,7 @@ describe('rustle → brain investigate (game.ts wire format)', () => {
     expect(rustle).not.toBeNull();
 
     const senses = { heard: [rustle!], wind: { vector: { x: 0, z: 0 } }, scent: null };
-    const world = { enemies: [] as FighterSim['state'][], allies: [], bushes: field.bushes };
+    const world = { enemies: [] as FighterSim['state'][], allies: [], bushes: field.bushes, allyEngageCount: 0 };
     const frame = brain.update(1000 / 60, senses, world);
 
     expect(brain.state).toBe('investigate');

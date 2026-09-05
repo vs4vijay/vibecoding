@@ -143,17 +143,30 @@ describe('attack button', () => {
     expectMove(a, 'punch');
   });
 
-  it('behind-unaware target beats downed/airborne/wall context moves', () => {
+  it('behind-unaware LIVING target beats wall context moves [T18: live row]', () => {
     // Every competing context true at once — stealthKill must win.
+    // (T18 semantics: the victim is alive — a downed body is soccerKick's,
+    // and tryStealthKill whiffs any kill offered on one.)
     const a = resolveAction(
       { button: 'attack' },
       makeActor({
         wallProximityM: 0.5,
-        nearestTarget: makeTarget({ relAngle: Math.PI, dist: 1.0, facingMe: false, unaware: true, isDowned: true, airborne: true }),
+        nearestTarget: makeTarget({ relAngle: Math.PI, dist: 1.0, facingMe: false, unaware: true }),
       }),
       NO_CTX,
     );
     expectMove(a, 'stealthKill');
+  });
+
+  it('downed unaware target behind → soccerKick, NOT the stealth kill [T18]', () => {
+    const a = resolveAction(
+      { button: 'attack' },
+      makeActor({
+        nearestTarget: makeTarget({ relAngle: Math.PI, dist: 1.0, facingMe: false, unaware: true, isDowned: true }),
+      }),
+      NO_CTX,
+    );
+    expectMove(a, 'soccerKick');
   });
 
   it('unaware target NOT behind → normal punch (stealth needs behind)', () => {

@@ -46,8 +46,13 @@ export const ANTIREP_PENALTY_CAP = 1.6;
 /** Consecutive uses of one move before the penalty ramp begins. */
 export const ANTIREP_RAMP_START = 2;
 
-/** Stealth kill needs |relAngle| at least this far behind the actor (rad). */
-export const STEALTH_BEHIND_HALF_RAD = Math.PI - 0.6;
+/**
+ * Stealth kill geometry [Task 18]: the attacker must sit within this
+ * half-angle of the victim's TAIL [brief: "behind within ±60° of the
+ * victim's heading"] — i.e. at least π − this far from the victim's front.
+ * (Supersedes the old π−0.6 behind test: the rear cone is the spec'd one.)
+ */
+export const STEALTH_REAR_HALF_RAD = Math.PI / 3;
 
 /** Leg cannon dive needs the target inside this front half-cone (rad). */
 export const LEG_CANNON_AHEAD_HALF_RAD = 1.0;
@@ -198,6 +203,21 @@ export const BODY_THROW_SPEED_MPS = 8;
  */
 export const BODY_THROW_IMPACT_DAMAGE = 40;
 
+// --- Stealth kills [Task 18] -------------------------------------------------
+
+/**
+ * HP a spineCrusher (unarmed/staff stealth kill) removes from a surviving
+ * victim [brief Task 18: "else 35"].
+ */
+export const STEALTH_SPINE_CRUSHER_DAMAGE = 35;
+/**
+ * A spineCrusher KOs outright below this victim hp [brief Task 18:
+ * "down+KO if hp<30"]. (Kill attribution catches the overlap band anyway —
+ * 35 damage from exactly 30..35 hp also lands a KO — but the flag is the
+ * pure result's honest answer for the weak-victim branch.)
+ */
+export const STEALTH_SPINE_CRUSHER_KO_HP = 30;
+
 
 // --- Render feedback thresholds [Task 14] ---
 
@@ -275,9 +295,11 @@ export const AI_CHASE_RANGE_M = 12;
  * numbers — difficulty.ts re-exports these as the `DIFFICULTY` record.
  */
 export const DIFFICULTY_PRESETS = {
-  easy: { reactionMs: 550, reversalChance: 0.15, aggression: 0.5, memoryLen: 2 },
-  normal: { reactionMs: 320, reversalChance: 0.35, aggression: 0.75, memoryLen: 4 },
-  hard: { reactionMs: 170, reversalChance: 0.6, aggression: 1.0, memoryLen: 6 },
+  // engageLimit: how many packmates may be in 'engage' at once [Task 18
+  // group gate] — extra brains stay in 'circle'.
+  easy: { reactionMs: 550, reversalChance: 0.15, aggression: 0.5, memoryLen: 2, engageLimit: 1 },
+  normal: { reactionMs: 320, reversalChance: 0.35, aggression: 0.75, memoryLen: 4, engageLimit: 2 },
+  hard: { reactionMs: 170, reversalChance: 0.6, aggression: 1.0, memoryLen: 6, engageLimit: 3 },
 } as const;
 
 // --- AI brain steering + utility scales [Task 16 review] ---

@@ -62,6 +62,7 @@ import { updateInjuries } from './injury';
 import type { InjuryEvent } from './injury';
 import { ScoreLedger } from './scoring';
 import type { ScoreLedger as LedgerView } from './scoring';
+import { tryStealthKill, type StealthResult } from './stealth';
 import {
   heldWeapon,
   onReversalVsArmed,
@@ -160,6 +161,14 @@ export interface FighterState {
    */
   antiRep?: AntiRepState;
   pendingReverseOf?: string;
+  /**
+   * [Task 18] Game-layer awareness annotation: true while this fighter's
+   * brain FSM is alerted (investigate/circle/engage/flee/downed — anything
+   * but 'patrol'). The game layer writes it from brain state each step;
+   * the sim and resolver only read it: unset/false = unaware = the stealth
+   * window is open. Brainless fighters (and the player) are never marked.
+   */
+  alerted?: boolean;
   /**
    * [Task 14] Horizontal launch velocity (m/s) riding out on shared state —
    * knockback (leg cannon) and wall-kick launches set it on the VICTIM's or
@@ -776,6 +785,11 @@ export class FighterSim {
     this.swungThisMove = false;
     this.hitsLandedThisMove = 0;
     recordAttack(this.state.antiRep!, id);
+    // [Task 18] A stealth kill IS its fire — the row has no startup/active
+    // window, so the weapon-shaped outcome applies at dispatch and the 400 ms
+    // recovery is the kill-animation lock. tryStealthKill re-gates the world
+    // at fire time; a rejected kill is just a whiffed animation lock.
+    if (id === 'stealthKill') this.fireStealthKill();
 
     if (!hasTimeline(def)) {
       // Zero-duration utility rows: pure effect, no animation lock — the
@@ -873,6 +887,42 @@ export class FighterSim {
     this.state.phase.t = 'idle';
     this.state.phase.moveId = undefined;
     this.state.phase.phaseMsLeft = Infinity;
+  }
+
+  /**
+   * [Task 18] Apply the stealth kill at the move's fire site: pick the best
+   * enemy victim the pure gate accepts (nearest wins), consume its weapon-
+   * shaped StealthResult, and attribute the kill — STEALTH_KILL lands only
+   * when the victim dies. SILENT by design [spec §3.7]: nothing here pushes
+   * a hearing/scream bridge event, so nearby patrols stay unaware.
+   */
+  private fireStealthKill(): void {
+    const s = this.state;
+    let victim: FighterState | null = null;
+    let result: StealthResult | null = null;
+    let bestDist = Infinity;
+    for (let i = 0; i < this.world.fighters.length; i++) {
+      const other = this.world.fighters[i];
+      if (other.id === s.id || other.team === s.team) continue;
+      const r = tryStealthKill(s, other);
+      if (r === null) continue;
+      const d = Math.hypot(other.pos.x - s.pos.x, other.pos.z - s.pos.z);
+      if (d < bestDist) {
+        bestDist = d;
+        victim = other;
+        result = r;
+      }
+    }
+    if (victim === null || result === null) return; // gate rejected: whiff lock
+    if (result.instantKill) {
+      applyLethalState(victim);
+    } else {
+      victim.hp -= result.damage;
+      if (victim.hp <= 0) applyLethalState(victim);
+      else if (result.knockdown) downFighter(victim);
+    }
+    // Kill attribution [Task 14 pattern]: hp is checked after application.
+    if (victim.hp <= 0) this.ledger?.award({ type: 'STEALTH_KILL' });
   }
 
   /**
@@ -1055,7 +1105,10 @@ function nearestTargetOf(self: FighterState, world: FighterSimWorld): TargetSnap
     isDowned: best.phase.t === 'downed' || best.phase.t === 'ko',
     airborne: best.stance === 'airborne',
     facingMe: facesToward(best, self),
-    unaware: false, // stealth awareness lands with Task 18's FSM
+    // [Task 18] Awareness flows into the resolver's stealth row: the game
+    // layer annotates each fighter with its brain's alert state every step
+    // (FighterState.alerted); unset = patrol/brainless = unaware.
+    unaware: best.alerted !== true,
     // Reversal wiring [spec §3.2]: expose the target's in-flight attack.
     // phaseMsElapsed is ABSOLUTE ms since the move started (moveElapsedMs
     // in every phase) — one clock, identical to what executeReversal feeds

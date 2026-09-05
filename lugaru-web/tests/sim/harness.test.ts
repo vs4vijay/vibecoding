@@ -242,6 +242,7 @@ describe('AI vs player harness (Task 16)', () => {
         enemies: [player.state],
         allies: [] as FighterState[],
         bushes: [],
+        allyEngageCount: 0,
       };
       const senses = { heard: [], wind: { vector: { x: 0, z: 0 } }, scent: null };
 
