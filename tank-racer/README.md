@@ -152,8 +152,8 @@ CI does this automatically via [`../.github/workflows/tank-racer-deploy.yml`](..
 2. `actions/checkout`, then `oven-sh/setup-bun`.
 3. `bun install --frozen-lockfile` + `BASE_PATH=/<repo>/tank-racer/ bun run build`
    inside `tank-racer/`.
-4. `actions/configure-pages` → `actions/upload-pages-artifact`
-   (`path: tank-racer/dist`) → `actions/deploy-pages`.
+4. `actions/configure-pages` → stage `tank-racer/dist` into `site/tank-racer/` →
+   `actions/upload-pages-artifact` (`path: site`) → `actions/deploy-pages`.
 
 The job declares `permissions: pages: write` + `id-token: write`, targets the
 `github-pages` environment, and uses a `pages` concurrency group so only one

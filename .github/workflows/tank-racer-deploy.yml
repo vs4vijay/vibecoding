@@ -50,10 +50,13 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      - name: Stage site (preserve /tank-racer/ URL prefix)
+        run: mkdir -p site && cp -r tank-racer/dist site/tank-racer
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: tank-racer/dist
+          path: site
 
       - name: Deploy to GitHub Pages
         id: deployment
