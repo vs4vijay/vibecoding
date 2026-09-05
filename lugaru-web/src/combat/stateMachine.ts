@@ -26,10 +26,15 @@ import { SPECIES } from '../data/species';
 import type { SpeciesDef } from '../data/species';
 import {
   ACCEL,
+  BODY_THROW_SPEED_MPS,
   COUNTER_WINDOW_MS,
-  GRAVITY,
+  DOWNED_GROUND_MS,
+  FLIP_STUN_MS,
+  FRICTION,
   INPUT_BUFFER_MS,
+  GRAVITY,
   JUMP_SPEED,
+  KNOCKDOWN_VELY,
   RECOVERY_CHAIN_MIN_MS,
   REVERSE_ATTEMPT_MS,
   RUN_STANCE_SPEED,
@@ -48,7 +53,7 @@ import type {
   WorldContext,
 } from './types';
 import { resolveAction } from './resolver';
-import { applyHit, findHit, forwardXZ } from './hitdetect';
+import { applyHit, applyLethalState, downFighter, findHit, forwardXZ } from './hitdetect';
 import { startCounter, tryReversal } from './reversal';
 import { createAntiRepState, recordAttack } from './antirepetition';
 import type { AntiRepState } from './antirepetition';
@@ -57,11 +62,24 @@ import { updateInjuries } from './injury';
 import type { InjuryEvent } from './injury';
 import { ScoreLedger } from './scoring';
 import type { ScoreLedger as LedgerView } from './scoring';
-import { onReversalVsArmed, weaponDropEvent } from './weaponsLogic';
-import type { WeaponSimEvent } from './weaponsLogic';
+import {
+  heldWeapon,
+  onReversalVsArmed,
+  thrownKnifeHit,
+  weaponDropEvent,
+} from './weaponsLogic';
+import type { ThrownKnifeOutcome, WeaponSimEvent } from './weaponsLogic';
+import { applySpecial, isSpecialMove } from './bodymoves';
+import type { CorpseThrowEvent, SpecialCtx, SpecialEffect } from './bodymoves';
+
+/**
+ * Everything the sim can hand the game layer in one step: Task 13's weapon
+ * events plus Task 14's corpse throw.
+ */
+export type CombatSimEvent = WeaponSimEvent | CorpseThrowEvent;
 
 /** Shared quiet-step value for lastCombatEvents — see the field's doc. */
-const NO_COMBAT_EVENTS: readonly WeaponSimEvent[] = [];
+const NO_COMBAT_EVENTS: readonly CombatSimEvent[] = [];
 
 /** Shared quiet-step value for lastInjuryEvents — see the field's doc. */
 const NO_INJURY_EVENTS: readonly InjuryEvent[] = [];
@@ -142,6 +160,14 @@ export interface FighterState {
    */
   antiRep?: AntiRepState;
   pendingReverseOf?: string;
+  /**
+   * [Task 14] Horizontal launch velocity (m/s) riding out on shared state —
+   * knockback (leg cannon) and wall-kick launches set it on the VICTIM's or
+   * ATTACKER's state, and that fighter's own integrate() carries + decays
+   * it (ground-friction decel). Absent/0 = no launch in flight.
+   */
+  pushX?: number;
+  pushZ?: number;
 }
 
 /** One landed strike, produced by findHit, consumed by applyHit. */
@@ -162,6 +188,13 @@ export interface FighterSimWorld {
   fighters: FighterState[];
   downedBodyNearby: boolean;
   weaponOnGroundNearby: boolean;
+  /**
+   * [Task 14] Nearest-wall probe for wall-kick gating: distance plus the
+   * unit ground-plane direction pointing AWAY from the wall (the launch
+   * heading). Absent = open field (snapshot reports Infinity, exactly the
+   * pre-Task-14 behavior).
+   */
+  wall?: { proximityM: number; awayX: number; awayZ: number };
 }
 
 // Kinematics constants live in data/tuning.ts, shared with
@@ -223,37 +256,50 @@ export class FighterSim {
   get horizontalVelZ(): number { return this.locoVelZ; }
   /** Crouch state for renderer (read-only). */
   get isCrouching(): boolean { return this.crouching; }
-
   /**
    * Injury events from the MOST RECENT update() step [Task 9]. The renderer
    * polls this once per frame (blood-drip FX, limp gait, KO ragdoll kick-
    * off); each step overwrites it, so pollers must read before the next.
-   */
-  /**
+   *
    * Quiet steps share one immutable empty array — no per-step allocation.
    */
   lastInjuryEvents: readonly InjuryEvent[] = NO_INJURY_EVENTS;
 
   /**
    * Combat events produced during the most recent update(): plain drop /
-   * throw data the game layer bridges to Rapier (WeaponDrops, Projectiles).
-   * Re-published (or reset to a shared empty array) every step; quiet steps
-   * share NO_COMBAT_EVENTS so no per-frame allocation happens.
+   * throw data the game layer bridges to Rapier (WeaponDrops, Projectiles)
+   * plus Task 14's corpse throw. Re-published (or reset to a shared empty
+   * array) every step; quiet steps share NO_COMBAT_EVENTS so no per-frame
+   * allocation happens.
    */
-  lastCombatEvents: readonly WeaponSimEvent[] = NO_COMBAT_EVENTS;
+  lastCombatEvents: readonly CombatSimEvent[] = NO_COMBAT_EVENTS;
 
   /** Event accumulator for the current step; published at update() end. */
-  private combatEvents: WeaponSimEvent[] = [];
+  private combatEvents: CombatSimEvent[] = [];
 
   /**
-   * Score sink [Task 9]: when set, reversal successes award SCORE_REVERSAL
-   * here. Injected via setScoreLedger; the game layer owns the ledger so
-   * results screens and persistence stay outside the sim. Other awards
-   * land where their causes happen — see docs in scoring.ts (Task 14
-   * wires LEG_CANNON/NICE_AIM/STYLE_WALLKICK, Task 13 NINJA_THROW,
-   * Task 18 STEALTH_KILL).
+   * [Task 14] Hits this fighter's CURRENT move has landed (collectHits
+   * counts them). The leg cannon reads it when its active window ends:
+   * zero landed hits is a whiff, and a whiffed cannon downs the attacker.
+   */
+  private hitsLandedThisMove = 0;
+
+  /**
+   * Score sink [Task 9]: when set, this fighter's awards land here.
+   * Injected via setScoreLedger; the game layer owns the ledger so
+   * results screens and persistence stay outside the sim. Every award
+   * fires where its cause happens [Task 14]: REVERSAL on a successful
+   * reversal, REVERSAL_KO when the counter throw KOs, LEG_CANNON on a
+   * landed leg cannon, NICE_AIM on a corpse hit, STYLE_WALLKICK when a
+   * wall kick kills, NINJA_THROW when this fighter's thrown knife kills
+   * (Task 18 owns STEALTH_KILL).
    */
   private ledger: LedgerView | null = null;
+
+  /** Total score accumulated in this fighter's ledger (0 when unset). */
+  get scoreTotal(): number {
+    return this.ledger?.total() ?? 0;
+  }
 
   /** Attach the score sink for this fighter's awards (idempotent). */
   setScoreLedger(ledger: LedgerView): void {
@@ -393,7 +439,177 @@ export class FighterSim {
       this.swingHitSet.add(e.victimId);
       landed.push(e);
     }
+    // [Task 14] The leg cannon reads this when its active window ends.
+    this.hitsLandedThisMove += landed.length;
     return landed;
+  }
+
+  // -- special-move application [Task 14] -----------------------------------
+
+  /**
+   * Apply one landed SPECIAL-move strike. The game layer routes special
+   * hits here instead of hitdetect.applyHit: the strike runs through
+   * applySpecial's strike-time gate and the returned effect is consumed
+   * uniformly — damage → KO/knockdown/stun, launches, pin disarm, corpse
+   * throw, shared-fate self-fall — with kill attribution and score awards
+   * on THIS fighter's ledger. Returns the applied effect, or null when the
+   * gate rejected the strike (a whiff changes nothing).
+   */
+  applySpecialStrike(hit: HitEvent, fighters: FighterState[]): SpecialEffect | null {
+    if (hit.attackerId !== this.state.id) return null; // awards land on the attacker's sim
+    let victim: FighterState | undefined;
+    for (let i = 0; i < fighters.length && victim === undefined; i++) {
+      if (fighters[i].id === hit.victimId) victim = fighters[i];
+    }
+    if (victim === undefined) return null;
+    const effect = applySpecial(hit.moveId, this.state, victim, this.specialCtx());
+    if (effect === null) return null;
+    this.applyEffect(effect, this.state, victim, hit.dirVector);
+    return effect;
+  }
+
+  /**
+   * Stage-2 body throw [Task 14]: a hurled corpse (see CorpseThrowEvent)
+   * just connected with `victimId`. The impact flows through the same
+   * uniform application — tuning-table damage + NICE_AIM on the hit.
+   * Returns the applied effect, or null (unknown victim / gate rejected).
+   */
+  applyCorpseImpact(victimId: string, fighters: FighterState[]): SpecialEffect | null {
+    let victim: FighterState | undefined;
+    for (let i = 0; i < fighters.length && victim === undefined; i++) {
+      if (fighters[i].id === victimId) victim = fighters[i];
+    }
+    if (victim === undefined) return null;
+    const ctx: SpecialCtx = { ...this.specialCtx(), corpseImpact: true };
+    const effect = applySpecial('bodyThrow', this.state, victim, ctx);
+    if (effect === null) return null;
+    const dx = victim.pos.x - this.state.pos.x;
+    const dz = victim.pos.z - this.state.pos.z;
+    const len = Math.hypot(dx, dz);
+    const dir = len > 1e-9 ? { x: dx / len, z: dz / len } : forwardXZ(this.state.heading);
+    this.applyEffect(effect, this.state, victim, dir);
+    return effect;
+  }
+
+  /**
+   * Thrown-knife impact bridge [Task 13 → Task 14]: the game layer reports
+   * a projectile hit; thrownKnifeHit applies the outcome (pure) and THIS
+   * sim — which must be the THROWER's — awards NINJA_THROW when the impact
+   * killed (kill-attribution rule: hp is checked after application, not
+   * inside the pure function). Returns the outcome, or null when called on
+   * any sim but the thrower's.
+   */
+  applyThrownKnifeImpact(victim: FighterState, thrower: FighterState): ThrownKnifeOutcome | null {
+    if (thrower.id !== this.state.id) return null;
+    const outcome = thrownKnifeHit(victim, thrower);
+    if (outcome.fatal) this.ledger?.award({ type: 'NINJA_THROW' });
+    return outcome;
+  }
+
+  /**
+   * Consume one SpecialEffect uniformly. Order matters: terminal state
+   * first (a KO never also knocks down), then launches, equipment, corpse
+   * bridge data, and finally the attacker's own shared-fate fall.
+   */
+  private applyEffect(
+    effect: SpecialEffect,
+    attacker: FighterState,
+    victim: FighterState,
+    dirVector: { x: number; z: number },
+  ): void {
+    if (effect.damage !== undefined && effect.damage > 0) {
+      const dmg = Math.round(effect.damage * SPECIES[attacker.species].punchDmgMult);
+      victim.hp -= dmg;
+      if (victim.hp <= 0) {
+        applyLethalState(victim);
+        if (effect.killScoreEvent !== undefined) this.ledger?.award(effect.killScoreEvent);
+      } else if (effect.knockdown === true) {
+        downFighter(victim);
+      } else if (effect.stunMs !== undefined) {
+        this.applyStun(victim, effect.stunMs);
+      }
+      // Hit-gated awards (LEG_CANNON, NICE_AIM) land on any landed strike.
+      if (effect.scoreEvent !== undefined) this.ledger?.award(effect.scoreEvent);
+    } else if (effect.stunMs !== undefined) {
+      this.applyStun(victim, effect.stunMs); // zero-damage stun (the flip)
+    }
+
+    if (effect.impulse !== undefined) {
+      victim.pushX = effect.impulse.x;
+      victim.pushZ = effect.impulse.z;
+      victim.velY = effect.impulse.y; // overrides the knockdown pop (slams)
+    }
+    if (effect.attackerImpulse !== undefined) {
+      attacker.pushX = effect.attackerImpulse.x;
+      attacker.pushZ = effect.attackerImpulse.z;
+    }
+
+    if (effect.disarm === true && heldWeapon(victim) !== null) {
+      this.combatEvents.push(weaponDropEvent(victim, attacker, 'disarm'));
+      victim.weapon = null;
+      victim.durability = undefined;
+      victim.bloodiedWeapon = undefined;
+    }
+
+    if (effect.corpseLaunch === true) {
+      this.combatEvents.push({
+        type: 'corpseThrow',
+        victimId: victim.id,
+        dir: { x: dirVector.x, z: dirVector.z },
+        speed: BODY_THROW_SPEED_MPS,
+      });
+    }
+
+    if (effect.selfKnockdown === true) this.selfKnockdown();
+  }
+
+  /** [Task 14] The attacker goes prone: whiffed leg cannon, air-grab commit. */
+  private selfKnockdown(): void {
+    const s = this.state;
+    s.currentMove = undefined;
+    s.moveElapsedMs = 0;
+    s.phase.t = 'downed';
+    s.phase.moveId = undefined;
+    s.phase.phaseMsLeft = DOWNED_GROUND_MS;
+    s.velY = KNOCKDOWN_VELY;
+    s.stance = 'downed';
+  }
+
+  /** [Task 14] Stun overlay: interrupts whatever ran, ticks out to idle. */
+  private applyStun(victim: FighterState, stunMs: number): void {
+    victim.currentMove = undefined;
+    victim.moveElapsedMs = 0;
+    victim.phase.t = 'hitstun';
+    victim.phase.moveId = undefined;
+    victim.phase.phaseMsLeft = stunMs;
+  }
+
+  /**
+   * [Task 14] Mid-air flip fired (zero-timeline move): grants the flip's
+   * air invulnerability — which cancels air grabs — and stuns every enemy
+   * inside the row's stun radius through the uniform effect path.
+   */
+  private fireFlip(): void {
+    const s = this.state;
+    s.flags.invulnerableAirFlipMs = FLIP_STUN_MS;
+    const fighters = this.world.fighters;
+    const ctx = this.specialCtx();
+    for (let i = 0; i < fighters.length; i++) {
+      const other = fighters[i];
+      if (other.id === s.id) continue;
+      const effect = applySpecial('flip', s, other, ctx);
+      if (effect?.stunMs !== undefined) this.applyStun(other, effect.stunMs);
+    }
+  }
+
+  /** [Task 14] Strike-time context for the pure dispatcher. */
+  private specialCtx(): SpecialCtx {
+    const wall = this.world.wall;
+    return {
+      wallProximityM: wall !== undefined ? wall.proximityM : Infinity,
+      wallAwayDir: wall !== undefined ? { x: wall.awayX, z: wall.awayZ } : undefined,
+      crouchHeld: this.crouching,
+    };
   }
 
   /** Resolve a fresh press through the resolver and dispatch the result. */
@@ -541,6 +757,10 @@ export class FighterSim {
     const res = startCounter(s, reverserId);
     if (!res.granted || res.effect === undefined) return;
     applyHit(res.effect, fighters);
+    // Score hook [Task 14]: a reversal chain that ends the reverser awards
+    // REVERSAL_KO to the counter-thrower's ledger — the kill is attributed
+    // here, where hp after application is visible (kill-attribution rule).
+    if (reverser.hp <= 0) this.ledger?.award({ type: 'REVERSAL_KO' });
     // The throw consumes the counter opportunity.
     s.pendingReverseOf = undefined;
   }
@@ -558,15 +778,18 @@ export class FighterSim {
     this.bufferedActionId = null;
     this.bufferMsLeft = 0;
     this.swungThisMove = false;
+    this.hitsLandedThisMove = 0;
     recordAttack(this.state.antiRep!, id);
 
     if (!hasTimeline(def)) {
-      // Zero-duration utility rows (jump/hop): pure impulse, no animation
-      // lock — the fire itself IS the effect.
+      // Zero-duration utility rows: pure effect, no animation lock — the
+      // fire itself IS the effect.
       if (id === 'jump' || id === 'hop') {
         this.state.velY = JUMP_SPEED;
         this.grounded = false;
         this.state.stance = 'airborne';
+      } else if (id === 'flip') {
+        this.fireFlip();
       }
       return;
     }
@@ -607,6 +830,7 @@ export class FighterSim {
       case 'active':
       case 'recovery': {
         const def = s.currentMove!;
+        const leavingActive = s.phase.t === 'active';
         s.moveElapsedMs += dt;
         s.phase.phaseMsLeft -= dt;
         if (s.phase.phaseMsLeft > 0) {
@@ -622,6 +846,12 @@ export class FighterSim {
           s.phase.phaseMsLeft = def.recoveryMs;
         } else {
           this.endMove();
+        }
+        // [Task 14] A leg cannon whose whole active window landed nothing
+        // whiffed: the attacker eats dirt (self-knockdown instead of the
+        // recovery the successful move would ride out).
+        if (leavingActive && def.id === 'legCannon' && this.hitsLandedThisMove === 0) {
+          this.selfKnockdown();
         }
         break;
       }
@@ -692,6 +922,18 @@ export class FighterSim {
     s.pos.x += this.locoVelX * dtS;
     s.pos.z += this.locoVelZ * dtS;
 
+    // [Task 14] Launch velocity in flight (knockback, wall-kick bounce):
+    // rides shared state so a VICTIM's own sim carries it; decays with the
+    // same ground-friction deceleration locomotion uses.
+    const pushX = s.pushX ?? 0;
+    const pushZ = s.pushZ ?? 0;
+    if (pushX !== 0 || pushZ !== 0) {
+      s.pos.x += pushX * dtS;
+      s.pos.z += pushZ * dtS;
+      s.pushX = approach(pushX, 0, FRICTION * dtS);
+      s.pushZ = approach(pushZ, 0, FRICTION * dtS);
+    }
+
     // Face the movement direction when it is meaningful.
     const hSpeed = Math.hypot(this.locoVelX, this.locoVelZ);
     if (hSpeed > 0.5) {
@@ -745,7 +987,7 @@ export class FighterSim {
       pos: s.pos,
       heading: s.heading,
       hasWeapon: s.weapon,
-      wallProximityM: Infinity,
+      wallProximityM: this.world.wall?.proximityM ?? Infinity,
       nearestTarget: nearestTargetOf(s, this.world),
       currentMove:
         movePhase !== undefined

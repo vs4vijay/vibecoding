@@ -5,12 +5,15 @@ import { InputManager } from './core/input';
 import { ChaseCamera } from './render/camera';
 import { createScene } from './render/scene';
 import { DebugStats } from './render/debugStats';
+import { FxParticles, HEAVY_LAND_MIN_FALL_MPS } from './render/fx';
 import { SPECIES } from './data/species';
 import { buildRig, type Rig } from './actors/skeleton';
 import { ClipPlayer } from './actors/clips';
 import { CharacterController } from './actors/controller';
-import { FighterSim, type FighterSimWorld } from './combat/stateMachine';
+import { FighterSim, type FighterSimWorld, type HitEvent } from './combat/stateMachine';
+import { isSpecialMove } from './combat/bodymoves';
 import { applyHit } from './combat/hitdetect';
+import { ScoreLedger } from './combat/scoring';
 import { HITSTOP_MS, KO_SLOWMO_SCALE, KO_SLOWMO_MS } from './data/tuning';
 import { heightAt } from './world/terrain';
 import { PhysicsWorld } from './world/physics';
@@ -55,6 +58,9 @@ export class Game {
   private readonly chaseCam: ChaseCamera;
   private readonly debug: DebugStats | null;
 
+  /** [Task 14] Preallocated combat particles (blood puffs, dust rings). */
+  private readonly fx: FxParticles;
+
   private readonly playerSim: FighterSim;
   private readonly dummySim: FighterSim;
   private readonly playerCtrl: CharacterController;
@@ -92,11 +98,13 @@ export class Game {
     this.sceneBundle = createScene(canvas);
     this.camera3d = new THREE.PerspectiveCamera(60, 1, 0.1, 300);
     this.chaseCam = new ChaseCamera(this.camera3d);
-
-    // --- Debug stats (dev only) ---
     this.debug = import.meta.env.DEV
-      ? new DebugStats(document.getElementById('app')!)
+      ? new DebugStats(document.getElementById('app')!, () => this.playerSim.scoreTotal)
       : null;
+
+    // [Task 14] Combat particles live in the render scene; the sim never
+    // touches them — triggers are read off sim state each step.
+    this.fx = new FxParticles(this.sceneBundle.scene);
 
     // --- Input ---
     this.input = new InputManager();
@@ -111,6 +119,9 @@ export class Game {
     const playerClip = new ClipPlayer(playerRig);
     this.playerCtrl = new CharacterController(playerRig, SPECIES.rabbit, playerClip);
     this.playerSim = new FighterSim('rabbit', 'player', true);
+    // Score sink [Task 9/14]: every player award (reversals, style bonuses,
+    // cannon/ninja/nice-aim) lands here; F3 shows the running total.
+    this.playerSim.setScoreLedger(new ScoreLedger());
 
     // --- Dummy (wolf) — static, null input ---
     const dummyRig = buildRig(SPECIES.wolf);
@@ -177,6 +188,7 @@ export class Game {
       this.clickHandler = null;
     }
     this.input.detach();
+    this.fx.dispose();
     this.sceneBundle.renderer.dispose();
     this.sceneBundle.scene.clear();
   }
@@ -196,6 +208,9 @@ export class Game {
 
     // Advance timescale (hitstop / slow-mo).
     const scale = this.timescale.update(realDtMs);
+
+    // Step the combat sim with the scaled time (hitstop freezes, slow-mo
+    // slows it).
     this.simLoop.advance(realDtMs * scale);
 
     // Step cosmetic physics with the same scaled time so ragdolls slow-mo
@@ -205,6 +220,9 @@ export class Game {
       this.physics.step(dtSec);
       for (const rd of this.ragdolls) rd.update();
     }
+
+    // [Task 14] Combat particles tick with the same scaled time.
+    this.fx.update(realDtMs * scale);
 
     // Render: copy sim → controller → rig (read-only), scaled by timescale
     // so hitstop freezes animation and slow-mo slows it.
@@ -217,24 +235,30 @@ export class Game {
   // --- sim step (called by FixedLoop) ------------------------------------
 
   private simStep(dtMs: number): void {
+    // Capture pre-step velocities: a fighter whose fast fall the ground
+    // eats this step just HEAVY-LANDED (Task 14 dust ring).
+    const playerVy = this.playerSim.state.velY;
+    const dummyVy = this.dummySim.state.velY;
+
     // Player: use sampled input; dummy: null (stands still).
     this.playerSim.update(dtMs, this.frame, this.world);
     this.dummySim.update(dtMs, null, this.world);
 
     // Collect + apply hits (player → dummy) using pre-allocated arrays.
     const pHits = this.playerSim.collectHits(this.playerVictims);
-    for (const hit of pHits) {
-      applyHit(hit, this.world.fighters);
-      this.lastHitDir = { x: hit.dirVector.x, y: 0, z: hit.dirVector.z };
-      this.timescale.hitstop(HITSTOP_MS);
-    }
+    for (const hit of pHits) this.landHit(hit, this.playerSim);
 
     // Collect + apply hits (dummy → player — usually empty for a null-input dummy).
     const dHits = this.dummySim.collectHits(this.dummyVictims);
-    for (const hit of dHits) {
-      applyHit(hit, this.world.fighters);
-      this.lastHitDir = { x: hit.dirVector.x, y: 0, z: hit.dirVector.z };
-      this.timescale.hitstop(HITSTOP_MS);
+    for (const hit of dHits) this.landHit(hit, this.dummySim);
+
+    // [Task 14] Heavy land: downward velocity just eaten by the ground —
+    // knockdown arcs and KO pops kick up a dust ring at the impact point.
+    if (playerVy <= -HEAVY_LAND_MIN_FALL_MPS && this.playerSim.state.velY === 0) {
+      this.fx.spawnDustRing(this.playerSim.state.pos);
+    }
+    if (dummyVy <= -HEAVY_LAND_MIN_FALL_MPS && this.dummySim.state.velY === 0) {
+      this.fx.spawnDustRing(this.dummySim.state.pos);
     }
 
     // KO: slow-mo once per transition, then hand the body to a ragdoll so
@@ -249,8 +273,34 @@ export class Game {
           force: SPECIES.wolf.massKg * 1.5,
         });
         this.ragdolls.push(rd);
+        this.fx.spawnDustRing(this.dummySim.state.pos);
       }
     }
+  }
+
+  /**
+   * Apply one collected hit [Task 14 routing]: specials flow through the
+   * attacker sim's applySpecialStrike (uniform effect consumption + score
+   * awards), plain hits through hitdetect.applyHit. Emits hit feedback:
+   * hitstop on every landed strike, a blood puff when a blade opens a
+   * fresh wound.
+   */
+  private landHit(hit: HitEvent, attackerSim: FighterSim): void {
+    let victim: FighterSim['state'] | undefined;
+    const fighters = this.world.fighters;
+    for (let i = 0; i < fighters.length && victim === undefined; i++) {
+      if (fighters[i].id === hit.victimId) victim = fighters[i];
+    }
+    if (victim === undefined) return;
+    const wasBleeding = victim.flags.bleeding;
+    if (isSpecialMove(hit.moveId)) {
+      attackerSim.applySpecialStrike(hit, this.world.fighters);
+    } else {
+      applyHit(hit, this.world.fighters);
+    }
+    this.lastHitDir = { x: hit.dirVector.x, y: 0, z: hit.dirVector.z };
+    this.timescale.hitstop(HITSTOP_MS);
+    if (victim.flags.bleeding && !wasBleeding) this.fx.spawnBloodPuff(victim.pos);
   }
 
   // --- render sync -------------------------------------------------------
@@ -322,6 +372,9 @@ export class Game {
     dummySim: FighterSim;
     timescale: Timescale;
     ragdolls: readonly RagdollHandle[];
+    /** Shared sim world — dev tools can probe wall/dummy state for verification. */
+    world: FighterSimWorld;
+    fx: FxParticles;
   } {
     return {
       chaseCam: this.chaseCam,
@@ -329,6 +382,8 @@ export class Game {
       dummySim: this.dummySim,
       timescale: this.timescale,
       ragdolls: this.ragdolls,
+      world: this.world,
+      fx: this.fx,
     };
   }
 }

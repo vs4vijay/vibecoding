@@ -180,3 +180,21 @@ export const THROWN_KNIFE_SPEED_MPS = 18;
 /** Fixed seed for the combat rng the game layer feeds clash rolls. */
 export const COMBAT_RNG_SEED = 20260823;
 
+// --- Body mechanics [Task 14] -----------------------------------------------
+
+/**
+ * Knockback launch speed (m/s) a landed leg cannon fires the victim away
+ * with, along the attacker's facing [brief Task 14: "massive knockback"].
+ */
+export const LEG_CANNON_KNOCK_SPEED_MPS = 12;
+/** Launch speed (m/s) the attacker leaves a wallKick wall with. */
+export const WALL_KICK_LAUNCH_MPS = 7;
+/** Horizontal launch speed (m/s) of a corpse hurled by a body throw. */
+export const BODY_THROW_SPEED_MPS = 8;
+/**
+ * Damage a thrown corpse deals when it connects with an enemy [spec §3.1:
+ * body-as-projectile 40] — the bodyThrow row's own damage stays 0 because
+ * the throw itself never hurts anyone.
+ */
+export const BODY_THROW_IMPACT_DAMAGE = 40;
+

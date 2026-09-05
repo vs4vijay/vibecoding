@@ -139,14 +139,7 @@ export function applyHit(hit: HitEvent, fighters: FighterState[]): FighterDelta[
   }
 
   if (victim.hp <= 0) {
-    victim.hp = 0;
-    victim.flags.unconscious = true;
-    victim.stance = 'downed';
-    victim.currentMove = undefined;
-    victim.moveElapsedMs = 0;
-    victim.phase.t = 'ko';
-    victim.phase.moveId = undefined;
-    victim.phase.phaseMsLeft = Infinity;
+    applyLethalState(victim);
     return deltas;
   }
 
@@ -155,10 +148,7 @@ export function applyHit(hit: HitEvent, fighters: FighterState[]): FighterDelta[
   victim.moveElapsedMs = 0;
   victim.phase.moveId = undefined;
   if (downs) {
-    victim.phase.t = 'downed';
-    victim.phase.phaseMsLeft = DOWNED_GROUND_MS;
-    victim.velY = KNOCKDOWN_VELY;
-    victim.stance = 'downed';
+    downFighter(victim);
     deltas[0].velY = KNOCKDOWN_VELY;
   } else {
     victim.phase.t = 'hitstun';
@@ -167,6 +157,37 @@ export function applyHit(hit: HitEvent, fighters: FighterState[]): FighterDelta[
   }
 
   return deltas;
+}
+
+/**
+ * Finish a fighter off: hp clamped to 0, unconscious flag, KO phase.
+ * Shared by applyHit and Task 14's special-effect application so every
+ * kill path lands the victim in the identical terminal state.
+ */
+export function applyLethalState(victim: FighterState): void {
+  victim.hp = 0;
+  victim.flags.unconscious = true;
+  victim.stance = 'downed';
+  victim.currentMove = undefined;
+  victim.moveElapsedMs = 0;
+  victim.phase.t = 'ko';
+  victim.phase.moveId = undefined;
+  victim.phase.phaseMsLeft = Infinity;
+}
+
+/**
+ * Put a living fighter on the ground: downed phase for DOWNED_GROUND_MS,
+ * KNOCKDOWN_VELY pop, downed stance, move cancelled. Shared by applyHit
+ * and Task 14's special-effect application (knockdown effects).
+ */
+export function downFighter(victim: FighterState): void {
+  victim.currentMove = undefined; // getting hit interrupts whatever ran
+  victim.moveElapsedMs = 0;
+  victim.phase.moveId = undefined;
+  victim.phase.t = 'downed';
+  victim.phase.phaseMsLeft = DOWNED_GROUND_MS;
+  victim.velY = KNOCKDOWN_VELY;
+  victim.stance = 'downed';
 }
 
 /** What one fighter gained/lost from an applied hit. */

@@ -4,12 +4,15 @@
  */
 export class DebugStats {
   private readonly el: HTMLDivElement;
+  /** Live score provider (Task 14) — shown when present. */
+  private readonly scoreFn: (() => number) | null;
   private visible = false;
   private frames = 0;
   private msLeft = 0;
   private fps = 0;
 
-  constructor(parent: HTMLElement) {
+  constructor(parent: HTMLElement, scoreFn?: () => number) {
+    this.scoreFn = scoreFn ?? null;
     this.el = document.createElement('div');
     this.el.id = 'debug-stats';
     this.el.textContent = '';
@@ -56,7 +59,8 @@ export class DebugStats {
       this.fps = Math.round((this.frames * 1000) / span);
       this.frames = 0;
       this.msLeft = 500;
-      this.el.textContent = `fps: ${this.fps}`;
+      this.el.textContent =
+        this.scoreFn !== null ? `fps: ${this.fps}\nscore: ${this.scoreFn()}` : `fps: ${this.fps}`;
     }
   }
 }
