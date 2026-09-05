@@ -8,7 +8,16 @@
  * antiRep penalty`, with a hard cap so one move can never exceed 3× in a row.
  */
 
-import { AI_MOVE_HARD_CAP } from '../data/tuning';
+import {
+  AI_HIT_PROB_FALLOFF,
+  AI_MOVE_HARD_CAP,
+  AI_PROB_SCALE_CROUCHED,
+  AI_PROB_SCALE_DOWNED,
+  AI_PROB_SCALE_RUNNING,
+  AI_PROB_SCALE_STANDING,
+  AI_PROB_SCALE_TARGET_ACTIVE,
+  AI_PROB_SCALE_TARGET_STARTUP,
+} from '../data/tuning';
 import { MOVES } from '../data/moves';
 import type { MoveDef, MoveId, MovePhase, Stance, WeaponClass } from '../combat/types';
 import { penaltyFor } from '../combat/antirepetition';
@@ -62,20 +71,22 @@ function currentStreak(s: AntiRepState, move: string): number {
  */
 function hitProbability(dist: number, move: MoveDef, target: AttackTarget): number {
   const reach =
-    dist <= move.rangeM ? 1 : Math.max(0, 1 - (dist - move.rangeM) * 0.5);
+    dist <= move.rangeM
+      ? 1
+      : Math.max(0, 1 - (dist - move.rangeM) * AI_HIT_PROB_FALLOFF);
   const stanceScale =
     target.stance === 'downed'
-      ? 1.2
+      ? AI_PROB_SCALE_DOWNED
       : target.stance === 'standing'
-        ? 1
+        ? AI_PROB_SCALE_STANDING
         : target.stance === 'crouched'
-          ? 0.75
-          : 0.6;
+          ? AI_PROB_SCALE_CROUCHED
+          : AI_PROB_SCALE_RUNNING;
   const phaseScale = !target.activeMove
     ? 1
     : target.activeMove.phase === 'startup'
-      ? 0.5
-      : 0.4;
+      ? AI_PROB_SCALE_TARGET_STARTUP
+      : AI_PROB_SCALE_TARGET_ACTIVE;
   return reach * stanceScale * phaseScale;
 }
 
@@ -107,16 +118,25 @@ export function pickAttack(
   // Utility: maximize damage × hit chance × anti-repetition pressure.
   let best: MoveId | null = null;
   let bestScore = -1;
+  let fallback: MoveId | null = null;
+  let fallbackScore = -1;
   for (const id of candidatesFor(self, target)) {
-    const streak = currentStreak(antiRep, id);
-    if (streak >= AI_MOVE_HARD_CAP) continue;
     const def = MOVES[id];
     const score =
       def.damage * hitProbability(target.dist, def, target) * penaltyFor(antiRep, id);
+    // Hard cap bans a move at 3+ consecutive uses — but if EVERY candidate
+    // is capped (single-move loadouts), prefer spamming over soft-locking.
+    if (currentStreak(antiRep, id) >= AI_MOVE_HARD_CAP) {
+      if (score > fallbackScore) {
+        fallbackScore = score;
+        fallback = id;
+      }
+      continue;
+    }
     if (score > bestScore) {
       bestScore = score;
       best = id;
     }
   }
-  return best;
+  return best ?? fallback;
 }

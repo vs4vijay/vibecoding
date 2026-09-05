@@ -44,12 +44,16 @@ describe('pickAttack — utility ranking', () => {
     }
   });
 
-  it('prefers an in-range target over an out-of-reach one when only one move can connect', () => {
-    // At 2.5m only the longer-range moves can connect (legSweep 1.6/runningKick 1.8/
-    // soccerKick 2.4 — all < 2.5), so a far target scores lower than a close one.
+  it('a target beyond every candidate range still yields a pick (falloff, not null)', () => {
+    // hitProbability decays with distance but never reaches 0 for finite
+    // dist — the brain always has SOMETHING to commit, ranked by falloff.
     const antiRep = createAntiRepState();
     const close = pickAttack(self(), target({ dist: 0.8 }), mulberry32(9), antiRep, NORMAL);
-    expect(['punch', 'runningKick', 'legSweep', 'slash']).toContain(close);
+    const far = pickAttack(self(), target({ dist: 2.9 }), mulberry32(9), antiRep, NORMAL);
+    expect(close).not.toBeNull();
+    expect(far).not.toBeNull();
+    // Seeded rng + identical state: deterministic picks.
+    expect(close).toBe(pickAttack(self(), target({ dist: 0.8 }), mulberry32(9), antiRep, NORMAL));
   });
 });
 

@@ -230,7 +230,7 @@ describe('AI vs player harness (Task 16)', () => {
       const wolf = new FighterSim('wolf', 'wolf', false);
       player.state.pos.z = -6;
       wolf.state.pos.z = 0;
-      wolf.state.heading = Math.PI; // face the player
+      wolf.state.heading = 0; // forward = (-sin h, -cos h) = (0, -1): faces the player at -z
       const brain = new Brain(wolf, DIFFICULTY.normal, rng);
 
       const world: FighterSimWorld = {
@@ -297,6 +297,7 @@ describe('AI vs player harness (Task 16)', () => {
           expect(Number.isNaN(f.pos.z)).toBe(false);
           expect(Number.isNaN(f.velY)).toBe(false);
           expect(Number.isNaN(f.heading)).toBe(false);
+          expect(Number.isNaN(f.hp)).toBe(false);
         }
 
         if (player.state.hp <= 0 || wolf.state.hp <= 0) {
@@ -305,8 +306,8 @@ describe('AI vs player harness (Task 16)', () => {
         }
       }
 
+      console.log(`seed ${seed}: reason=${koReason} player=${player.state.hp} wolf=${wolf.state.hp} brain=${brain.state} dist=${Math.hypot(wolf.state.pos.x - player.state.pos.x, wolf.state.pos.z - player.state.pos.z).toFixed(1)}`);
       expect(koReason).toBe('hp'); // fight actually terminated
-      expect(stepsRun).toBeLessThanOrEqual(maxSteps);
     }, 30_000);
   }
 });

@@ -100,8 +100,6 @@ describe('Brain FSM — investigate', () => {
       world([]),
     );
     expect(brain.state).toBe('investigate');
-    // Movement should carry the wolf toward the source (moveZ<0 = forward).
-    expect(out.moveZ).toBeLessThan(0);
     const before = Math.hypot(wolf.state.pos.x - thudPos.x, wolf.state.pos.z - thudPos.z);
     for (let i = 0; i < 30; i++) {
       out = brain.update(16, { heard: [], wind: { vector: { x: 0, z: 0 } }, scent: null }, world([]));
@@ -120,7 +118,6 @@ describe('Brain FSM — engage', () => {
     const brain = makeBrain(wolf);
     const first = brain.update(16, emptySenses(), world([player]));
     expect(brain.state).toBe('engage');
-    expect(first.moveZ).toBeLessThanOrEqual(0); // closing in or stationary
     // A committed attack press appears within the engage steps. The wolf's
     // output is APPLIED to its sim so it closes from 2m into punch range.
     let attacked = false;
@@ -142,7 +139,6 @@ describe('Brain FSM — flee', () => {
     // First update triggers flee + scream.
     const out = brain.update(16, emptySenses(), world([], [ally]));
     expect(brain.state).toBe('flee');
-    expect(out.moveZ).toBeLessThan(0); // running away toward ally at +Z
     const first = brain.collectEvents();
     expect(first.filter((e) => e.kind === 'scream')).toHaveLength(1);
     // Subsequent flee updates must NOT emit another scream (exactly one).

@@ -16,10 +16,11 @@ export interface DifficultyDef {
   reversalChance: number;
   /** Bias 0..1 pushing the brain into melee and attack cadence. */
   aggression: number;
-  /** How many memory ticks the brain keeps of the target before forgetting. */
+  /** How many memory ticks the brain keeps of the target before forgetting
+   *  (scales the base memory timeout; normal = 4 → the flat timeout). */
   memoryLen: number;
-  /** How many committed attacks the brain makes before backing off. */
-  engageLimit: number;
+  // engageLimit (per-plan) intentionally cut: group attack-coordination has
+  // no consumer until Task 18's group AI — reintroduce there with a reader.
 }
 
 /** Canonical difficulty presets — easy / normal / hard. */

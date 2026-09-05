@@ -275,7 +275,29 @@ export const AI_CHASE_RANGE_M = 12;
  * numbers — difficulty.ts re-exports these as the `DIFFICULTY` record.
  */
 export const DIFFICULTY_PRESETS = {
-  easy: { reactionMs: 550, reversalChance: 0.15, aggression: 0.5, memoryLen: 2, engageLimit: 1 },
-  normal: { reactionMs: 320, reversalChance: 0.35, aggression: 0.75, memoryLen: 4, engageLimit: 2 },
-  hard: { reactionMs: 170, reversalChance: 0.6, aggression: 1.0, memoryLen: 6, engageLimit: 3 },
+  easy: { reactionMs: 550, reversalChance: 0.15, aggression: 0.5, memoryLen: 2 },
+  normal: { reactionMs: 320, reversalChance: 0.35, aggression: 0.75, memoryLen: 4 },
+  hard: { reactionMs: 170, reversalChance: 0.6, aggression: 1.0, memoryLen: 6 },
 } as const;
+
+// --- AI brain steering + utility scales [Task 16 review] ---
+
+/** Utility falloff per metre beyond a move's reach (hitProbability). */
+export const AI_HIT_PROB_FALLOFF = 0.5;
+/** hitProbability multipliers by target stance. */
+export const AI_PROB_SCALE_DOWNED = 1.2;
+export const AI_PROB_SCALE_STANDING = 1;
+export const AI_PROB_SCALE_CROUCHED = 0.75;
+export const AI_PROB_SCALE_RUNNING = 0.6;
+/** hitProbability multipliers when the target is mid-move. */
+export const AI_PROB_SCALE_TARGET_STARTUP = 0.5;
+export const AI_PROB_SCALE_TARGET_ACTIVE = 0.4;
+/** Loudness of the flee scream event. */
+export const AI_SCREAM_LOUDNESS = 1.5;
+/** Waypoint-reached radius (m) for patrol wander. */
+export const AI_WAYPOINT_REACHED_M = 0.5;
+/**
+ * Scent-probe distance (m): with no seen/heard memory, a strong local scent
+ * sends the brain investigating this far upwind of its position.
+ */
+export const AI_SCENT_PROBE_M = 4;
