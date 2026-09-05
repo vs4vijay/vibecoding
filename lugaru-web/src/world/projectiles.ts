@@ -26,8 +26,11 @@ export interface KnifeEvent {
   at?: { x: number; y: number; z: number };
 }
 
+/** A real weapon class that can lie on the ground as a pickup. */
+export type WeaponDropClass = 'knife' | 'sword' | 'staff';
+
 export interface DropHandle {
-  weaponClass: 'knife' | 'sword' | 'staff';
+  weaponClass: WeaponDropClass;
   pos: { x: number; y: number; z: number };
 }
 
@@ -180,7 +183,7 @@ export class Projectiles {
 // WeaponDrops — dropped weapons become ground pickups
 // ---------------------------------------------------------------------------
 
-const DROP_HALF_EXTENTS: Record<'knife' | 'sword' | 'staff', { x: number; y: number; z: number }> = {
+const DROP_HALF_EXTENTS: Record<WeaponDropClass, { x: number; y: number; z: number }> = {
   knife: { x: 0.08, y: 0.18, z: 0.02 },
   sword: { x: 0.1, y: 0.45, z: 0.03 },
   staff: { x: 0.05, y: 0.9, z: 0.05 },
@@ -191,7 +194,7 @@ const DROP_FRICTION = 0.5;
 
 export class WeaponDrops {
   private readonly world: PhysicsWorld;
-  private readonly drops: Map<number, { body: RAPIER.RigidBody; collider: RAPIER.Collider; cls: 'knife' | 'sword' | 'staff' }> = new Map();
+  private readonly drops: Map<number, { body: RAPIER.RigidBody; collider: RAPIER.Collider; cls: WeaponDropClass }> = new Map();
   private nextId = 1;
 
   constructor(world: PhysicsWorld) {
@@ -200,7 +203,7 @@ export class WeaponDrops {
 
   /** Spawn a weapon drop at `pos` with optional initial `vel`. */
   spawnDrop(
-    weaponClass: 'knife' | 'sword' | 'staff',
+    weaponClass: WeaponDropClass,
     pos: { x: number; y: number; z: number },
     vel?: { x: number; y: number; z: number },
   ): number {
@@ -244,6 +247,55 @@ export class WeaponDrops {
     const drop = this.drops.get(best.id)!;
     const t = drop.body.translation();
     return { weaponClass: drop.cls, pos: { x: t.x, y: t.y, z: t.z } };
+  }
+
+  /**
+   * Allocation-free nearest drop probe for per-step game loops: writes the
+   * hit into `out` and returns true, or returns false (out untouched)
+   * when nothing lies within `maxM`. (`nearest` is the convenience twin.)
+   */
+  nearestInto(
+    pos: { x: number; y: number; z: number },
+    maxM: number,
+    out: { id: number; weaponClass: WeaponDropClass; pos: { x: number; y: number; z: number } },
+  ): boolean {
+    let bestId = 0;
+    let bestD2 = maxM * maxM;
+    let bx = 0;
+    let by = 0;
+    let bz = 0;
+    for (const [id, drop] of this.drops) {
+      const t = drop.body.translation();
+      const dx = t.x - pos.x;
+      const dy = t.y - pos.y;
+      const dz = t.z - pos.z;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 <= bestD2) {
+        bestD2 = d2;
+        bestId = id;
+        bx = t.x;
+        by = t.y;
+        bz = t.z;
+      }
+    }
+    if (bestId === 0) return false;
+    out.id = bestId;
+    out.weaponClass = this.drops.get(bestId)!.cls;
+    out.pos.x = bx;
+    out.pos.y = by;
+    out.pos.z = bz;
+    return true;
+  }
+
+  /**
+   * Iterate live drops (id, class, body position) without building an
+   * array — the pickup visuals sync through this each frame. The position
+   * object is Rapier's own translation vector: read it, don't keep it.
+   */
+  forEachDrop(fn: (id: number, weaponClass: WeaponDropClass, pos: { x: number; y: number; z: number }) => void): void {
+    for (const [id, drop] of this.drops) {
+      fn(id, drop.cls, drop.body.translation());
+    }
   }
 
   /** Remove a drop by the handle returned from `spawnDrop`. */

@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { FixedLoop } from './core/loop';
 import { Timescale } from './core/timescale';
-import { InputManager } from './core/input';
 import { ChaseCamera } from './render/camera';
 import { createScene } from './render/scene';
 import { DebugStats } from './render/debugStats';
-import { FxParticles, HEAVY_LAND_MIN_FALL_MPS } from './render/fx';
+import { FxParticles, HEAVY_LAND_MIN_FALL_MPS, WindParticles, PickupVisuals } from './render/fx';
+import { addBoulders, addBushes, addGrassTufts, type SwayField } from './render/scene';
 import { SPECIES } from './data/species';
 import { buildRig, type Rig } from './actors/skeleton';
 import { ClipPlayer } from './actors/clips';
@@ -14,9 +14,20 @@ import { FighterSim, type FighterSimWorld, type HitEvent } from './combat/stateM
 import { isSpecialMove } from './combat/bodymoves';
 import { applyHit } from './combat/hitdetect';
 import { ScoreLedger } from './combat/scoring';
-import { HITSTOP_MS, KO_SLOWMO_SCALE, KO_SLOWMO_MS } from './data/tuning';
+import { CONTEXT_CROUCH_PICKUP_MS, HITSTOP_MS, KO_SLOWMO_SCALE, KO_SLOWMO_MS, WORLD_RNG_SEED, PICKUP_REACH_M, RUN_STANCE_SPEED } from './data/tuning';
+import { WEAPONS } from './data/weapons';
 import { heightAt } from './world/terrain';
 import { PhysicsWorld } from './world/physics';
+import { WindSystem } from './world/wind';
+import { InputManager, type InputFrame } from './core/input';
+import { BushField, type SpawnPoint } from './world/bushes';
+import { BOULDER_WALLS, nearestWall, type WallProbe } from './world/walls';
+import { WeaponDrops, type WeaponDropClass } from './world/projectiles';
+import { spawnPickups } from './world/pickups';
+import { emitHearing, type HearingEvent } from './ai/perception';
+import { Brain, type BrainSenses, type BrainWorld } from './ai/brain';
+import { DIFFICULTY } from './ai/difficulty';
+import { mulberry32 } from './core/rng';
 import { spawnRagdoll, type RagdollHandle } from './actors/ragdoll';
 
 /**
@@ -91,6 +102,59 @@ export class Game {
   // Track previous KO state to fire slow-mo + ragdoll once per transition.
   private dummyWasKO = false;
 
+  // --- [Task 17] Arena dressing + senses ---------------------------------
+  /** Slow random-walk wind — drives drift particles, sway, and AI scent. */
+  private readonly wind: WindSystem;
+  /** Sight-blocking, rustle-emitting bush scatter. */
+  readonly bushField: BushField;
+  /** The dummy's brain — hears rustles through senses.heard. */
+  private readonly brain: Brain;
+  /** Weapon drops (physics-backed, created in start() after Rapier init). */
+  private drops: WeaponDrops | null = null;
+
+  /** Per-step rustle buffer — reused, read by the brain's senses. */
+  private readonly heardEvents: HearingEvent[] = [];
+  /** Reused sense/world frames the brain reads (no per-step allocation). */
+  private readonly senses: BrainSenses;
+  private readonly brainWorld: BrainWorld;
+
+  // Per-fighter nearest-wall probes [Task 14-P1 hard carry]. Persistent
+  // objects mutated in place by nearestWall, swapped into world.wall per
+  // consumer phase — zero per-step allocation.
+  private readonly wallPlayer: WallProbe = { proximityM: Infinity, awayX: 1, awayZ: 0 };
+  private readonly wallDummy: WallProbe = { proximityM: Infinity, awayX: 1, awayZ: 0 };
+  /** Last-step positions for the fighters' rustle segments. */
+  private readonly prevPlayerPos = { x: 0, z: 0 };
+  private readonly prevDummyPos = { x: 0, z: -3 };
+  /** Scratch for the per-step nearest-drop probe. */
+  private readonly dropProbe: {
+    id: number;
+    weaponClass: WeaponDropClass;
+    pos: { x: number; y: number; z: number };
+  } = { id: 0, weaponClass: 'knife', pos: { x: 0, y: 0, z: 0 } };
+  /** The player's previous phase moveId — pickup consumption is once per dispatch. */
+  private lastPlayerMoveId: string | undefined = undefined;
+  /** Sneak-hold tracking for the synthetic context-crouch press (see playerInput). */
+  private crouchHoldMs = 0;
+  private crouchContextArmed = true;
+  /** Reused synthetic frame — no per-step allocation. */
+  private readonly synthFrame: InputFrame = {
+    moveX: 0,
+    moveZ: 0,
+    lookDX: 0,
+    lookDY: 0,
+    pressed: { attack: false, jump: false, crouch: false },
+    held: { attack: false, jump: false, crouch: false },
+  };
+
+  // Dressing animation handles + visual clock (scaled time — hitstop
+  // freezes the sway too).
+  private readonly bushSway: SwayField;
+  private readonly grassSway: SwayField;
+  private readonly windFx: WindParticles;
+  private readonly pickupFx: PickupVisuals;
+  private visualTimeSec = 0;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
 
@@ -98,8 +162,25 @@ export class Game {
     this.sceneBundle = createScene(canvas);
     this.camera3d = new THREE.PerspectiveCamera(60, 1, 0.1, 300);
     this.chaseCam = new ChaseCamera(this.camera3d);
+    // --- [Task 17] Arena dressing (seeded — same layout every run) ---
+    this.wind = new WindSystem(mulberry32(WORLD_RNG_SEED));
+    const spawns: SpawnPoint[] = [
+      { x: 0, z: 0 }, // player spawn
+      { x: 0, z: -3 }, // dummy spawn
+    ];
+    this.bushField = new BushField(mulberry32(WORLD_RNG_SEED + 1), spawns);
+    addBoulders(this.sceneBundle.scene);
+    this.bushSway = addBushes(this.sceneBundle.scene, this.bushField.bushes, mulberry32(WORLD_RNG_SEED + 3));
+    this.grassSway = addGrassTufts(this.sceneBundle.scene, mulberry32(WORLD_RNG_SEED + 4));
+    this.windFx = new WindParticles(this.sceneBundle.scene);
+    this.pickupFx = new PickupVisuals(this.sceneBundle.scene);
+
     this.debug = import.meta.env.DEV
-      ? new DebugStats(document.getElementById('app')!, () => this.playerSim.scoreTotal)
+      ? new DebugStats(
+          document.getElementById('app')!,
+          () => this.playerSim.scoreTotal,
+          () => this.debugInfo(),
+        )
       : null;
 
     // [Task 14] Combat particles live in the render scene; the sim never
@@ -123,7 +204,7 @@ export class Game {
     // cannon/ninja/nice-aim) lands here; F3 shows the running total.
     this.playerSim.setScoreLedger(new ScoreLedger());
 
-    // --- Dummy (wolf) — static, null input ---
+    // --- Dummy (wolf) — brain-driven [Task 17] ---
     const dummyRig = buildRig(SPECIES.wolf);
     this.dummyRig = dummyRig;
     this.sceneBundle.scene.add(dummyRig.root);
@@ -133,6 +214,17 @@ export class Game {
     // Place dummy 3 m in front of player (player faces -Z at heading 0).
     this.dummySim.state.pos.z = -3;
     this.dummySim.state.heading = Math.PI; // face +Z toward player
+
+    // [Task 17] The wolf's brain: rustles/noises reach it through
+    // senses.heard; bushes block its sight. Its RNG stream is offset from
+    // the scatter streams so consumers stay independent.
+    this.brain = new Brain(this.dummySim, DIFFICULTY.normal, mulberry32(WORLD_RNG_SEED + 2));
+    this.senses = { heard: this.heardEvents, wind: this.wind, scent: null };
+    this.brainWorld = {
+      enemies: [this.playerSim.state],
+      allies: [],
+      bushes: this.bushField.bushes,
+    };
 
     // Shared world snapshot (mutated in-place each step — no allocation).
     this.world = {
@@ -170,6 +262,11 @@ export class Game {
   async start(_mode: 'sandbox' = 'sandbox'): Promise<void> {
     if (this.running) return;
     this.physics = await PhysicsWorld.create(heightAt);
+    // [Task 17] Boulder colliders from the same layout the scene meshes
+    // render, then the fixed pickup loadout near the player spawn.
+    for (const box of BOULDER_WALLS) this.physics.addBox(box.center, box.halfExtents);
+    this.drops = new WeaponDrops(this.physics);
+    spawnPickups(this.drops);
     this.running = true;
     this.lastMs = performance.now();
     this.tick();
@@ -183,12 +280,12 @@ export class Game {
       window.removeEventListener('resize', this.resizeHandler);
       this.resizeHandler = null;
     }
-    if (this.clickHandler) {
-      this.canvas.removeEventListener('click', this.clickHandler);
-      this.clickHandler = null;
-    }
     this.input.detach();
     this.fx.dispose();
+    this.windFx.dispose();
+    this.pickupFx.dispose();
+    this.bushSway.dispose();
+    this.grassSway.dispose();
     this.sceneBundle.renderer.dispose();
     this.sceneBundle.scene.clear();
   }
@@ -224,6 +321,16 @@ export class Game {
     // [Task 14] Combat particles tick with the same scaled time.
     this.fx.update(realDtMs * scale);
 
+    // [Task 17] Arena dressing animation: bushes/grass lean along the
+    // wind, drift particles ride it, pickups bob. Runs on the scaled
+    // clock so hitstop freezes the sway too.
+    this.visualTimeSec += dtSec;
+    const windVec = this.wind.vector;
+    this.bushSway.update(this.visualTimeSec, windVec);
+    this.grassSway.update(this.visualTimeSec, windVec);
+    this.windFx.update(realDtMs * scale, windVec, this.playerSim.state.pos);
+    if (this.drops !== null) this.pickupFx.update(this.visualTimeSec, this.drops);
+
     // Render: copy sim → controller → rig (read-only), scaled by timescale
     // so hitstop freezes animation and slow-mo slows it.
     this.updateRender(realDtMs * scale);
@@ -240,17 +347,55 @@ export class Game {
     const playerVy = this.playerSim.state.velY;
     const dummyVy = this.dummySim.state.velY;
 
-    // Player: use sampled input; dummy: null (stands still).
-    this.playerSim.update(dtMs, this.frame, this.world);
-    this.dummySim.update(dtMs, null, this.world);
+    // [Task 17] Wind random-walk (sim state: seeded, drives dressing + AI).
+    this.wind.update(dtMs);
+
+    // [Task 17] Bush rustles: this step checks the movement the fighters
+    // made LAST step (prevPos → pos segment), then rolls prevPos forward
+    // at the end. Events land in the reused buffer the brain reads below.
+    this.heardEvents.length = 0;
+    this.rustleFor(this.playerSim.state, this.prevPlayerPos, dtMs);
+    this.rustleFor(this.dummySim.state, this.prevDummyPos, dtMs);
+
+    // [Task 14-P1 hard carry] Populate the shared snapshot's wall probe
+    // per consumer: each sim, and each attacker's hit application, must
+    // read ITS OWN nearest-wall — the probe is swapped in before every
+    // phase that can read it. Zero-alloc: persistent probe objects whose
+    // fields nearestWall mutates in place.
+    this.world.wall = this.probeWall(this.playerSim.state.pos, this.wallPlayer);
+    this.playerSim.update(dtMs, this.playerInput(dtMs), this.world);
+
+    // [Task 17] Dummy input comes from its brain (hears the rustle
+    // buffer; investigates). Emitted screams are drained — the player has
+    // no hearing consumer yet (Task 18 owns multi-AI hearing).
+    this.brain.drainEvents();
+    const aiFrame = this.brain.update(dtMs, this.senses, this.brainWorld);
+    this.world.wall = this.probeWall(this.dummySim.state.pos, this.wallDummy);
+    this.dummySim.update(dtMs, aiFrame, this.world);
 
     // Collect + apply hits (player → dummy) using pre-allocated arrays.
+    // world.wall points at the ATTACKER's probe here — applySpecialStrike
+    // reads it lazily (wallKick gate + away-direction launch).
+    this.world.wall = this.probeWall(this.playerSim.state.pos, this.wallPlayer);
     const pHits = this.playerSim.collectHits(this.playerVictims);
     for (const hit of pHits) this.landHit(hit, this.playerSim);
 
-    // Collect + apply hits (dummy → player — usually empty for a null-input dummy).
+    this.world.wall = this.probeWall(this.dummySim.state.pos, this.wallDummy);
     const dHits = this.dummySim.collectHits(this.dummyVictims);
     for (const hit of dHits) this.landHit(hit, this.dummySim);
+
+    // [Task 17] Crouch-pickup bridge: the nearest-drop probe drives
+    // weaponOnGroundNearby (resolver's pickupOrContext row) and consumes
+    // the drop into the player's hand when the move dispatches.
+    this.updatePlayerPickup();
+
+    // Roll prev positions forward for the next step's rustle segment.
+    const pp = this.playerSim.state.pos;
+    this.prevPlayerPos.x = pp.x;
+    this.prevPlayerPos.z = pp.z;
+    const dp = this.dummySim.state.pos;
+    this.prevDummyPos.x = dp.x;
+    this.prevDummyPos.z = dp.z;
 
     // [Task 14] Heavy land: downward velocity just eaten by the ground —
     // knockdown arcs and KO pops kick up a dust ring at the impact point.
@@ -277,6 +422,117 @@ export class Game {
       }
     }
   }
+  /**
+   * One fighter's bush-rustle check. The gait (loud run vs quiet ease) is
+   * derived from actual displacement — any fast crossing counts, including
+   * a fighter riding a knockback launch through a canopy.
+   */
+  private rustleFor(state: FighterSim['state'], prev: { x: number; z: number }, dtMs: number): void {
+    const speed = Math.hypot(state.pos.x - prev.x, state.pos.z - prev.z) / (dtMs / 1000);
+    const event = this.bushField.rustleCheck(state.pos, prev, speed > RUN_STANCE_SPEED);
+    if (event !== null) emitHearing(this.heardEvents, event);
+  }
+
+  /**
+   * Nearest-wall probe into a persistent scratch object, shaped for the
+   * world snapshot: returns the probe, or undefined in the open field.
+   */
+  private probeWall(pos: { x: number; z: number }, out: WallProbe): WallProbe | undefined {
+    return nearestWall(pos, BOULDER_WALLS, out) ? out : undefined;
+  }
+
+  /**
+   * Player-side pickup logic [Task 17, per weaponsLogic's split]: the
+   * per-step nearest-drop probe feeds weaponOnGroundNearby; when the
+   * resolver's pickupOrContext move dispatches, the probed drop is removed
+   * from the world and re-armed in the fighter's hand from WEAPONS.
+   */
+  private updatePlayerPickup(): void {
+    if (this.drops === null) return;
+    const s = this.playerSim.state;
+    const found = this.drops.nearestInto(s.pos, PICKUP_REACH_M, this.dropProbe);
+    this.world.weaponOnGroundNearby = found;
+
+    // Consume exactly once per pickupOrContext dispatch (the move enters
+    // recovery for 250 ms — without the edge detect the bent-over commit
+    // would vacuum every drop in reach one per step).
+    const moveId = s.phase.moveId;
+    const dispatched = moveId === 'pickupOrContext' && this.lastPlayerMoveId !== 'pickupOrContext';
+    this.lastPlayerMoveId = moveId;
+    if (!found || !dispatched) return;
+
+    this.drops.remove(this.dropProbe.id);
+    const def = WEAPONS[this.dropProbe.weaponClass];
+    s.weapon = def.id;
+    s.durability = def.durability;
+  }
+
+  /**
+   * Assemble the player's input frame for this step.
+   *
+   * [Task 17] Sneak-hold pickup: the resolver's context branch (crouched +
+   * press edge → pickupOrContext) can never fire from raw DOM input — a
+   * crouch press edge always arrives while still standing (the crouched
+   * stance only exists while the key is HELD, and holding produces no new
+   * edges). So when the player has sneak-held crouch next to a ground
+   * weapon for CONTEXT_CROUCH_PICKUP_MS (past the reverse-press window —
+   * a hold never reads as a reversal), the game layer injects exactly one
+   * synthetic crouch press. The sim cannot tell it from a real keypress —
+   * that is the game layer's input-assembly contract. Rearmed when the
+   * key is released, so each hold picks up at most one drop.
+   */
+  private playerInput(dtMs: number): InputFrame {
+    const f = this.frame;
+    if (!f.held.crouch) {
+      this.crouchHoldMs = 0;
+      this.crouchContextArmed = true;
+      return f;
+    }
+    this.crouchHoldMs += dtMs;
+    if (
+      !this.crouchContextArmed ||
+      this.crouchHoldMs < CONTEXT_CROUCH_PICKUP_MS ||
+      !this.playerSim.isCrouching ||
+      !this.world.weaponOnGroundNearby ||
+      f.pressed.crouch
+    ) {
+      return f;
+    }
+    const s = this.synthFrame;
+    s.moveX = f.moveX;
+    s.moveZ = f.moveZ;
+    s.lookDX = f.lookDX;
+    s.lookDY = f.lookDY;
+    s.pressed.attack = f.pressed.attack;
+    s.pressed.jump = f.pressed.jump;
+    s.pressed.crouch = true;
+    s.held.attack = f.held.attack;
+    s.held.jump = f.held.jump;
+    s.held.crouch = true;
+    this.crouchContextArmed = false;
+    return s;
+  }
+  /** F3 dev lines: wind, wall probe, brain state, last-heard marker. */
+  private debugInfo(): string {
+    const w = this.wind.vector;
+    const deg = ((Math.atan2(w.z, w.x) * 180) / Math.PI + 360) % 360;
+    // The persistent player probe (the shared world.wall swaps per phase —
+    // reading it here would show the dummy's values half the time).
+    const wall = this.wallPlayer;
+    const heard = this.brain.lastHeard;
+    const wallLine =
+      wall !== undefined
+        ? `${wall.proximityM.toFixed(2)}m away(${wall.awayX.toFixed(2)}, ${wall.awayZ.toFixed(2)})`
+        : 'open';
+    const heardLine = heard !== null ? ` heard(${heard.x.toFixed(1)}, ${heard.z.toFixed(1)})` : '';
+    return [
+      `wind: ${deg.toFixed(0)}deg str ${this.wind.strength.toFixed(2)} vec(${w.x.toFixed(2)}, ${w.z.toFixed(2)})`,
+      `wall(player): ${wallLine}`,
+      `ai: ${this.brain.state}${heardLine}`,
+      `bushes: ${this.bushField.bushes.length}  pickups(on ground): ${this.world.weaponOnGroundNearby ? 'yes' : 'no'}`,
+    ].join('\n');
+  }
+
 
   /**
    * Apply one collected hit [Task 14 routing]: specials flow through the
@@ -379,6 +635,11 @@ export class Game {
     /** Shared sim world — dev tools can probe wall/dummy state for verification. */
     world: FighterSimWorld;
     fx: FxParticles;
+    /** [Task 17] verification handles: wind, bush layout, wolf brain, drops. */
+    wind: WindSystem;
+    bushField: BushField;
+    brain: Brain;
+    drops: WeaponDrops | null;
   } {
     return {
       chaseCam: this.chaseCam,
@@ -388,6 +649,10 @@ export class Game {
       ragdolls: this.ragdolls,
       world: this.world,
       fx: this.fx,
+      wind: this.wind,
+      bushField: this.bushField,
+      brain: this.brain,
+      drops: this.drops,
     };
   }
 }

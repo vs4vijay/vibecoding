@@ -6,13 +6,16 @@ export class DebugStats {
   private readonly el: HTMLDivElement;
   /** Live score provider (Task 14) — shown when present. */
   private readonly scoreFn: (() => number) | null;
+  /** Extra dev lines (wind, wall probe, lastHeard) — shown when present. */
+  private readonly infoFn: (() => string) | null;
   private visible = false;
   private frames = 0;
   private msLeft = 0;
   private fps = 0;
 
-  constructor(parent: HTMLElement, scoreFn?: () => number) {
+  constructor(parent: HTMLElement, scoreFn?: () => number, infoFn?: () => string) {
     this.scoreFn = scoreFn ?? null;
+    this.infoFn = infoFn ?? null;
     this.el = document.createElement('div');
     this.el.id = 'debug-stats';
     this.el.textContent = '';
@@ -60,7 +63,9 @@ export class DebugStats {
       this.frames = 0;
       this.msLeft = 500;
       this.el.textContent =
-        this.scoreFn !== null ? `fps: ${this.fps}\nscore: ${this.scoreFn()}` : `fps: ${this.fps}`;
+        `fps: ${this.fps}` +
+        (this.scoreFn !== null ? `\nscore: ${this.scoreFn()}` : '') +
+        (this.infoFn !== null ? `\n${this.infoFn()}` : '');
     }
   }
 }

@@ -124,6 +124,8 @@ export class Brain {
   private memory: Memory | null = null;
   // Flee scream fires exactly once per flee episode.
   private screamed = false;
+  /** Position of the most recently HEARD sound (debug overlay marker). */
+  private lastHeardPos: { x: number; z: number } | null = null;
   // Waypoint wander state.
   private waypoint: { x: number; z: number } | null = null;
   private wanderPauseMs = 0;
@@ -149,11 +151,28 @@ export class Brain {
     return this.aistate;
   }
 
+  /** Position of the last sound this brain actually heard, or null. */
+  get lastHeard(): { x: number; z: number } | null {
+    return this.lastHeardPos;
+  }
+
   /** Any hearing events this brain has emitted since the last drain. */
   collectEvents(): HearingEvent[] {
     const drained = this.events.slice();
     this.events.length = 0;
     return drained;
+  }
+
+  /**
+   * Drop any emitted events without allocating a drained copy — the
+   * game-loop path calls this every step purely so the internal buffer
+   * cannot grow unbounded. (`collectEvents` is the content-returning twin
+   * used by tests.)
+   */
+  drainEvents(): number {
+    const n = this.events.length;
+    this.events.length = 0;
+    return n;
   }
 
   /** Advance the brain one fixed step and produce its InputFrame. */
@@ -179,6 +198,7 @@ export class Brain {
     const listener = { pos: solar.pos, species: solar.species };
     for (const e of senses.heard) {
       if (hear(listener, e)) {
+        this.lastHeardPos = { x: e.pos.x, z: e.pos.z };
         this.memory = { pos: { x: e.pos.x, z: e.pos.z }, t: this.simMs };
       }
     }

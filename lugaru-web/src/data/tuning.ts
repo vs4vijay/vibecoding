@@ -301,3 +301,44 @@ export const AI_WAYPOINT_REACHED_M = 0.5;
  * sends the brain investigating this far upwind of its position.
  */
 export const AI_SCENT_PROBE_M = 4;
+
+
+
+// ---------------------------------------------------------------------------
+// Arena dressing [Task 17] — bushes, boulder walls, pickups.
+// ---------------------------------------------------------------------------
+
+/**
+ * Seed for every arena-scatter RNG stream (bushes, grass, brain). Derive
+ * per-consumer streams by offsetting this (seed, seed+1, …) so adding a
+ * consumer never reshuffles the existing ones.
+ */
+export const WORLD_RNG_SEED = 20260823;
+/** Bush count in the arena scatter [brief Task 17: ~40]. */
+export const BUSH_COUNT = 40;
+/**
+ * Rustle trigger radius (m) [brief Task 17: 0.8]. Sight blocking uses the
+ * larger BUSH_RADIUS_M; the rustle circle sits inside the visible canopy.
+ */
+export const BUSH_RUSTLE_RADIUS_M = 0.8;
+/** Min clearance (m) between a bush and every fighter spawn [brief: 3]. */
+export const BUSH_MIN_SPAWN_CLEARANCE_M = 3;
+/** Min spacing (m) between two bushes so the scatter never clumps. */
+export const BUSH_MIN_SPACING_M = 1.5;
+/** Keep-off-edge margin (m) applied to the arena bounds when scattering. */
+export const BUSH_SCATTER_MARGIN_M = 4;
+/** Loudness of a bush crossed WITHOUT running (crouch-walk) [brief: 0.15]. */
+export const BUSH_RUSTLE_CROUCH_LOUDNESS = 0.15;
+/**
+ * A boulder only counts as a wall-kick wall when it stands at least this
+ * tall [brief Task 17: ≥1.6m].
+ */
+export const WALL_KICK_MIN_HEIGHT_M = 1.6;
+/** Crouch-pickup reach (m): a drop within this of a crouching fighter reads weaponOnGroundNearby. */
+export const PICKUP_REACH_M = 1.5;
+/**
+ * Sneak-hold duration (ms) after which the game layer injects the crouch
+ * context press that resolves pickupOrContext. Past REVERSE_PRESS_WINDOW_MS
+ * so a hold can never read as a reverse attempt, and once per hold episode.
+ */
+export const CONTEXT_CROUCH_PICKUP_MS = 250;
