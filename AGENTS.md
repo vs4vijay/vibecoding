@@ -2,6 +2,7 @@
 
 - make use of `bun` instead of `npm`
 - make use of `uv` instread of `python`
+- web games in this repo follow [docs/GAMES.md](docs/GAMES.md) — stack conventions, test/verification expectations, and the shared GitHub Pages deploy workflow (add new games there; never create a second Pages workflow)
 
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands

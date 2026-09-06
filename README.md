@@ -304,6 +304,26 @@ Core workflow:
 
 ---
 
+## Games
+
+Browser games built in this repo, deployed together to GitHub Pages via a
+single combined workflow (`.github/workflows/games-pages-deploy.yml`).
+
+| Game | Play | Source | Stack |
+|---|---|---|---|
+| **Undead Highway** | [vs4vijay.github.io/vibecoding/zombie-highway](https://vs4vijay.github.io/vibecoding/zombie-highway/) | [`zombie-highway/`](./zombie-highway) | TypeScript, Vite, three.js |
+| **Tank Racer** | [vs4vijay.github.io/vibecoding/tank-racer](https://vs4vijay.github.io/vibecoding/tank-racer/) | [`tank-racer/`](./tank-racer) | TypeScript, Vite, three.js |
+
+In development: [`dave-dangerous/`](./dave-dangerous),
+[`lugaru-web/`](./lugaru-web), [`subway-surfers/`](./subway-surfers),
+[`cs-clone/`](./cs-clone), [`lf2-web/`](./lf2-web).
+
+Building a new game? Follow the playbook: [docs/GAMES.md](./docs/GAMES.md) —
+scaffolding conventions, test/verification expectations, the deployment
+workflow (and why there is exactly one), and the new-game checklist.
+
+---
+
 ## Projects
 
 ### [WealthIQ](./wealthiq)
