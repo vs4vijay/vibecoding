@@ -12,6 +12,7 @@ import { initUI, toggleLeaderboard, escapeHtml } from './ui.js';
 import { createPredictor } from './prediction.js';
 import { applyLocalInput, extractLocalState, SIMULATION_DT, type LocalSimState } from './movement.js';
 import { createAudio } from './audio.js';
+import { createTicker } from './timestep.js';
 
 // ─── Globals ──────────────────────────────────────────────
 let scene: THREE.Scene;
@@ -73,6 +74,24 @@ function makePredictor() {
 }
 let predictor = makePredictor();
 let predictedForPlayerId: string | null = null;
+
+// Fixed-timestep input. The local prediction and the server both advance
+// exactly SIMULATION_DT per input, so inputs must be emitted once per
+// SIMULATION_DT of accumulated play time — emitting one per rAF frame made
+// movement speed and input rate scale with the display refresh rate.
+function stepLocalInput(): void {
+  input.seq++;
+  const inputState: InputState = {
+    ...input,
+    yaw: localPlayer.rotation?.x || 0,
+    pitch: localPlayer.rotation?.y || 0,
+    seq: input.seq,
+    timestamp: Date.now(),
+  };
+  predictor.pushLocalInput(input.seq, inputState);
+  sendInput(inputState);
+}
+const inputTicker = createTicker(stepLocalInput, SIMULATION_DT * 1000);
 
 // Procedural sound effects. The AudioContext is created lazily on the first
 // user gesture (unlock below) per browser autoplay policy.
@@ -730,20 +749,18 @@ function updateScoreboard(): void {
 function renderLoop(): void {
   requestAnimationFrame(renderLoop);
 
-  const dt = Math.min(clock.getDelta(), 0.05);
+  // Read the frame delta once (Clock.getDelta() advances its internal timer);
+  // per-frame visuals keep their own 50 ms clamp via `dt`.
+  const frameDeltaMs = clock.getDelta() * 1000;
+  const dt = Math.min(frameDeltaMs / 1000, 0.05);
 
-  // Send input to server and predict its effect locally
+  // Fixed-timestep input: accumulate real elapsed time and emit one input per
+  // SIMULATION_DT (bounded catch-up; huge deltas clamped for tab-background
+  // returns). When input is inactive, reset so returning never bursts.
   if (isPointerLocked && getPlayerId() && !localPlayer.isDead) {
-    input.seq++;
-    const inputState: InputState = {
-      ...input,
-      yaw: localPlayer.rotation?.x || 0,
-      pitch: localPlayer.rotation?.y || 0,
-      seq: input.seq,
-      timestamp: Date.now(),
-    };
-    predictor.pushLocalInput(input.seq, inputState);
-    sendInput(inputState);
+    inputTicker.advance(frameDeltaMs);
+  } else {
+    inputTicker.reset();
   }
 
   // Local view follows the predicted state; server corrections are eased

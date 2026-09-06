@@ -181,7 +181,6 @@ Use Drizzle ORM in `packages/server/src/db/` with the schema from `schema.ts`.
 
 ## Known Issues & TODO
 
-- [ ] Fixed-timestep input accumulator (movement speed currently scales with display refresh rate)
 - [ ] Better player models (skins, animations)
 - [ ] More maps
 - [ ] Matchmaking system
