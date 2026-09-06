@@ -16,7 +16,7 @@ without breaking the others.
 | Dave Dangerous | <https://vs4vijay.github.io/vibecoding/dave-dangerous/> | [`dave-dangerous/`](../dave-dangerous) | TS strict · Vite 5 | vitest |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
-status): [`subway-surfers/`](../subway-surfers), [`cs-clone/`](../cs-clone),
+status): [`subway-surfers/`](../subway-surfers), [`dustline/`](../dustline),
 [`lf2-web/`](../lf2-web).
 
 Each game folder is self-contained: its own `package.json` + lockfile, its own
