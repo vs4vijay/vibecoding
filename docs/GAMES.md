@@ -10,9 +10,9 @@ without breaking the others.
 
 | Game | Play URL | Source | Stack | Tests |
 |---|---|---|---|---|
-| Undead Highway | <https://vs4vijay.github.io/vibecoding/zombie-highway/> | [`zombie-highway/`](../zombie-highway) | TS strict · Vite 8 · three.js | vitest (node env) |
+| Undead Driver | <https://vs4vijay.github.io/vibecoding/undead-driver/> | [`undead-driver/`](../undead-driver) | TypeScript, Vite, three.js | vitest (node env) |
 | Tank Racer | <https://vs4vijay.github.io/vibecoding/tank-racer/> | [`tank-racer/`](../tank-racer) | TS strict · Vite 8 · three.js | bun test (pure logic) |
-| Lugaru Combat Prototype | <https://vs4vijay.github.io/vibecoding/lugaru-web/> | [`lugaru-web/`](../lugaru-web) | TS strict · Vite · three.js · Rapier | vitest |
+| Lugaru Combat | <https://vs4vijay.github.io/vibecoding/lugaru-combat/> | [`lugaru-combat/`](../lugaru-combat) | TypeScript, Vite, three.js, Rapier | vitest |
 | Dave Dangerous | <https://vs4vijay.github.io/vibecoding/dave-dangerous/> | [`dave-dangerous/`](../dave-dangerous) | TS strict · Vite 5 | vitest |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
@@ -51,7 +51,7 @@ plan).
 
 | Option | How | Used by |
 |---|---|---|
-| Relative base (recommended) | `vite.config.ts`: `base: "./"` — emits `./assets/...`, works under any subpath, no env needed | zombie-highway |
+| Relative base (recommended) | `vite.config.ts`: `base: "./"` — emits `./assets/...`, works under any subpath, no env needed | undead-driver |
 | `BASE_PATH` env | `vite.config.ts` reads `process.env.BASE_PATH`; CI sets `BASE_PATH=/vibecoding/<slug>/` | tank-racer |
 
 Relative base is simpler; prefer it unless the game needs absolute URLs
@@ -107,12 +107,12 @@ Relative base is simpler; prefer it unless the game needs absolute URLs
 - **three.js bundle size:** split it into its own vendor chunk (Vite 8 is
   rolldown-based — use `build.rolldownOptions.output.codeSplitting`, not the
   deprecated `manualChunks`) and raise `chunkSizeWarningLimit` to just above
-  the vendor chunk size. See `zombie-highway/vite.config.ts`.
+  the vendor chunk size. See `undead-driver/vite.config.ts`.
 - **Favicon 404:** the browser always requests it. Use an inline SVG data-URI
   `<link rel="icon">` — no asset files, no console errors.
 - **HUD/menus layering:** keep toasts/coach/menus on separate DOM roots from
   the HUD so hiding one can't hide the others; check z-index layering on the
-  game-over card (see zombie-highway history).
+  game-over card (see undead-driver history).
 - **Determinism:** seed RNGs per run (not per page load), or every run plays
   the same level. Obstacle/spawn cadence fixed in *distance* makes crash
   points quasi-deterministic even with random patterns — don't mistake that

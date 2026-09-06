@@ -313,9 +313,9 @@ single combined workflow (`.github/workflows/games-pages-deploy.yml`).
 
 | Game | Play | Source | Stack |
 |---|---|---|---|
-| **Undead Highway** | [vs4vijay.github.io/vibecoding/zombie-highway](https://vs4vijay.github.io/vibecoding/zombie-highway/) | [`zombie-highway/`](./zombie-highway) | TypeScript, Vite, three.js |
+| **Undead Driver** | [vs4vijay.github.io/vibecoding/undead-driver](https://vs4vijay.github.io/vibecoding/undead-driver/) | [`undead-driver/`](./undead-driver) | TypeScript, Vite, three.js |
 | **Tank Racer** | [vs4vijay.github.io/vibecoding/tank-racer](https://vs4vijay.github.io/vibecoding/tank-racer/) | [`tank-racer/`](./tank-racer) | TypeScript, Vite, three.js |
-| **Lugaru Combat Prototype** | [vs4vijay.github.io/vibecoding/lugaru-web](https://vs4vijay.github.io/vibecoding/lugaru-web/) | [`lugaru-web/`](./lugaru-web) | TypeScript, Vite, three.js, Rapier |
+| **Lugaru Combat** | [vs4vijay.github.io/vibecoding/lugaru-combat](https://vs4vijay.github.io/vibecoding/lugaru-combat/) | [`lugaru-combat/`](./lugaru-combat) | TypeScript, Vite, three.js, Rapier |
 | **Dave Dangerous** | [vs4vijay.github.io/vibecoding/dave-dangerous](https://vs4vijay.github.io/vibecoding/dave-dangerous/) | [`dave-dangerous/`](./dave-dangerous) | TypeScript, Vite 5 |
 
 In development: [`dave-dangerous/`](./dave-dangerous), [`subway-surfers/`](./subway-surfers), [`cs-clone/`](./cs-clone), [`lf2-web/`](./lf2-web).
