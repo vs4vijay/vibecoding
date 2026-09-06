@@ -1,6 +1,7 @@
 import type { ClientMessage, ServerMessage, Team } from '@dustline/shared';
+import { WEAPONS } from '@dustline/shared';
 import type { ServerGameState } from '../game/types.js';
-import { createGameState, addPlayer, removePlayer, queueInput, tick, onMatchEnd, onBulletHit } from '../game/engine.js';
+import { createGameState, addPlayer, removePlayer, queueInput, tick, onMatchEnd, onMatchStart, onBulletHit } from '../game/engine.js';
 import { toPlayerState } from '../game/player.js';
 import { applyRttSample } from '../game/rtt.js';
 import { persistMatchEnd, persistDisconnectStats } from '../db/repository.js';
@@ -26,12 +27,45 @@ onMatchEnd((state, winner) => {
   void persistMatchEnd(state, winner);
 });
 
-// Hit confirmations: when a player's bullet lands, tell the SHOOTER so their
-// client can flash the hit marker (client network.ts 'hit' case → audio
+// Match lifecycle notifications: broadcast so every client can update its
+// HUD/timer state (client network.ts onMatchStart/onMatchEnd consumers).
+onMatchStart((state) => {
+  broadcast({ type: 'matchStart', matchId: state.match.id });
+});
+
+onMatchEnd((state, winner) => {
+  broadcast({
+    type: 'matchEnd',
+    tScore: state.match.tScore,
+    ctScore: state.match.ctScore,
+    winner,
+  });
+});
+
+// Bullet-hit notifications: when a player's bullet lands, tell the SHOOTER so
+// their client can flash the hit marker (client network.ts 'hit' case → audio
 // hitMarker()). Fired after damage is applied, so healthLeft is the victim's
 // post-hit health (0 on a kill). The victim's socket gets nothing here.
-onBulletHit(({ shooter, victim, damage }) => {
+//
+// On a lethal hit the kill/death flow rides the same event: `kill` is
+// broadcast to every client (the shared message has no target field — each
+// client's kill feed resolves usernames from its snapshot), and `death` goes
+// to the victim's socket only. A killing shot therefore produces hit + kill
+// (+ death on the victim) alongside each other.
+onBulletHit(({ bullet, shooter, victim, damage, headshot, killed }) => {
   sendToPlayer(shooter.id, { type: 'hit', damage, healthLeft: victim.health, shooterId: shooter.id });
+
+  if (killed) {
+    const weaponName = WEAPONS[bullet.weaponId]?.name ?? bullet.weaponId;
+    broadcast({
+      type: 'kill',
+      killerId: shooter.id,
+      victimId: victim.id,
+      weaponName,
+      headshot,
+    });
+    sendToPlayer(victim.id, { type: 'death', killerId: shooter.id, weaponName });
+  }
 });
 
 function startGameLoop(): void {

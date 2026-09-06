@@ -107,3 +107,48 @@ describe('client hit confirmation', () => {
     }
   });
 });
+
+describe('client kill/death/match dispatch', () => {
+  it('dispatches kill, death, matchStart and matchEnd to their callbacks', async () => {
+    const realLog = console.log;
+    console.log = () => {}; // silence network.ts connection logs
+    try {
+      const network = await import('./network.js');
+      const kills: { killerId: string; victimId: string; weapon: string }[] = [];
+      const deaths: { killerId: string; weapon: string }[] = [];
+      const starts: string[] = [];
+      const ends: { tScore: number; ctScore: number; winner: string }[] = [];
+      network.setCallbacks2({
+        onSnapshot: () => {},
+        onPlayerJoined: () => {},
+        onPlayerLeft: () => {},
+        onKill: (killerId, victimId, weapon) => kills.push({ killerId, victimId, weapon }),
+        onDeath: (killerId, weapon) => deaths.push({ killerId, weapon }),
+        onMatchStart: matchId => starts.push(matchId),
+        onMatchEnd: (tScore, ctScore, winner) => ends.push({ tScore, ctScore, winner }),
+        onError: () => {},
+        onHit: () => {},
+      });
+
+      const connected = network.connect('Tester', 'T');
+      const ws = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!;
+      ws.onopen?.();
+      ws.receive({ type: 'joined', playerId: 'p_1' });
+      await connected;
+
+      ws.receive({ type: 'kill', killerId: 'p_1', victimId: 'p_2', weaponName: 'AK-47', headshot: false });
+      ws.receive({ type: 'death', killerId: 'p_1', weaponName: 'AK-47' });
+      ws.receive({ type: 'matchStart', matchId: 'm-1' });
+      ws.receive({ type: 'matchEnd', tScore: 3, ctScore: 5, winner: 'CT' });
+
+      expect(kills).toEqual([{ killerId: 'p_1', victimId: 'p_2', weapon: 'AK-47' }]);
+      expect(deaths).toEqual([{ killerId: 'p_1', weapon: 'AK-47' }]);
+      expect(starts).toEqual(['m-1']);
+      expect(ends).toEqual([{ tScore: 3, ctScore: 5, winner: 'CT' }]);
+
+      network.disconnect();
+    } finally {
+      console.log = realLog;
+    }
+  });
+});

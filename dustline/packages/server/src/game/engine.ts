@@ -35,6 +35,26 @@ export function onMatchEnd(listener: MatchEndListener): void {
   matchEndListeners.push(listener);
 }
 
+/** Called when a match transitions from warmup to 'live'. */
+export type MatchStartListener = (state: ServerGameState) => void;
+
+const matchStartListeners: MatchStartListener[] = [];
+
+/** Register a listener fired when a match starts. Listener errors are contained. */
+export function onMatchStart(listener: MatchStartListener): void {
+  matchStartListeners.push(listener);
+}
+
+function emitMatchStart(state: ServerGameState): void {
+  for (const listener of matchStartListeners) {
+    try {
+      listener(state);
+    } catch (err) {
+      console.error('match-start listener failed:', err);
+    }
+  }
+}
+
 /** Payload for bullet-hit listeners (see onBulletHit). */
 export interface BulletHitEvent {
   bullet: ServerBullet;
@@ -239,7 +259,7 @@ function startMatch(state: ServerGameState): void {
   state.match.status = 'live';
   state.match.timeRemaining = MATCH_DURATION_MS;
   state.match.startTime = Date.now();
-  
+
   // Reset all players
   for (const player of state.players.values()) {
     respawnPlayer(player);
@@ -253,6 +273,10 @@ function startMatch(state: ServerGameState): void {
       damageDealt: 0,
     };
   }
+
+  // Notify listeners (match-start notifications). Errors are contained per
+  // listener so they can never break the tick loop.
+  emitMatchStart(state);
 }
 
 export function endMatch(state: ServerGameState, winner: Team): void {

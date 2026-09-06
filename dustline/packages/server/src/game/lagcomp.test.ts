@@ -344,4 +344,38 @@ describe('bullet-hit notifications (engine)', () => {
       expect(events.length).toBe(0);
     });
   });
+
+  it('marks killed=true on the killing shot event, with the victim at 0 hp', () => {
+    withZeroSpread(() => {
+      const state = createGameState();
+      const shooter = addPlayer(state, 'shooter', 'T');
+      const target = addPlayer(state, 'target', 'CT');
+
+      shooter.position = { x: -20, y: 0.9, z: -25 };
+      target.position = { x: -15, y: 0.9, z: -25 };
+
+      const events: BulletHitEvent[] = [];
+      const off = onBulletHit(e => events.push(e));
+      try {
+        tick(state);
+        // One lethal shot: drop the victim low with no armor first.
+        target.armor = 0;
+        target.health = 10;
+        queueInput(state, shooter.id, makeInput({
+          seq: 1,
+          fire: true,
+          yaw: Math.PI / 2,
+          pitch: -0.334,
+        }));
+        tick(state);
+      } finally {
+        off();
+      }
+
+      expect(target.isDead).toBe(true);
+      expect(events.length).toBe(1);
+      expect(events[0]!.killed).toBe(true);
+      expect(events[0]!.victim.health).toBe(0);
+    });
+  });
 });
