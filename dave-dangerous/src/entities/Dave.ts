@@ -37,7 +37,6 @@ export class Dave implements Entity {
     // jetpack
     const jetting = input.jetpack && this.jetpackFuel > 0;
     if (jetting) {
-      this.vel.y += (input.jump ? -1 : 1) * 0; // direction handled below by up thrust
       this.vel.y += PHYSICS.JETPACK_THRUST;
       this.jetpackFuel = Math.max(0, this.jetpackFuel - PHYSICS.JETPACK_FUEL_PER_FRAME);
       this.grounded = false;
@@ -79,6 +78,7 @@ export class Dave implements Entity {
       this.vel.x = 0;
     }
     // Y axis
+    this.grounded = false;
     this.pos.y += this.vel.y;
     hb = this.hitbox;
     hit = map.solidCollides(hb);
@@ -86,11 +86,6 @@ export class Dave implements Entity {
       if (this.vel.y > 0) { this.pos.y = Math.floor((hb.y + hb.h) / PHYSICS.TILE) * PHYSICS.TILE - PHYSICS.HITBOX.y - PHYSICS.HITBOX.h - 0.01; this.grounded = true; }
       else if (this.vel.y < 0) { this.pos.y = (Math.floor(hb.y / PHYSICS.TILE) + 1) * PHYSICS.TILE - PHYSICS.HITBOX.y + 0.01; }
       this.vel.y = 0;
-    }
-
-    // illusory: fall through if moving down (only when not standing)
-    if (!this.grounded && this.vel.y > 0 && map.isIllusoryAt(hb.x + hb.w / 2, hb.y + hb.h + 1)) {
-      // do nothing: illusory is not solid (solidCollides skips it)
     }
   }
 
