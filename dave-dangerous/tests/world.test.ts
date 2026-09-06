@@ -92,4 +92,24 @@ describe("World", () => {
     expect(deaths).toBe(1);
     expect(w.enemies[1]!.dead).toBe(false); // guard skips the second enemy entirely
   });
+  it("spawns dave standing on LEVEL_1 floor; horizontal input traverses both ways", () => {
+    clearAll();
+    const st = new GameState();
+    const w = new World(LEVEL_1, st);
+    const rng = new RNG(1);
+    for (let i = 0; i < 30; i++) w.update(idle, rng);
+    expect(w.dave.pos.y).toBeCloseTo(159.99, 2); // bottom resting on floor top (y=192)
+    expect(w.dave.grounded).toBe(true);
+    const x0 = w.dave.pos.x; // 48
+    const left = { ...idle, left: true };
+    for (let i = 0; i < 60; i++) {
+      w.update(left, rng);
+      expect(w.dave.pos.x).toBeLessThanOrEqual(x0); // left input never pushes dave right
+    }
+    expect(w.dave.pos.x).toBeLessThan(x0); // traverses left
+    const w2 = new World(LEVEL_1, new GameState());
+    const right = { ...idle, right: true };
+    for (let i = 0; i < 60; i++) w2.update(right, new RNG(1));
+    expect(w2.dave.pos.x).toBeGreaterThan(x0); // traverses right
+  });
 });
