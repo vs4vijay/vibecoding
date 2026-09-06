@@ -7,10 +7,10 @@
 #
   # Layout on Pages:
   #   /                   <- games-hub/ landing page (static, no build)
-  #   /tank-racer/       <- tank-racer/dist      (built with BASE_PATH)
-  #   /zombie-highway/   <- zombie-highway/dist  (vite base "./", subpath-safe)
-  #   /lugaru-web/       <- lugaru-web/dist      (vite base "./", subpath-safe)
-  #   /dave-dangerous/   <- dave-dangerous/dist  (vite base "./", subpath-safe)
+  #   /tank-racer/        <- tank-racer/dist      (built with BASE_PATH)
+  #   /undead-driver/     <- undead-driver/dist  (vite base "./", subpath-safe)
+  #   /lugaru-combat/     <- lugaru-combat/dist  (vite base "./", subpath-safe)
+  #   /dave-dangerous/    <- dave-dangerous/dist  (vite base "./", subpath-safe)
 
 name: Deploy Games to Pages
 
@@ -19,8 +19,8 @@ on:
     branches: [main]
     paths:
       - "tank-racer/**"
-      - "zombie-highway/**"
-      - "lugaru-web/**"
+      - "undead-driver/**"
+      - "lugaru-combat/**"
       - "dave-dangerous/**"
       - "games-hub/**"
       - ".github/workflows/games-pages-deploy.yml"
@@ -57,17 +57,17 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
-      - name: Build zombie-highway
-        working-directory: zombie-highway
+      - name: Build undead-driver
+        working-directory: undead-driver
         # vite.config.ts sets base "./" so the build works under any subpath
-        # (/vibecoding/zombie-highway/) with no BASE_PATH env needed.
+        # (/vibecoding/undead-driver/) with no BASE_PATH env needed.
         run: |
           bun install --frozen-lockfile
           bun run build
-      - name: Build lugaru-web
-        working-directory: lugaru-web
+      - name: Build lugaru-combat
+        working-directory: lugaru-combat
         # vite.config.ts sets base "./" so the build works under any subpath
-        # (/vibecoding/lugaru-web/) with no BASE_PATH env needed.
+        # (/vibecoding/lugaru-combat/) with no BASE_PATH env needed.
         run: |
           bun install --frozen-lockfile
           bun run build
@@ -85,8 +85,8 @@ jobs:
           mkdir -p site
           cp -r games-hub/. site/
           cp -r tank-racer/dist site/tank-racer
-          cp -r zombie-highway/dist site/zombie-highway
-          cp -r lugaru-web/dist site/lugaru-web
+          cp -r undead-driver/dist site/undead-driver
+          cp -r lugaru-combat/dist site/lugaru-combat
           cp -r dave-dangerous/dist site/dave-dangerous
 
       - name: Upload Pages artifact
