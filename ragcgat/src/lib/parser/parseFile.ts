@@ -137,7 +137,7 @@ export function buildMessage(groups: RegExpExecArray, pattern: TimestampPattern,
 }
 
 export function buildChat(messages: Message[], headerLineCount: number, totalLineCount: number): Chat {
-	const participants = [...new Set(messages.map((m) => m.sender).filter(Boolean))];
+	const participants = [...new Set(messages.map((m) => m.sender).filter((s) => Boolean(s) && s !== 'system'))];
 	return {
 		messages,
 		participants,

@@ -1,4 +1,4 @@
-# AGENTS.md — Undead Highway (`zombie-highway/`)
+# AGENTS.md — Undead Highway (`undead-driver/`)
 
 Endless zombie-driving arcade web game (homage to *Zombie Highway*, 2010). Vite + TypeScript (strict) + three.js. Zero image/audio assets — all visuals are three.js primitives, all audio WebAudio synthesis. Design spec + implementation history live in `.plan.md`.
 

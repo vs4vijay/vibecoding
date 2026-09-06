@@ -109,6 +109,21 @@ describe('parseString', () => {
 		const r2 = parseString(input);
 		expect(r1.messages[0].dedupHash).toBe(r2.messages[0].dedupHash);
 	});
+
+	it('keeps ordinary prose with system keywords as text with the real sender (CR-01)', () => {
+		const result = parseString('[2024/07/09, 08:01:49] Alice: I left my keys at home');
+		expect(result.messages).toHaveLength(1);
+		expect(result.messages[0].type).toBe('text');
+		expect(result.messages[0].sender).toBe('Alice');
+	});
+
+	it('excludes the system sentinel from participants (WR-01)', () => {
+		const result = parseString(
+			'3/15/24, 2:30 PM - Messages and calls are end-to-end encrypted.\n3/15/24, 2:31 PM - Alice: Hello',
+		);
+		expect(result.participants).toEqual(['Alice']);
+		expect(result.participants).not.toContain('system');
+	});
 });
 
 it('parses ISO AM/PM bracketed format', () => {

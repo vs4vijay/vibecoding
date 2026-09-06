@@ -1,6 +1,6 @@
-# AGENTS.md — Lugaru Combat Prototype (`lugaru-web/`)
+# AGENTS.md — Lugaru Combat Prototype (`lugaru-combat/`)
 
-Third-person arena combat browser remake of *Lugaru's* core loop (3D rabbit combat — three context-sensitive buttons, timing-based reversals, simulated senses, ragdoll physics). Bun + Vite + TypeScript (strict) + three.js + Rapier (cosmetic dynamics only). Design spec lives in `docs/superpowers/specs/2026-08-22-lugaru-web-design.md`; task plan in `docs/superpowers/plans/2026-08-23-lugaru-web-combat-prototype.md`.
+Third-person arena combat browser remake of *Lugaru's* core loop (3D rabbit combat — three context-sensitive buttons, timing-based reversals, simulated senses, ragdoll physics). Bun + Vite + TypeScript (strict) + three.js + Rapier (cosmetic dynamics only). Design spec lives in `docs/superpowers/specs/2026-08-22-lugaru-combat-design.md`; task plan in `docs/superpowers/plans/2026-08-23-lugaru-combat-combat-prototype.md`.
 
 ## Commands
 

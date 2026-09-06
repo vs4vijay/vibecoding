@@ -76,6 +76,46 @@ describe('classifyMessage', () => {
 		const result = classifyMessage('Just a normal message', 'Alice', 'Just a normal message');
 		expect(result.type).toBe('text');
 	});
+
+	it('returns text for prose containing "left" (CR-01)', () => {
+		const result = classifyMessage('I left my keys at home', 'Alice', 'I left my keys at home');
+		expect(result.type).toBe('text');
+	});
+
+	it('returns text for prose containing "added" (CR-01)', () => {
+		const result = classifyMessage('I added sugar to the coffee', 'Alice', 'I added sugar to the coffee');
+		expect(result.type).toBe('text');
+	});
+
+	it('returns text for prose containing "removed" (CR-01)', () => {
+		const result = classifyMessage('I removed him from the list', 'Alice', 'I removed him from the list');
+		expect(result.type).toBe('text');
+	});
+
+	it('returns text for prose mentioning the IMG- prefix (WR-03)', () => {
+		const result = classifyMessage('The IMG- tag is used for figures', 'Alice', 'The IMG- tag is used for figures');
+		expect(result.type).toBe('text');
+	});
+
+	it('returns text for prose mentioning a bare .gif extension (IN-01)', () => {
+		const result = classifyMessage('Check out this .gif url', 'Alice', 'Check out this .gif url');
+		expect(result.type).toBe('text');
+	});
+
+	it('returns deleted for "You deleted this message" (WR-04)', () => {
+		const result = classifyMessage('You deleted this message', 'Alice', 'You deleted this message');
+		expect(result.type).toBe('deleted');
+	});
+
+	it('still returns system for canonical invite-link join events', () => {
+		const result = classifyMessage('Bob joined using invite link', 'Bob', 'Bob joined using invite link');
+		expect(result.type).toBe('system');
+	});
+
+	it('still returns system for canonical "left the group" notices', () => {
+		const result = classifyMessage('Alice left', 'Alice', 'Alice left');
+		expect(result.type).toBe('system');
+	});
 });
 
 describe('getClassificationLabel', () => {

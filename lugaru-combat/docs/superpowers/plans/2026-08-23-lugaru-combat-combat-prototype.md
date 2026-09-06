@@ -8,7 +8,7 @@
 
 **Tech Stack:** Bun, Vite 7, TypeScript 5 strict, three ^0.180, @dimforge/rapier3d-compat, vitest 3.
 
-**Spec:** `docs/superpowers/specs/2026-08-22-lugaru-web-design.md` — implementers MUST read the spec; this plan argues from it. Section references below ([spec §N]) point there.
+**Spec:** `docs/superpowers/specs/2026-08-22-lugaru-combat-design.md` — implementers MUST read the spec; this plan argues from it. Section references below ([spec §N]) point there.
 
 ## Global Constraints
 
@@ -27,7 +27,7 @@
 ## File Structure
 
 ```
-lugaru-web/
+lugaru-combat/
 ├── package.json  tsconfig.json  vite.config.ts  index.html  .gitignore  README.md
 ├── src/
 │   ├── main.ts                  # boot, error overlay wiring, coarse-pointer guard
@@ -61,7 +61,7 @@ lugaru-web/
 `package.json`:
 ```json
 {
-  "name": "lugaru-web",
+  "name": "lugaru-combat",
   "private": true,
   "type": "module",
   "scripts": {
@@ -129,7 +129,7 @@ describe('scaffold', () => {
 
 - [ ] **Step 5: Verify page boots** — `bun run dev`; playwright-cli: open `http://localhost:5173`, assert no `#error-screen` visible, canvas present. Kill server.
 
-- [ ] **Step 6: Commit** — `rtk git add -A && rtk git commit -m "chore: scaffold lugaru-web (vite+ts+three+rapier)"`
+- [ ] **Step 6: Commit** — `rtk git add -A && rtk git commit -m "chore: scaffold lugaru-combat (vite+ts+three+rapier)"`
 
 ---
 
