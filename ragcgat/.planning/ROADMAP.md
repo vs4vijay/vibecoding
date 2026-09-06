@@ -118,9 +118,18 @@ Plans:
   4. Virtual scrolling keeps rendered DOM nodes under ~200 regardless of total message count (supports 100K+ message chats)
   5. Dark mode respects system `prefers-color-scheme` by default with manual toggle
 
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 **Notes**: Builds reactive chat query layer on Dexie `liveQuery()`. Media rendering is deferred — placeholders only in v1.
+
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Tracer Slice: v3 lastMessageAt migration, liveQuery queries, sidebar, capped bubble view with placeholders, dark mode shell (tracer-first, Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-02-PLAN.md — Virtualization & Polish: paged windowing with 200-node budget, scroll anchoring, date dividers, sender colors, empty states (Wave 2)
 
 ---
 
