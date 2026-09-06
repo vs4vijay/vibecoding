@@ -23,9 +23,13 @@ export class Coach {
     root.append(this.wrap);
   }
 
+  /**
+   * Progress (steer/shot seen) deliberately survives hide()/show() within
+   * a page session — a player killed mid-learning is not re-taught from
+   * scratch on retry. Flags only clear on a fresh page load; once the
+   * caller persists zh.coachSeen, show() is never invoked again.
+   */
   show(): void {
-    this.steered = false;
-    this.shot = false;
     this.wrap.classList.remove("hidden");
   }
 
@@ -43,7 +47,7 @@ export class Coach {
     this.refresh();
   }
 
-  /** True once both dismissal conditions have fired since show(). */
+  /** True once both dismissal conditions have fired this page session. */
   get done(): boolean {
     return this.steered && this.shot;
   }

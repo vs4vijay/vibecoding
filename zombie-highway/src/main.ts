@@ -50,7 +50,6 @@ export function boot(): void {
   let bestScore = load("bestScore", 0);
   let bestDist = load("bestDist", 0);
   let runs = load("runs", 0);
-  const coachWanted = coachPending();
   let coachActive = false;
 
   // --- audio unlock: any first gesture on the page -------------------------
@@ -98,6 +97,14 @@ export function boot(): void {
       save("bestDist", bestDist);
     }
     if (newBestScore) hud.toast("NEW BEST!");
+    // The coach must never overlap the game-over card. If both taught
+    // actions landed in this same sim step, persist before clearing —
+    // the tick check below won't run once coachActive is false.
+    if (coachActive) {
+      if (coach.done) markCoachSeen();
+      coachActive = false;
+      coach.hide();
+    }
     menus.showGameOver(stats, newBestScore);
     hud.hide();
   });
@@ -110,7 +117,10 @@ export function boot(): void {
     hud.show();
     rig.resetDeathCam();
     session.startRun();
-    if (coachWanted) {
+    // Re-read the persisted flag on EVERY PLAY/RETRY — never a boot-time
+    // snapshot, or a completion saved earlier in this page session would
+    // resurrect the coach on later runs.
+    if (coachPending()) {
       coachActive = true;
       coach.show();
     }
@@ -176,9 +186,12 @@ export function boot(): void {
     rig.tick(dt);
     renderer.render(scene, camera);
 
-    // Coach dismissal: persist once both taught actions happened.
+    // Coach dismissal: persist once both taught actions happened. The
+    // explicit hide() is defensive — progress latches across retries, so
+    // a show() racing a completion must never leave the overlay on screen.
     if (coachActive && coach.done) {
       coachActive = false;
+      coach.hide();
       markCoachSeen();
     }
 
