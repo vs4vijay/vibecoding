@@ -45,10 +45,11 @@ export class GameState {
     this.oneUpsEarned = 0;
   }
   snapshot(): SaveData {
-    return { lives: this.lives, score: this.score, level: this.level, hasGun: this.hasGun, jetpackFuel: this.jetpackFuel };
+    return { lives: this.lives, score: this.score, level: this.level, hasGun: this.hasGun, jetpackFuel: this.jetpackFuel, oneUpsEarned: this.oneUpsEarned };
   }
   restore(s: SaveData): void {
     this.lives = s.lives; this.score = s.score; this.level = s.level;
     this.hasGun = s.hasGun; this.jetpackFuel = s.jetpackFuel;
+    this.oneUpsEarned = s.oneUpsEarned;
   }
 }

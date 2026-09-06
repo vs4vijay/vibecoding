@@ -11,6 +11,7 @@ import { AudioEngine } from "./audio/AudioEngine";
 import { RNG } from "./core/RNG";
 import { LEVEL_1, LEVELS, BONUS_ROOMS } from "./levels/levels";
 import { on } from "./core/Events";
+import type { LevelData } from "./core/types";
 
 export const GAME_FLOW = ["playing", "gameover"] as const;
 export type GameFlow = (typeof GAME_FLOW)[number];
@@ -27,6 +28,7 @@ export class Game {
   private input = new Input();
   private state: GameState;
   private world: World | null = null;
+  private currentLevel: LevelData = LEVEL_1;
   private loop: GameLoop;
   private flow: GameFlow = GAME_FLOW_KEYS.playing;
   private rng: RNG;
@@ -69,11 +71,11 @@ export class Game {
   }
 
   private startLevel(levelId: number): void {
-    const level = (this.inBonus ? BONUS_ROOMS : LEVELS)[levelId] ?? LEVEL_1;
+    this.currentLevel = (this.inBonus ? BONUS_ROOMS : LEVELS)[levelId] ?? LEVEL_1;
     this.world?.destroy();
     this.state.level = levelId;
     this.state.currentScreen = 0;
-    this.world = new World(level, this.state);
+    this.world = new World(this.currentLevel, this.state);
     this.world.spawnEnemies(this.rng);
     // Carried T18 pointer: push restored/carried gear INTO dave before the first
     // World.update — its backfill (state.jetpackFuel = dave.jetpackFuel) would
@@ -142,9 +144,9 @@ export class Game {
       this.flow = GAME_FLOW_KEYS.gameover;
       return;
     }
-    // respawn at screen start; resurrecting mid-emit is the expected shape
-    // (World's contact loop guards on dave.alive per iteration)
-    this.world.dave.pos = { x: 3 * 16, y: 11 * 16 };
+    // respawn on the floor top at the level's dave spawn; resurrecting mid-emit
+    // is the expected shape (World's contact loop guards on dave.alive per iteration)
+    this.world.dave.pos = respawnPos(this.currentLevel);
     this.world.dave.vel = { x: 0, y: 0 };
     this.world.dave.grounded = false;
     this.world.dave.alive = true;
@@ -169,6 +171,14 @@ export class Game {
     on("oneup:pickup", () => this.audio.playSfx("oneup"));
     on("level:complete", () => this.audio.playSfx("warp"));
   }
+}
+
+/** Dave respawn point: the level's dave EntitySpawn in pixels — same source of
+ *  truth as the initial spawn, so respawns always land standing on the floor top. */
+export function respawnPos(level: LevelData): { x: number; y: number } {
+  const spawn = level.screens[level.startScreen]!.entities.find(e => e.type === "dave");
+  if (!spawn) throw new Error("level missing dave");
+  return { x: spawn.x * 16, y: spawn.y * 16 };
 }
 
 function itemSpriteName(type: string): string {

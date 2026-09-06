@@ -5,6 +5,7 @@ export interface SaveData {
   level: number;
   hasGun: boolean;
   jetpackFuel: number;
+  oneUpsEarned: number;
 }
 
 export class SaveState {
