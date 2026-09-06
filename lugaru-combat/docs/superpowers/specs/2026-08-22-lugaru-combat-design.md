@@ -27,7 +27,7 @@ Decisions locked with user:
 
 ## 2. Architecture
 
-New project at `lugaru-web/`. Vite + TypeScript strict mode, bun as package
+New project at `lugaru-combat/`. Vite + TypeScript strict mode, bun as package
 manager. No server component; everything client-side. localStorage for scores.
 
 ```

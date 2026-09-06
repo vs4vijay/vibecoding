@@ -6,8 +6,8 @@ Five phases delivering a local-first WhatsApp chat archive: build a format-toler
 
 ## Phases
 
-- [ ] **Phase 1: Parser Library** - Build format-tolerant WhatsApp export parser with type definitions
-- [ ] **Phase 2: Storage Layer** - IndexedDB schema, repositories, and batch persistence
+- [x] **Phase 1: Parser Library** - Build format-tolerant WhatsApp export parser with type definitions
+- [x] **Phase 2: Storage Layer** - IndexedDB schema, repositories, and batch persistence
 - [ ] **Phase 3: Import Feature** - Drag-drop import with Web Worker parsing and preview-before-commit
 - [ ] **Phase 4: Chat Browsing** - Conversation sidebar, chat-style bubble UI, and virtual scrolling
 - [ ] **Phase 5: Full-Text Search** - Keyword search across and within conversations with result navigation
@@ -34,15 +34,15 @@ Five phases delivering a local-first WhatsApp chat archive: build a format-toler
 Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Core Parser Skeleton: project scaffold, type definitions, iOS/Android parse, normalization, classification, dedup hash, 40K cap (tracer-first, Wave 1)
+- [x] 01-01-PLAN.md — Core Parser Skeleton: project scaffold, type definitions, iOS/Android parse, normalization, classification, dedup hash, 40K cap (tracer-first, Wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Full Coverage & Benchmark: 14+ pattern families, CJK/fullwidth normalization, 24-fixture benchmark integration (Wave 2)
+- [x] 01-02-PLAN.md — Full Coverage & Benchmark: 14+ pattern families, CJK/fullwidth normalization, 24-fixture benchmark integration (Wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion — gap closure for VERIFICATION gaps_found)*
 
-- [ ] 01-03-PLAN.md — Classification Hardening & Participants Fix: word-boundary system matching (CR-01), filename-shape media anchoring (WR-03/IN-01), deleted variant (WR-04), participants excludes 'system' (WR-01) (Wave 3)
+- [x] 01-03-PLAN.md — Classification Hardening & Participants Fix: word-boundary system matching (CR-01), filename-shape media anchoring (WR-03/IN-01), deleted variant (WR-04), participants excludes 'system' (WR-01) (Wave 3)
 
 ---
 
@@ -60,8 +60,17 @@ Plans:
   4. `navigator.storage.persist()` is requested on first data write for storage durability
   5. Database versioning and migration path exist for future schema changes
 
-**Plans**: TBD
+**Plans**: 2 plans
 **Notes**: Pure infrastructure — no UI. Dexie.js schema defined here is used by all downstream phases.
+
+Plans:
+**Wave 1**
+
+- [x] 02-01-PLAN.md — Tracer Slice: Dexie install (human-verified), schema with compound + multiEntry + unique indexes, tokenizer, persistence helper, round-trip tracer test
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 02-02-PLAN.md — Repositories & Migration: chunked dedup-before-write bulk import, keyset pagination, keyword search, importChatText entry point, versioned migration + upgrade test
 
 ---
 
@@ -136,8 +145,8 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Parser Library | 0/3 | Planning complete | - |
-| 2. Storage Layer | 0/0 | Not started | - |
+| 1. Parser Library | 3/3 | Complete | 2026-09-06 |
+| 2. Storage Layer | 2/2 | Complete | 2026-09-06 |
 | 3. Import Feature | 0/0 | Not started | - |
 | 4. Chat Browsing | 0/0 | Not started | - |
 | 5. Full-Text Search | 0/0 | Not started | - |

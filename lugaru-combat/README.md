@@ -94,9 +94,9 @@ Principles:
 ### Reference documents
 
 - Design spec (binding authority):
-  `docs/superpowers/specs/2026-08-22-lugaru-web-design.md`
+  `docs/superpowers/specs/2026-08-22-lugaru-combat-design.md`
 - Implementation plan (task breakdown + interfaces):
-  `docs/superpowers/plans/2026-08-23-lugaru-web-combat-prototype.md`
+  `docs/superpowers/plans/2026-08-23-lugaru-combat-combat-prototype.md`
 
 ## Tuning pass notes (Task 20)
 

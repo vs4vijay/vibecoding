@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "undead-highway",
+      "name": "undead-driver",
       "dependencies": {
         "three": "^0.185.1",
       },
