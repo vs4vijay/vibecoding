@@ -43,4 +43,17 @@ describe("Input", () => {
     release(input, "KeyA");
     expect(input.read().left).toBe(false);
   });
+  it("detach removes the listeners it attached", () => {
+    const added: Array<[string, unknown]> = [];
+    const removed: Array<[string, unknown]> = [];
+    const fakeTarget = {
+      addEventListener(type: string, listener: unknown) { added.push([type, listener]); },
+      removeEventListener(type: string, listener: unknown) { removed.push([type, listener]); },
+    } as unknown as Window;
+    const input = new Input();
+    input.attach(fakeTarget);
+    expect(added.map(([type]) => type)).toEqual(["keydown", "keyup"]);
+    input.detach();
+    expect(removed).toEqual(added);
+  });
 });

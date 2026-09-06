@@ -16,6 +16,7 @@ export class Input {
   private frames: InputBuffer = { left: 0, right: 0, jump: 0, jetpack: 0, fire: 0 };
   private fireQueued = false;
   private attached = false;
+  private target: Window | null = null;
   private onKeyDown = (e: KeyEventLike) => {
     const action = KEY_ACTIONS[e.code];
     if (action) {
@@ -35,11 +36,15 @@ export class Input {
   attach(target: Window): void {
     if (this.attached) return;
     this.attached = true;
+    this.target = target;
     target.addEventListener("keydown", this.onKeyDown);
     target.addEventListener("keyup", this.onKeyUp);
   }
   detach(): void {
-    if (!this.attached) return;
+    if (!this.attached || !this.target) return;
+    this.target.removeEventListener("keydown", this.onKeyDown);
+    this.target.removeEventListener("keyup", this.onKeyUp);
+    this.target = null;
     this.attached = false;
     this.held.clear();
     this.frames = { left: 0, right: 0, jump: 0, jetpack: 0, fire: 0 };
