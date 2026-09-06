@@ -28,7 +28,7 @@ Five phases delivering a local-first WhatsApp chat archive: build a format-toler
   4. Parser detects the 40K message export cap and surfaces a warning
   5. Parser passes the chattopdf 24-fixture benchmark covering 14+ date format families
 
-**Plans**: 2 plans
+**Plans**: 3 plans
 **Notes**: Pure library — no UI, no storage, no Worker. Testable from terminal. The 24-fixture benchmark is the coverage target.
 
 Plans:
@@ -39,6 +39,10 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [ ] 01-02-PLAN.md — Full Coverage & Benchmark: 14+ pattern families, CJK/fullwidth normalization, 24-fixture benchmark integration (Wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion — gap closure for VERIFICATION gaps_found)*
+
+- [ ] 01-03-PLAN.md — Classification Hardening & Participants Fix: word-boundary system matching (CR-01), filename-shape media anchoring (WR-03/IN-01), deleted variant (WR-04), participants excludes 'system' (WR-01) (Wave 3)
 
 ---
 
@@ -132,7 +136,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Parser Library | 0/2 | Planning complete | - |
+| 1. Parser Library | 0/3 | Planning complete | - |
 | 2. Storage Layer | 0/0 | Not started | - |
 | 3. Import Feature | 0/0 | Not started | - |
 | 4. Chat Browsing | 0/0 | Not started | - |
