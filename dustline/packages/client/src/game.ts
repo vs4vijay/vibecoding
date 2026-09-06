@@ -8,7 +8,7 @@ import {
   createDefaultWeaponState,
 } from '@dustline/shared';
 import { connect, sendInput, sendRespawn, getPlayerId, setCallbacks2 } from './network.js';
-import { initUI, toggleLeaderboard } from './ui.js';
+import { initUI, toggleLeaderboard, escapeHtml } from './ui.js';
 import { createPredictor } from './prediction.js';
 import { applyLocalInput, extractLocalState, SIMULATION_DT, type LocalSimState } from './movement.js';
 import { createAudio } from './audio.js';
@@ -709,9 +709,11 @@ function updateScoreboard(): void {
 
   players.sort((a, b) => b.score - a.score);
 
+  // escapeHtml: usernames are user-controlled — interpolating them raw into
+  // innerHTML would let any client run script in every other client's page.
   tbody.innerHTML = players.map(p => `
     <tr>
-      <td style="color: ${p.team === 'T' ? '#f39c12' : '#3498db'}">${p.name}</td>
+      <td style="color: ${p.team === 'T' ? '#f39c12' : '#3498db'}">${escapeHtml(p.name)}</td>
       <td>${p.kills}</td>
       <td>${p.deaths}</td>
       <td>${p.score}</td>

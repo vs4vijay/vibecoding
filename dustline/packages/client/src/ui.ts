@@ -148,7 +148,11 @@ function renderLeaderboard(body: HTMLElement, entries: LeaderboardEntry[]): void
   }).join('');
 }
 
-function escapeHtml(text: string): string {
+/**
+ * Escape a string for safe interpolation into innerHTML. User-controlled
+ * values (usernames, chat) must never reach an HTML template unescaped.
+ */
+export function escapeHtml(text: string): string {
   const entities: Record<string, string> = {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   };
