@@ -21,23 +21,25 @@ export const SFX_PARAMS: Record<SfxId, SfxParams> = {
 };
 
 export class AudioEngine {
-  readonly supported: boolean;
+  private supportedFlag: boolean;
   private ctx: AudioContext | null;
   private mutedFlag = false;
 
   constructor(ctx: AudioContext | null = null) {
     this.ctx = ctx;
-    this.supported = this.ctx !== null;
+    this.supportedFlag = ctx !== null;
   }
+  get supported(): boolean { return this.supportedFlag; }
 
   ensure(): AudioContext | null {
     if (!this.ctx && typeof globalThis.AudioContext === "function") {
-      this.ctx = new globalThis.AudioContext();
-      this.supportedAs(true);
+      const ctx = new globalThis.AudioContext();
+      this.ctx = ctx;
+      this.supportedFlag = true;
+      if (ctx.state === "suspended") void ctx.resume();
     }
     return this.ctx;
   }
-  private supportedAs(v: true): void { /* noop */ }
 
   setMuted(m: boolean): void { this.mutedFlag = m; }
   get muted(): boolean { return this.mutedFlag; }
