@@ -1,0 +1,191 @@
+// src/game.ts
+import { GameLoop } from "./core/GameLoop";
+import { Input } from "./core/Input";
+import { Renderer, scaleToFit } from "./render/Renderer";
+import { HUD } from "./render/HUD";
+import { DebugOverlay } from "./render/DebugOverlay";
+import { World } from "./world/World";
+import { GameState } from "./state/GameState";
+import { SaveState } from "./state/SaveState";
+import { AudioEngine } from "./audio/AudioEngine";
+import { RNG } from "./core/RNG";
+import { LEVEL_1, LEVELS, BONUS_ROOMS } from "./levels/levels";
+import { on } from "./core/Events";
+
+export const GAME_FLOW = ["playing", "gameover"] as const;
+export type GameFlow = (typeof GAME_FLOW)[number];
+export const GAME_FLOW_KEYS: Record<GameFlow, GameFlow> = {
+  playing: "playing",
+  gameover: "gameover",
+};
+
+export class Game {
+  private renderer: Renderer;
+  private hud: HUD;
+  private debug: DebugOverlay;
+  private audio: AudioEngine;
+  private input = new Input();
+  private state: GameState;
+  private world: World | null = null;
+  private loop: GameLoop;
+  private flow: GameFlow = GAME_FLOW_KEYS.playing;
+  private rng: RNG;
+  private inBonus = false;
+
+  constructor(container: HTMLElement) {
+    const scale = scaleToFit(window.innerWidth, window.innerHeight);
+    this.renderer = new Renderer(container, scale);
+    this.hud = new HUD(this.renderer);
+    this.debug = new DebugOverlay(this.renderer);
+    this.audio = new AudioEngine(); // no ctx — lazily ensured on first playSfx
+    this.state = new GameState();
+    const saved = SaveState.load();
+    if (saved) this.state.restore(saved);
+    this.rng = new RNG(Date.now() >>> 0);
+    this.loop = new GameLoop({
+      update: dt => this.update(dt),
+      render: alpha => this.render(alpha),
+    });
+  }
+
+  start(): void {
+    this.input.attach(window);
+    this.startLevel(1);
+    on("dave:die", () => this.onDeath());
+    on("level:complete", () => this.onComplete());
+    this.wireAudio();
+    window.addEventListener("keydown", e => {
+      if (e.code === "Backquote") {
+        e.preventDefault();
+        this.debug.toggle();
+      }
+      if (e.code === "KeyR" && this.flow === GAME_FLOW_KEYS.gameover) {
+        e.preventDefault();
+        this.restart();
+      }
+    });
+    // attach exactly once and never stop(): GameLoop.stop() is dead (rafId never assigned)
+    this.loop.attach(f => requestAnimationFrame(f));
+  }
+
+  private startLevel(levelId: number): void {
+    const level = (this.inBonus ? BONUS_ROOMS : LEVELS)[levelId] ?? LEVEL_1;
+    this.world?.destroy();
+    this.state.level = levelId;
+    this.state.currentScreen = 0;
+    this.world = new World(level, this.state);
+    this.world.spawnEnemies(this.rng);
+    // Carried T18 pointer: push restored/carried gear INTO dave before the first
+    // World.update — its backfill (state.jetpackFuel = dave.jetpackFuel) would
+    // otherwise clobber a restored save's fuel/gun with a fresh Dave's 0.
+    this.world.dave.hasGun = this.state.hasGun;
+    this.world.dave.jetpackFuel = this.state.jetpackFuel;
+    this.rng = RNG.deserialize((Date.now() & 0xffffffff) >>> 0);
+    this.flow = GAME_FLOW_KEYS.playing;
+  }
+
+  private update(_dt: number): void {
+    const world = this.world;
+    if (!world) return;
+    const input = this.input.read(); // consumes the fire edge
+    jetpackHeld = input.jetpack;
+    if (this.flow === GAME_FLOW_KEYS.gameover) {
+      if (input.fire) this.restart(); // R handled by the keydown listener; fire also accepted
+      return;
+    }
+    if (input.fire) {
+      world.fire();
+      this.audio.playSfx("shoot");
+    }
+    world.update(input, this.rng);
+    this.input.tick();
+  }
+
+  private render(_alpha: number): void {
+    const r = this.renderer;
+    r.clear();
+    const world = this.world;
+    if (!world) return;
+    const map = world.map;
+    for (let ty = 0; ty < map.height; ty++) {
+      for (let tx = 0; tx < map.width; tx++) {
+        r.drawTile(map.at(tx, ty)?.id ?? 0, tx, ty);
+      }
+    }
+    for (const it of world.items) {
+      if (!it.collected) r.drawSprite(itemSpriteName(it.type), it.pos.x, it.pos.y);
+    }
+    r.drawSprite(world.door.opened ? "door_open" : "door_closed", world.door.pos.x, world.door.pos.y);
+    for (const e of world.enemies) {
+      if (!e.dead) r.drawSprite("spider", e.pos.x, e.pos.y);
+    }
+    for (const p of world.projectiles) {
+      if (!p.spent) r.drawSprite("bullet", p.pos.x, p.pos.y);
+    }
+    if (world.dave.alive) {
+      const d = world.dave;
+      const sprite = d.vel.y < 0 ? "dave_jump" : d.jetpackFuel > 0 && jetpackHeld ? "dave_jetpack" : "dave_stand";
+      r.drawSprite(sprite, d.pos.x, d.pos.y);
+    }
+    this.hud.draw(this.state);
+    this.debug.draw(world);
+    if (this.flow === GAME_FLOW_KEYS.gameover) {
+      r.drawText("GAME OVER — Press R to restart", 5, 96);
+    }
+  }
+
+  private onDeath(): void {
+    if (!this.world) return;
+    this.audio.playSfx("die");
+    const alive = this.state.loseLife();
+    if (!alive) {
+      this.flow = GAME_FLOW_KEYS.gameover;
+      return;
+    }
+    // respawn at screen start; resurrecting mid-emit is the expected shape
+    // (World's contact loop guards on dave.alive per iteration)
+    this.world.dave.pos = { x: 3 * 16, y: 11 * 16 };
+    this.world.dave.vel = { x: 0, y: 0 };
+    this.world.dave.grounded = false;
+    this.world.dave.alive = true;
+  }
+
+  private onComplete(): void {
+    SaveState.persist(this.state.snapshot());
+    this.inBonus = !this.inBonus;
+    this.startLevel(1); // table picked by inBonus: LEVELS[1] or BONUS_ROOMS[1]
+  }
+
+  private restart(): void {
+    this.state.reset(1); // lives/score are drained after game over — start fresh
+    this.inBonus = false;
+    this.startLevel(1);
+  }
+
+  private wireAudio(): void {
+    on("dave:collect", e => this.audio.playSfx(e.item === "trophy" ? "trophy" : "collect"));
+    on("gun:pickup", () => this.audio.playSfx("gun"));
+    on("jetpack:pickup", () => this.audio.playSfx("jetpack"));
+    on("oneup:pickup", () => this.audio.playSfx("oneup"));
+    on("level:complete", () => this.audio.playSfx("warp"));
+  }
+}
+
+function itemSpriteName(type: string): string {
+  switch (type) {
+    case "orb": return "orb";
+    case "blueDiamond": return "blue_diamond";
+    case "redDiamond": return "red_diamond";
+    case "ring": return "ring";
+    case "crown": return "crown";
+    case "scepter": return "scepter";
+    case "trophy": return "trophy";
+    case "gun": return "gun";
+    case "jetpack": return "jetpack";
+    case "oneUp": return "oneup";
+    default: return "orb";
+  }
+}
+
+/** mirrored from Input each update tick; render reads it for the jetpack sprite pick */
+let jetpackHeld = false;

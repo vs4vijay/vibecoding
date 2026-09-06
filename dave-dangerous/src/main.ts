@@ -1,3 +1,7 @@
-// src/main.ts — entry; wired fully in Task 20
+// src/main.ts — entry point
+import { Game } from "./game";
+
 const app = document.querySelector<HTMLDivElement>("#app");
-if (app) app.textContent = "Dangerous Dave — booting";
+if (!app) throw new Error("missing #app");
+const game = new Game(app);
+game.start();
