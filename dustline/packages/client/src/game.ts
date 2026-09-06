@@ -9,6 +9,8 @@ import {
 } from '@dustline/shared';
 import { connect, sendInput, sendRespawn, getPlayerId, setCallbacks2 } from './network.js';
 import { initUI } from './ui.js';
+import { createPredictor } from './prediction.js';
+import { applyLocalInput, extractLocalState, SIMULATION_DT, type LocalSimState } from './movement.js';
 
 // ─── Globals ──────────────────────────────────────────────
 let scene: THREE.Scene;
@@ -57,6 +59,19 @@ const input = {
   weaponSlot: null as 'primary' | 'secondary' | null,
   seq: 0,
 };
+
+// Client-side prediction for the local player. `currentEntities` is the map
+// geometry the server is simulating against (kept in sync from snapshots).
+let currentEntities: EntityState[] = DEFAULT_MAP.entities;
+
+function makePredictor() {
+  return createPredictor<LocalSimState, InputState, PlayerState>(
+    (state, inputState) => applyLocalInput(state, inputState, currentEntities, SIMULATION_DT),
+    extractLocalState,
+  );
+}
+let predictor = makePredictor();
+let predictedForPlayerId: string | null = null;
 
 // Weapon model (visible gun)
 let weaponGroup: THREE.Group;
@@ -318,14 +333,22 @@ function setupResize(): void {
 function handleSnapshot(snapshot: GameSnapshot): void {
   currentSnapshot = snapshot;
   matchState = snapshot.match;
+  currentEntities = snapshot.entities;
 
   // Update local player state from server
   const self = snapshot.players.find(p => p.id === getPlayerId());
   if (self) {
+    // Reconcile the local prediction with the authoritative state
+    if (predictedForPlayerId !== self.id) {
+      // (Re)joined: fresh predictor and per-connection seq counter
+      predictor = makePredictor();
+      predictedForPlayerId = self.id;
+      input.seq = 0;
+    }
+    predictor.onServerSnapshot(self, self.lastInputSeq ?? 0);
+
+    const wasDead = localPlayer.isDead ?? false;
     Object.assign(localPlayer, {
-      position: self.position,
-      rotation: self.rotation,
-      velocity: self.velocity,
       health: self.health,
       armor: self.armor,
       isDead: self.isDead,
@@ -334,15 +357,11 @@ function handleSnapshot(snapshot: GameSnapshot): void {
       currentWeaponSlot: self.currentWeaponSlot,
     });
 
-    // Update camera
-    camera.position.set(
-      self.position.x,
-      self.position.y + PLAYER_HEIGHT * 0.5,
-      self.position.z
-    );
-    camera.rotation.order = 'YXZ';
-    camera.rotation.x = self.rotation.x;
-    camera.rotation.y = self.rotation.y;
+    // While dead — and on the first snapshot after a respawn — no inputs are
+    // predicted, so the server owns the view angles (spawn rotation, etc.).
+    if (self.isDead || wasDead) {
+      localPlayer.rotation = { ...self.rotation };
+    }
   }
 
   // Update remote players
@@ -672,7 +691,7 @@ function renderLoop(): void {
 
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  // Send input to server
+  // Send input to server and predict its effect locally
   if (isPointerLocked && getPlayerId() && !localPlayer.isDead) {
     input.seq++;
     const inputState: InputState = {
@@ -682,7 +701,24 @@ function renderLoop(): void {
       seq: input.seq,
       timestamp: Date.now(),
     };
+    predictor.pushLocalInput(input.seq, inputState);
     sendInput(inputState);
+  }
+
+  // Local view follows the predicted state; server corrections are eased
+  // inside the predictor so reconciliation never snaps the camera.
+  const renderState = predictor.getRenderState();
+  if (renderState) {
+    localPlayer.position = renderState.position;
+    localPlayer.velocity = renderState.velocity;
+    camera.position.set(
+      renderState.position.x,
+      renderState.position.y + PLAYER_HEIGHT * 0.5,
+      renderState.position.z
+    );
+    camera.rotation.order = 'YXZ';
+    camera.rotation.x = localPlayer.rotation?.x || 0;
+    camera.rotation.y = localPlayer.rotation?.y || 0;
   }
 
   // Update minimap periodically
