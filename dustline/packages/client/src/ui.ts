@@ -79,3 +79,78 @@ export function initUI(state: HUDState): void {
     }
   }
 }
+
+// ─── Leaderboard (persistent stats, toggle with L) ───────
+export interface LeaderboardEntry {
+  username: string;
+  totalKills: number;
+  totalDeaths: number;
+  kd: number;
+  headshots: number;
+  matches: number;
+  wins: number;
+  losses: number;
+  accuracy: number;
+}
+
+let leaderboardVisible = false;
+
+export function isLeaderboardVisible(): boolean {
+  return leaderboardVisible;
+}
+
+/** Toggle the leaderboard panel; fetches fresh entries when opening. */
+export async function toggleLeaderboard(): Promise<void> {
+  const panel = document.getElementById('leaderboardPanel');
+  if (!panel) return;
+  leaderboardVisible = !leaderboardVisible;
+  panel.classList.toggle('hidden', !leaderboardVisible);
+  if (leaderboardVisible) {
+    await refreshLeaderboard();
+  }
+}
+
+async function refreshLeaderboard(): Promise<void> {
+  const body = document.getElementById('leaderboardBody');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="7" class="leaderboard-status">Loading...</td></tr>';
+  try {
+    // Same-origin fetch: in dev the vite proxy forwards /leaderboard to the
+    // game server (see vite.config.ts); in production the server serves the
+    // client build itself, so no CORS handling is needed.
+    const res = await fetch('/leaderboard?limit=20');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const entries = (await res.json()) as LeaderboardEntry[];
+    renderLeaderboard(body, entries);
+  } catch (err) {
+    // Render gracefully — never leave an unhandled rejection behind.
+    console.error('Leaderboard fetch failed:', err);
+    body.innerHTML = '<tr><td colspan="7" class="leaderboard-status">Leaderboard unavailable</td></tr>';
+  }
+}
+
+function renderLeaderboard(body: HTMLElement, entries: LeaderboardEntry[]): void {
+  if (entries.length === 0) {
+    body.innerHTML = '<tr><td colspan="7" class="leaderboard-status">No recorded players yet</td></tr>';
+    return;
+  }
+  body.innerHTML = entries.map((e, i) => {
+    const accuracyPct = Math.round(e.accuracy * 100);
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(e.username)}</td>
+      <td>${e.kd.toFixed(2)}</td>
+      <td>${e.totalKills}</td>
+      <td>${e.totalDeaths}</td>
+      <td>${accuracyPct}%</td>
+      <td>${e.wins}/${e.losses}</td>
+    </tr>`;
+  }).join('');
+}
+
+function escapeHtml(text: string): string {
+  const entities: Record<string, string> = {
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, ch => entities[ch] ?? ch);
+}

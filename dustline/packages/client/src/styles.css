@@ -231,6 +231,57 @@ canvas#minimap {
   padding: 6px 8px;
 }
 
+/* Leaderboard (L) */
+#leaderboardPanel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.85);
+  padding: 20px 24px;
+  border-radius: 8px;
+  z-index: 30;
+  min-width: 480px;
+  pointer-events: all;
+}
+
+#leaderboardPanel table {
+  width: 100%;
+  color: #fff;
+  border-collapse: collapse;
+}
+
+#leaderboardPanel th {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid #444;
+}
+
+#leaderboardPanel td {
+  padding: 5px 10px;
+}
+
+.leaderboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  color: #fff;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.leaderboard-hint {
+  color: #888;
+  font-weight: normal;
+  font-size: 12px;
+}
+
+.leaderboard-status {
+  color: #888;
+  text-align: center;
+  padding: 12px;
+}
+
 /* Login Screen */
 #loginScreen {
   position: fixed;

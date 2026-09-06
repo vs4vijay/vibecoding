@@ -41,6 +41,7 @@ export default defineConfig({
     proxy: {
       '/ws': 'ws://localhost:3000',
       '/api': 'http://localhost:3000',
+      '/leaderboard': 'http://localhost:3000',
     },
   },
 });

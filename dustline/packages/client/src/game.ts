@@ -8,7 +8,7 @@ import {
   createDefaultWeaponState,
 } from '@dustline/shared';
 import { connect, sendInput, sendRespawn, getPlayerId, setCallbacks2 } from './network.js';
-import { initUI } from './ui.js';
+import { initUI, toggleLeaderboard } from './ui.js';
 import { createPredictor } from './prediction.js';
 import { applyLocalInput, extractLocalState, SIMULATION_DT, type LocalSimState } from './movement.js';
 import { createAudio } from './audio.js';
@@ -300,6 +300,7 @@ function setupInput(): void {
       case 'Digit1': input.weaponSlot = 'primary'; break;
       case 'Digit2': input.weaponSlot = 'secondary'; break;
       case 'KeyM': if (!e.repeat) audio.toggleMute(); break;
+      case 'KeyL': if (!e.repeat) void toggleLeaderboard(); break;
       case 'Tab':
         e.preventDefault();
         toggleScoreboard();
