@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { RagChatDB, type MessageRecord } from '../db';
+import { type MessageRecord, RagChatDB } from '../db';
 import { tokenize } from '../tokenize';
 
 let db: RagChatDB | undefined;
@@ -16,6 +16,7 @@ afterEach(async () => {
 describe('tracer round trip', () => {
 	it('writes a chat plus 20 messages and reads back newest 10 via compound index', async () => {
 		db = new RagChatDB(`tracer-${randomUUID()}`);
+		const database: RagChatDB = db;
 
 		const chatId = (await db.chats.add({
 			name: 'Family Group',
@@ -39,8 +40,8 @@ describe('tracer round trip', () => {
 			};
 		});
 
-		await db.transaction('rw', db.messages, async () => {
-			await db!.messages.bulkPut(records);
+		await database.transaction('rw', database.messages, async () => {
+			await database.messages.bulkPut(records);
 		});
 
 		const newest = await db.messages
@@ -56,12 +57,7 @@ describe('tracer round trip', () => {
 		}
 		expect(newest[0].timestamp).toBe(base + 19 * 1000);
 
-		const hits = await db.messages
-			.where('terms')
-			.anyOf(tokenize('PINEAPPLE'))
-			.distinct()
-			.limit(10)
-			.toArray();
+		const hits = await db.messages.where('terms').anyOf(tokenize('PINEAPPLE')).distinct().limit(10).toArray();
 		expect(hits).toHaveLength(1);
 		expect(hits[0].text).toContain('pineapple');
 	});
@@ -71,11 +67,7 @@ describe('tracer round trip', () => {
 		await db.open();
 		const schema = db.messages.schema;
 		expect(schema.indexes.some((idx) => idx.name === '[chatId+timestamp]')).toBe(true);
-		expect(
-			schema.indexes.some((idx) => idx.name === 'terms' && idx.multi === true),
-		).toBe(true);
-		expect(
-			schema.indexes.some((idx) => idx.name === 'dedupHash' && idx.unique === true),
-		).toBe(true);
+		expect(schema.indexes.some((idx) => idx.name === 'terms' && idx.multi === true)).toBe(true);
+		expect(schema.indexes.some((idx) => idx.name === 'dedupHash' && idx.unique === true)).toBe(true);
 	});
 });
