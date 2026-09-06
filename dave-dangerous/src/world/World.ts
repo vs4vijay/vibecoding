@@ -70,11 +70,13 @@ export class World {
       this.dave.hasGun = this.state.hasGun;
       this.dave.jetpackFuel = this.state.jetpackFuel;
     }
+    // backfill consumed fuel dave→state — HUD and SaveState.snapshot read state.jetpackFuel
+    this.state.jetpackFuel = this.dave.jetpackFuel;
 
     // dave vs enemies
-    const dhb = this.dave.hitbox;
     for (const e of this.enemies) {
-      if (e.dead) continue;
+      if (e.dead || !this.dave.alive) continue;
+      const dhb = this.dave.hitbox;
       const ehb = e.hitbox;
       const overlap = dhb.x < ehb.x + ehb.w && dhb.x + dhb.w > ehb.x && dhb.y < ehb.y + ehb.h && dhb.y + dhb.h > ehb.y;
       if (overlap) {
