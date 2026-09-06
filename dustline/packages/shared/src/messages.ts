@@ -4,7 +4,8 @@ export type ClientMessage =
   | { type: 'join'; username: string; team: Team }
   | { type: 'input'; data: InputState }
   | { type: 'respawn' }
-  | { type: 'switchTeam'; team: Team };
+  | { type: 'switchTeam'; team: Team }
+  | { type: 'pong'; t: number };
 
 export type ServerMessage =
   | { type: 'snapshot'; snapshot: GameSnapshot }
@@ -17,4 +18,5 @@ export type ServerMessage =
   | { type: 'playerJoined'; player: PlayerState }
   | { type: 'playerLeft'; playerId: string }
   | { type: 'matchStart'; matchId: string }
-  | { type: 'matchEnd'; tScore: number; ctScore: number; winner: Team };
+  | { type: 'matchEnd'; tScore: number; ctScore: number; winner: Team }
+  | { type: 'ping'; t: number };

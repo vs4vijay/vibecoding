@@ -2,13 +2,19 @@ import type { ClientMessage, ServerMessage, Team } from '@dustline/shared';
 import type { ServerGameState } from '../game/types.js';
 import { createGameState, addPlayer, removePlayer, queueInput, tick } from '../game/engine.js';
 import { toPlayerState } from '../game/player.js';
+import { applyRttSample } from '../game/rtt.js';
 import config from '../config.js';
+
+/** How often the server probes each connection's round-trip time. */
+const RTT_PROBE_INTERVAL_MS = 1000;
 
 interface ClientData {
   playerId: string | null;
   username: string | null;
   team: Team | null;
   connectedAt: number;
+  /** Per-connection RTT probe timer; cleared on close. */
+  pingTimer: ReturnType<typeof setInterval> | null;
 }
 
 const clients = new Map<Bun.ServerWebSocket<any>, ClientData>();
@@ -43,14 +49,24 @@ export function handleOpen(ws: Bun.ServerWebSocket<any>): void {
     username: null,
     team: null,
     connectedAt: Date.now(),
+    pingTimer: null,
   };
   ws.data = data;
   clients.set(ws, data);
+  // App-level RTT probe: the client echoes pong with the same timestamp and
+  // the server measures the round trip (see game/rtt.ts).
+  data.pingTimer = setInterval(() => {
+    send(ws, { type: 'ping', t: Date.now() });
+  }, RTT_PROBE_INTERVAL_MS);
   console.log(`🔌 Client connected. Total: ${clients.size}`);
 }
 
 export function handleClose(ws: Bun.ServerWebSocket<any>): void {
   const data = clients.get(ws);
+  if (data?.pingTimer) {
+    clearInterval(data.pingTimer);
+    data.pingTimer = null;
+  }
   if (data?.playerId) {
     removePlayer(gameState, data.playerId);
     broadcast({
@@ -112,6 +128,19 @@ export function handleMessage(ws: Bun.ServerWebSocket<any>, message: string | Bu
       case 'input': {
         if (data.playerId) {
           queueInput(gameState, data.playerId, msg.data);
+        }
+        break;
+      }
+
+      case 'pong': {
+        // The client echoes our ping timestamp unchanged; measure the round
+        // trip into the player's server-side RTT estimate. applyRttSample
+        // clamps/ignores bogus samples, so hostile pongs cannot corrupt it.
+        if (data.playerId) {
+          const player = gameState.players.get(data.playerId);
+          if (player) {
+            applyRttSample(player, msg.t, Date.now());
+          }
         }
         break;
       }

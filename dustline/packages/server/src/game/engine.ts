@@ -20,7 +20,7 @@ import {
 } from './player.js';
 import { fireWeapon, startReload, finishReload, getWeaponMuzzlePosition, findBulletHit } from './weapon.js';
 import type { RewoundTarget } from './weapon.js';
-import { PositionHistory, rewoundHitboxToAABB, resolveRewindTick } from './lagcomp.js';
+import { PositionHistory, rewoundHitboxToAABB, resolveShooterRewindTick } from './lagcomp.js';
 export function generateId(): string {
   return crypto.randomUUID();
 }
@@ -110,7 +110,7 @@ export function queueInput(state: ServerGameState, playerId: string, input: Inpu
           hitPlayerId: null,
           expired: false,
           // Test the shot against the world as this shooter saw it.
-          rewindTick: resolveRewindTick(state.history, player.id, player.lastInputSeq, state.tick),
+          rewindTick: resolveShooterRewindTick(state.history, player, state.tick),
         };
         state.bullets.push(bullet);
       }

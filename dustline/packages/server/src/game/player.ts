@@ -44,6 +44,7 @@ export function createPlayer(
     currentWeaponSlot: 'primary',
     inputSeq: 0,
     lastInputSeq: 0,
+    rttMs: 0,
     stats: {
       kills: 0,
       deaths: 0,

@@ -19,6 +19,8 @@ export interface ServerPlayer {
   inputSeq: number;
   /** Highest client input seq processed (acked back via snapshots). */
   lastInputSeq: number;
+  /** Server-measured RTT (EWMA of ping/pong round trips), 0 until the first pong. */
+  rttMs: number;
   stats: PlayerStats;
   respawnTimer: number;
   lastInputTime: number;

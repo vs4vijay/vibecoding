@@ -1,4 +1,4 @@
-import { HISTORY_TICKS, PLAYER_HEIGHT, PLAYER_RADIUS } from '@dustline/shared';
+import { HISTORY_TICKS, LAG_COMP_INTERP_MS, PLAYER_HEIGHT, PLAYER_RADIUS, TICK_INTERVAL_MS } from '@dustline/shared';
 import type { Vec3 } from '@dustline/shared';
 import type { AABB } from './collision.js';
 import type { ServerPlayer } from './types.js';
@@ -108,4 +108,34 @@ export function resolveRewindTick(
   const found = history.findTickForInputSeq(playerId, lastInputSeq);
   if (found === null) return currentTick;
   return Math.max(currentTick - HISTORY_TICKS, Math.min(found, currentTick));
+}
+
+/**
+ * Rewind depth in ticks for a shooter with the given measured RTT: half the
+ * RTT (the shooter's view of the world lags the server by the one-way delay)
+ * plus the remote player's client-side interpolation estimate
+ * (LAG_COMP_INTERP_MS), rounded up to whole ticks and clamped to the history
+ * window.
+ */
+export function rewindTicksForRtt(rttMs: number): number {
+  const ticks = Math.ceil((rttMs / 2 + LAG_COMP_INTERP_MS) / TICK_INTERVAL_MS);
+  return Math.max(0, Math.min(HISTORY_TICKS, ticks));
+}
+
+/**
+ * The tick a shot from this shooter should be tested against. With a measured
+ * RTT (ping/pong EWMA), rewind by the rtt-derived depth; before the first
+ * pong arrives (rttMs <= 0), fall back to the seq→tick mapping, then to the
+ * current tick.
+ */
+export function resolveShooterRewindTick(
+  history: PositionHistory,
+  player: Pick<ServerPlayer, 'id' | 'lastInputSeq' | 'rttMs'>,
+  currentTick: number
+): number {
+  const rttMs = player.rttMs ?? 0;
+  if (rttMs > 0) {
+    return currentTick - rewindTicksForRtt(rttMs);
+  }
+  return resolveRewindTick(history, player.id, player.lastInputSeq, currentTick);
 }
