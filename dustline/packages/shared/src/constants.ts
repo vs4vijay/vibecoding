@@ -9,10 +9,12 @@ export const SNAPSHOT_INTERVAL_MS = 1000 / SNAPSHOT_RATE;
 // (≈1 s of history at the 60 Hz tick).
 export const HISTORY_TICKS = 60;
 
-// Estimated delay of a remote player's client-side interpolation behind the
-// latest snapshot. Added to half the shooter's measured RTT to derive the
+// Average age of the newest rendered snapshot at fire time — the client
+// renders server snapshots without interpolation, so what the shooter saw
+// lags the server by roughly half the snapshot interval (30 Hz / 2 = one
+// 60 Hz tick). Added to half the shooter's measured RTT to derive the
 // rewind depth for lag compensation (see server game/lagcomp.ts).
-export const LAG_COMP_INTERP_MS = 50;
+export const LAG_COMP_INTERP_MS = TICK_INTERVAL_MS;
 
 // How long the client takes to visually ease a server correction into the
 // predicted local state, so reconciliation does not snap the camera.

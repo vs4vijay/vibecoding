@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { HISTORY_TICKS, LAG_COMP_INTERP_MS } from '@dustline/shared';
+import { HISTORY_TICKS, LAG_COMP_INTERP_MS, TICK_INTERVAL_MS } from '@dustline/shared';
 import { clampRttSample, updateRttEwma, applyRttSample } from './rtt.js';
 import { PositionHistory, rewindTicksForRtt, resolveShooterRewindTick } from './lagcomp.js';
 import { createPlayer, toPlayerState } from './player.js';
@@ -7,9 +7,9 @@ import { addPlayer, createGameState, queueInput, tick } from './engine.js';
 import { handleOpen, handleClose } from '../websocket/connection.js';
 
 describe('RTT EWMA (pong samples)', () => {
-  it('clamps samples into [0, 5000] ms', () => {
+  it('clamps samples into [0, 400] ms', () => {
     expect(clampRttSample(120)).toBe(120);
-    expect(clampRttSample(10_000)).toBe(5000);
+    expect(clampRttSample(10_000)).toBe(400);
     expect(clampRttSample(-50)).toBe(0);
   });
 
@@ -46,14 +46,18 @@ describe('RTT EWMA (pong samples)', () => {
 });
 
 describe('rewind depth from RTT', () => {
-  it('implements ceil((rtt/2 + interp) / tickInterval) clamped to [0, HISTORY_TICKS]', () => {
-    expect(LAG_COMP_INTERP_MS).toBe(50);
-    // 100 ms RTT: (50 + 50) / (1000/60) = exactly 6 ticks
-    expect(rewindTicksForRtt(100)).toBe(6);
-    // Interp estimate alone: ceil(50 / 16.67) = 3
-    expect(rewindTicksForRtt(0)).toBe(3);
-    // Odd RTT rounds up: (8.5 + 50) / 16.67 = 3.51 → 4
-    expect(rewindTicksForRtt(17)).toBe(4);
+  it('implements ceil((rtt/2 + snapshotAge) / tickInterval) clamped to [0, HISTORY_TICKS]', () => {
+    // The margin is one tick: the client renders server snapshots without
+    // interpolation, so the newest rendered snapshot is on average half a
+    // 30 Hz snapshot interval old (LAG_COMP_INTERP_MS = TICK_INTERVAL_MS).
+    expect(LAG_COMP_INTERP_MS).toBe(TICK_INTERVAL_MS);
+    // 100 ms RTT: (50 + 16.67) / (1000/60) = exactly 4 ticks
+    // (was 6 under the old 50 ms interpolation margin that assumed client-side interp)
+    expect(rewindTicksForRtt(100)).toBe(4);
+    // Snapshot age alone: ceil(16.67 / 16.67) = 1
+    expect(rewindTicksForRtt(0)).toBe(1);
+    // Odd RTT rounds up: (8.5 + 16.67) / 16.67 = 1.51 → 2
+    expect(rewindTicksForRtt(17)).toBe(2);
     // Absurd RTT is bounded by the history window
     expect(rewindTicksForRtt(1_000_000)).toBe(HISTORY_TICKS);
   });
@@ -68,7 +72,7 @@ describe('resolveShooterRewindTick', () => {
 
     expect(resolveShooterRewindTick(history, p, 20)).toBe(1); // rtt 0 → seq mapping
     p.rttMs = 100;
-    expect(resolveShooterRewindTick(history, p, 20)).toBe(14); // 20 - 6, deeper than the seq tick
+    expect(resolveShooterRewindTick(history, p, 20)).toBe(16); // 20 - 4, deeper than the seq tick
   });
 
   it('falls back to the seq→tick mapping, then currentTick, when no RTT is known', () => {
@@ -140,7 +144,7 @@ describe('RTT-aware rewind depth (engine)', () => {
     };
   }
 
-  /** Tick 1 records the target ON the ray; ticks 2..7 record it well off it. */
+  /** Tick 1 records the target ON the ray; ticks 2..5 record it well off it. */
   function setupState() {
     const state = createGameState();
     const shooter = addPlayer(state, 'shooter', 'T');
@@ -151,7 +155,7 @@ describe('RTT-aware rewind depth (engine)', () => {
     tick(state); // tick 1: target at the aimed spot
 
     target.position = { x: -15, y: 0.9, z: -20 }; // strafes off the ray
-    for (let i = 0; i < 6; i++) tick(state); // ticks 2..7
+    for (let i = 0; i < 4; i++) tick(state); // ticks 2..5
 
     return { state, shooter, target };
   }
@@ -166,10 +170,12 @@ describe('RTT-aware rewind depth (engine)', () => {
     tick(state); // next tick resolves the bullet
   }
 
-  it('a 100 ms RTT shooter rewinds 6 ticks and hits where the target WAS', () => {
+  it('a 100 ms RTT shooter rewinds 4 ticks and hits where the target WAS', () => {
     withZeroSpread(() => {
       const { state, shooter, target } = setupState();
-      shooter.rttMs = 100; // depth = ceil((100/2 + 50) / (1000/60)) = 6 → rewindTick = 7 - 6 = 1
+      // depth = ceil((100/2 + 16.67) / (1000/60)) = 4 → rewindTick = 5 - 4 = 1
+      // (was 6 ticks before LAG_COMP_INTERP_MS stopped assuming client interpolation)
+      shooter.rttMs = 100;
       fireAtOldSpot(state, shooter.id);
 
       expect(shooter.stats.shotsHit).toBe(1);

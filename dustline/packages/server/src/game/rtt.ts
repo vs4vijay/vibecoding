@@ -1,8 +1,14 @@
 import type { ServerPlayer } from './types.js';
 
-/** Round-trip samples outside [RTT_SAMPLE_MIN_MS, RTT_SAMPLE_MAX_MS] are treated as bogus. */
+/**
+ * Round-trip samples outside [RTT_SAMPLE_MIN_MS, RTT_SAMPLE_MAX_MS] are
+ * treated as bogus. The 400 ms ceiling is anti-abuse: rewind depth scales
+ * with measured RTT, so a pong-delayering client could otherwise buy deeper
+ * lag-comp rewind by inflating its samples. Genuine RTTs above 400 ms get
+ * under-rewound — a bias against the delayer, not the honest player.
+ */
 export const RTT_SAMPLE_MIN_MS = 0;
-export const RTT_SAMPLE_MAX_MS = 5000;
+export const RTT_SAMPLE_MAX_MS = 400;
 
 /** Weight of a new sample in the RTT EWMA (history keeps 1 - alpha). */
 const RTT_EWMA_ALPHA = 0.25;
@@ -26,7 +32,7 @@ export function updateRttEwma(currentRttMs: number, sampleMs: number): number {
  * Feed one pong round trip (sentAtMs → recvNowMs) into the player's EWMA.
  * Malformed samples (non-finite, e.g. a garbage echoed timestamp) are ignored
  * so a bad pong cannot corrupt the estimate; finite samples are clamped
- * before blending, so hostile pings cannot push RTT outside [0, 5000] ms.
+ * before blending, so hostile pings cannot push RTT outside [0, 400] ms.
  */
 export function applyRttSample(player: ServerPlayer, sentAtMs: number, recvNowMs: number): void {
   const sampleMs = recvNowMs - sentAtMs;

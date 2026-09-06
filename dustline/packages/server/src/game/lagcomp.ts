@@ -113,9 +113,9 @@ export function resolveRewindTick(
 /**
  * Rewind depth in ticks for a shooter with the given measured RTT: half the
  * RTT (the shooter's view of the world lags the server by the one-way delay)
- * plus the remote player's client-side interpolation estimate
- * (LAG_COMP_INTERP_MS), rounded up to whole ticks and clamped to the history
- * window.
+ * plus the average age of the newest rendered snapshot (LAG_COMP_INTERP_MS —
+ * the client renders server snapshots without interpolation), rounded up to
+ * whole ticks and clamped to the history window.
  */
 export function rewindTicksForRtt(rttMs: number): number {
   const ticks = Math.ceil((rttMs / 2 + LAG_COMP_INTERP_MS) / TICK_INTERVAL_MS);
