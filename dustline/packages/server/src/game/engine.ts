@@ -5,7 +5,6 @@ import {
   MATCH_DURATION_MS,
   ROUND_END_DURATION_MS,
   WEAPONS,
-  PLAYER_HEIGHT,
   DEFAULT_MAP,
 } from '@dustline/shared';
 import type { GameSnapshot, InputState, Team } from '@dustline/shared';
@@ -19,8 +18,9 @@ import {
   switchWeapon,
   toPlayerState,
 } from './player.js';
-import { fireWeapon, startReload, finishReload, getWeaponMuzzlePosition } from './weapon.js';
-import { intersectRayAABB, playerToAABB } from './collision.js';
+import { fireWeapon, startReload, finishReload, getWeaponMuzzlePosition, findBulletHit } from './weapon.js';
+import type { RewoundTarget } from './weapon.js';
+import { PositionHistory, rewoundHitboxToAABB, resolveRewindTick } from './lagcomp.js';
 export function generateId(): string {
   return crypto.randomUUID();
 }
@@ -41,6 +41,7 @@ export function createGameState(): ServerGameState {
     players: new Map(),
     bullets: [],
     entities: [...DEFAULT_MAP.entities],
+    history: new PositionHistory(),
     tick: 0,
     lastSnapshotTime: 0,
   };
@@ -96,7 +97,7 @@ export function queueInput(state: ServerGameState, playerId: string, input: Inpu
       const fireResult = fireWeapon(weapon, player, Date.now());
       if (fireResult) {
         player.stats.shotsFired++;
-        
+
         const muzzle = getWeaponMuzzlePosition(player);
         const bullet: ServerBullet = {
           id: generateId(),
@@ -108,6 +109,8 @@ export function queueInput(state: ServerGameState, playerId: string, input: Inpu
           weaponId: weapon.typeId,
           hitPlayerId: null,
           expired: false,
+          // Test the shot against the world as this shooter saw it.
+          rewindTick: resolveRewindTick(state.history, player.id, player.lastInputSeq, state.tick),
         };
         state.bullets.push(bullet);
       }
@@ -162,6 +165,10 @@ export function tick(state: ServerGameState): GameSnapshot | null {
 
   // Check win conditions
   checkWinConditions(state);
+
+  // Record player hitboxes for lag compensation (after all state updates of
+  // this tick, so the frame reflects the state as of the end of tick).
+  state.history.record(state.tick, state.players.values());
 
   // Generate snapshot if needed
   let snapshot: GameSnapshot | null = null;
@@ -249,7 +256,7 @@ function processBullets(state: ServerGameState): void {
 
   for (let i = 0; i < state.bullets.length; i++) {
     const bullet = state.bullets[i];
-    
+
     // Check if bullet expired (5 seconds max)
     if (now - bullet.createdAt > 5000) {
       bullet.expired = true;
@@ -260,36 +267,28 @@ function processBullets(state: ServerGameState): void {
       continue;
     }
 
-    // Check collision with players
-    for (const player of state.players.values()) {
-      if (player.id === bullet.shooterId || player.isDead) continue;
+    // Lag compensation: test the ray against targets as they were at the
+    // shooter's rewind tick (targets without history fall back to live
+    // positions inside findBulletHit).
+    const result = findBulletHit(bullet, state.players.values(), rewoundTargetsFor(state, bullet.rewindTick));
 
-      const playerAABB = playerToAABB(player.position);
-      const hit = intersectRayAABB(bullet.origin, bullet.direction, playerAABB);
-      
-      if (hit && hit.t > 0 && (WEAPONS[bullet.weaponId]?.range || 100) > hit.t) {
-        bullet.hitPlayerId = player.id;
-        bullet.expired = true;
+    if (result) {
+      bullet.hitPlayerId = result.player.id;
+      bullet.expired = true;
 
-        // Calculate headshot (hit above 75% of player height)
-        const headshot = hit.point.y > player.position.y + PLAYER_HEIGHT * 0.25;
-        const damage = headshot ? bullet.damage * 2 : bullet.damage;
+      const damage = result.headshot ? bullet.damage * 2 : bullet.damage;
+      damagePlayer(result.player, damage);
 
-        damagePlayer(player, damage);
+      const shooter = state.players.get(bullet.shooterId);
+      if (shooter) {
+        shooter.stats.damageDealt += damage;
+        shooter.stats.shotsHit++;
+        if (result.headshot) shooter.stats.headshots++;
 
-        const shooter = state.players.get(bullet.shooterId);
-        if (shooter) {
-          shooter.stats.damageDealt += damage;
-          shooter.stats.shotsHit++;
-          if (headshot) shooter.stats.headshots++;
-          
-          if (player.isDead) {
-            shooter.stats.kills++;
-            player.stats.deaths++;
-          }
+        if (result.player.isDead) {
+          shooter.stats.kills++;
+          result.player.stats.deaths++;
         }
-
-        break;
       }
     }
   }
@@ -298,6 +297,17 @@ function processBullets(state: ServerGameState): void {
   for (let i = bulletsToRemove.length - 1; i >= 0; i--) {
     state.bullets.splice(bulletsToRemove[i], 1);
   }
+}
+
+function rewoundTargetsFor(state: ServerGameState, tick: number): Map<string, RewoundTarget> {
+  const targets = new Map<string, RewoundTarget>();
+  for (const player of state.players.values()) {
+    const hitbox = state.history.rewind(player.id, tick);
+    if (hitbox) {
+      targets.set(player.id, { position: hitbox.pos, aabb: rewoundHitboxToAABB(hitbox) });
+    }
+  }
+  return targets;
 }
 
 function createSnapshot(state: ServerGameState): GameSnapshot {

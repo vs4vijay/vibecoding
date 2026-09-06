@@ -1,4 +1,5 @@
 import type { Vec3, Vec2, Team, WeaponState, PlayerState, MatchState, EntityState, BulletState, PlayerStats, MapData } from '@dustline/shared';
+import type { PositionHistory } from './lagcomp.js';
 
 export interface ServerPlayer {
   id: string;
@@ -35,6 +36,8 @@ export interface ServerBullet {
   weaponId: string;
   hitPlayerId: string | null;
   expired: boolean;
+  /** Tick the shot is tested against (lag compensation, resolved at fire time). */
+  rewindTick: number;
 }
 
 export interface ServerMatch {
@@ -54,6 +57,8 @@ export interface ServerGameState {
   players: Map<string, ServerPlayer>;
   bullets: ServerBullet[];
   entities: EntityState[];
+  /** Per-tick player hitbox history for lag compensation. */
+  history: PositionHistory;
   tick: number;
   lastSnapshotTime: number;
 }

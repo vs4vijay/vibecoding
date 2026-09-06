@@ -5,6 +5,10 @@ export const TICK_INTERVAL_MS = 1000 / TICK_RATE;
 export const SNAPSHOT_RATE = 30;
 export const SNAPSHOT_INTERVAL_MS = 1000 / SNAPSHOT_RATE;
 
+// Ticks of player position history kept for server-side lag compensation
+// (≈1 s of history at the 60 Hz tick).
+export const HISTORY_TICKS = 60;
+
 // How long the client takes to visually ease a server correction into the
 // predicted local state, so reconciliation does not snap the camera.
 export const CORRECTION_LERP_MS = 100;
