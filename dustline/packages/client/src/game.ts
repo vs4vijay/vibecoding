@@ -11,6 +11,7 @@ import { connect, sendInput, sendRespawn, getPlayerId, setCallbacks2 } from './n
 import { initUI } from './ui.js';
 import { createPredictor } from './prediction.js';
 import { applyLocalInput, extractLocalState, SIMULATION_DT, type LocalSimState } from './movement.js';
+import { createAudio } from './audio.js';
 
 // ─── Globals ──────────────────────────────────────────────
 let scene: THREE.Scene;
@@ -72,6 +73,10 @@ function makePredictor() {
 }
 let predictor = makePredictor();
 let predictedForPlayerId: string | null = null;
+
+// Procedural sound effects. The AudioContext is created lazily on the first
+// user gesture (unlock below) per browser autoplay policy.
+const audio = createAudio();
 
 // Weapon model (visible gun)
 let weaponGroup: THREE.Group;
@@ -252,6 +257,8 @@ function setupInput(): void {
 
   // Pointer lock on click
   canvas.addEventListener('click', () => {
+    // First user gesture: safe to create/resume the AudioContext.
+    audio.unlock();
     if (!isPointerLocked) {
       canvas.requestPointerLock();
     }
@@ -292,6 +299,7 @@ function setupInput(): void {
         break;
       case 'Digit1': input.weaponSlot = 'primary'; break;
       case 'Digit2': input.weaponSlot = 'secondary'; break;
+      case 'KeyM': if (!e.repeat) audio.toggleMute(); break;
       case 'Tab':
         e.preventDefault();
         toggleScoreboard();
@@ -338,6 +346,12 @@ function handleSnapshot(snapshot: GameSnapshot): void {
   // Update local player state from server
   const self = snapshot.players.find(p => p.id === getPlayerId());
   if (self) {
+    // Weapon state before reconciliation — used to detect local fire/reload
+    // transitions (the server is authoritative for firing, so per-shot sounds
+    // follow lastFireTime/isReloading changes rather than raw input).
+    const prevPrimary = localPlayer.primaryWeapon;
+    const prevSecondary = localPlayer.secondaryWeapon;
+
     // Reconcile the local prediction with the authoritative state
     if (predictedForPlayerId !== self.id) {
       // (Re)joined: fresh predictor and per-connection seq counter
@@ -356,6 +370,19 @@ function handleSnapshot(snapshot: GameSnapshot): void {
       secondaryWeapon: self.secondaryWeapon,
       currentWeaponSlot: self.currentWeaponSlot,
     });
+
+    // Audio for the local weapon firing / reloading (same-slot comparison,
+    // since weapon state objects are fresh per snapshot).
+    const weapon = self.currentWeaponSlot === 'primary' ? self.primaryWeapon : self.secondaryWeapon;
+    const prevWeapon = self.currentWeaponSlot === 'primary' ? prevPrimary : prevSecondary;
+    if (weapon && prevWeapon) {
+      if (weapon.lastFireTime > prevWeapon.lastFireTime) {
+        audio.shot(weapon.typeId);
+      }
+      if (weapon.isReloading && !prevWeapon.isReloading) {
+        audio.reload();
+      }
+    }
 
     // While dead — and on the first snapshot after a respawn — no inputs are
     // predicted, so the server owns the view angles (spawn rotation, etc.).
@@ -392,6 +419,9 @@ function handlePlayerLeft(playerId: string): void {
 }
 
 function handleKill(killerId: string, victimId: string, weaponName: string): void {
+  if (killerId === getPlayerId()) {
+    audio.killConfirm();
+  }
   const killer = currentSnapshot?.players.find(p => p.id === killerId);
   const victim = currentSnapshot?.players.find(p => p.id === victimId);
   if (killer && victim) {
@@ -400,15 +430,18 @@ function handleKill(killerId: string, victimId: string, weaponName: string): voi
 }
 
 function handleDeath(killerId: string, weaponName: string): void {
+  audio.death();
   const killer = currentSnapshot?.players.find(p => p.id === killerId);
   showDeathScreen(killer?.username || 'Unknown', weaponName);
 }
 
 function handleMatchStart(_matchId: string): void {
+  audio.matchStart();
   addKillFeedEntry('Match started!');
 }
 
 function handleMatchEnd(tScore: number, ctScore: number, winner: Team): void {
+  audio.matchEnd();
   addKillFeedEntry(`Match ended! Winner: ${winner} (${tScore}-${ctScore})`);
 }
 
