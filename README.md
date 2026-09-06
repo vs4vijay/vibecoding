@@ -317,8 +317,12 @@ single combined workflow (`.github/workflows/games-pages-deploy.yml`).
 | **Tank Racer** | [vs4vijay.github.io/vibecoding/tank-racer](https://vs4vijay.github.io/vibecoding/tank-racer/) | [`tank-racer/`](./tank-racer) | TypeScript, Vite, three.js |
 | **Lugaru Combat** | [vs4vijay.github.io/vibecoding/lugaru-combat](https://vs4vijay.github.io/vibecoding/lugaru-combat/) | [`lugaru-combat/`](./lugaru-combat) | TypeScript, Vite, three.js, Rapier |
 | **Dave Dangerous** | [vs4vijay.github.io/vibecoding/dave-dangerous](https://vs4vijay.github.io/vibecoding/dave-dangerous/) | [`dave-dangerous/`](./dave-dangerous) | TypeScript, Vite 5 |
+| **Dustline** | local server — `cd dustline && bun run dev` ([quickstart](./dustline#readme)) | [`dustline/`](./dustline) | TypeScript, Vite, three.js · Bun + Hono + WebSocket |
 
-In development: [`dave-dangerous/`](./dave-dangerous), [`subway-surfers/`](./subway-surfers), [`dustline/`](./dustline), [`lf2-web/`](./lf2-web).
+In development: [`subway-surfers/`](./subway-surfers), [`lf2-web/`](./lf2-web).
+
+Dustline is the exception to the Pages flow: it needs its own WebSocket game
+server, so it runs locally instead of as a static site.
 
 Building a new game? Follow the playbook: [docs/GAMES.md](./docs/GAMES.md) —
 scaffolding conventions, test/verification expectations, the deployment

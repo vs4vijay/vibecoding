@@ -149,6 +149,15 @@
     --ink:#1a0a0c;
     --marquee-bg:#2a0a0e;
   }
+  .cab--dustline{
+    --accent:#d4a24e;
+    --accent-soft:rgba(212,162,78,.13);
+    --accent-line:rgba(212,162,78,.4);
+    --genre:#d4a24e;
+    --label:#b8c4a8;
+    --ink:#161207;
+    --marquee-bg:#15110a;
+  }
 
   .cab__marquee{
     position:relative;
@@ -352,7 +361,7 @@
 </head>
 <body>
 
-  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 4 cabinets online</p>
+  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 4 cabinets online · 1 runs locally</p>
   <h1 class="hero__title">Vibecoding <span class="hero__hollow">Arcade</span></h1>
   <p class="hero__sub">Browser games built with AI — procedural everything, zero assets, no installs. <strong>Click a cabinet and play.</strong></p>
 </header>
@@ -498,13 +507,48 @@
       </article>
     </li>
 
+    <li>
+      <article class="cab cab--dustline" aria-labelledby="cab-dustline-title">
+        <div class="cab__marquee">
+          <svg class="motif" viewBox="0 0 150 100" width="172" height="115" role="img" aria-label="Crosshair emblem for Dustline" focusable="false">
+            <defs>
+              <radialGradient id="glowDL" cx="50%" cy="50%" r="62%">
+                <stop offset="0%" stop-color="#d4a24e" stop-opacity=".24"/>
+                <stop offset="100%" stop-color="#d4a24e" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="150" height="100" fill="url(#glowDL)"/>
+            <g stroke="#d4a24e" fill="none" stroke-width="2.4" stroke-linecap="round">
+              <circle cx="75" cy="50" r="21"/>
+              <path d="M75 18 L75 32 M75 68 L75 82 M43 50 L57 50 M93 50 L107 50"/>
+            </g>
+            <circle cx="75" cy="50" r="2.6" fill="#d4a24e"/>
+            <circle cx="103" cy="29" r="2.2" fill="#8a8f7a"/>
+            <circle cx="49" cy="74" r="2.2" fill="#8a8f7a"/>
+          </svg>
+        </div>
+        <div class="cab__body">
+          <p class="cab__genre">Tactical FPS · 5v5 · Server-authoritative</p>
+          <h2 class="cab__title" id="cab-dustline-title">Dustline</h2>
+          <p class="cab__desc">Counter-Strike-inspired multiplayer FPS with client-side prediction, lag-compensated hit registration, and a persistent leaderboard. Runs on its own WebSocket game server, so it plays locally instead of on Pages.</p>
+          <div class="cab__panel">
+            <span class="cab__panel-label">Controls</span>
+            <p class="cab__keys"><kbd>W</kbd>/<kbd>A</kbd>/<kbd>S</kbd>/<kbd>D</kbd> move · <kbd>Mouse</kbd> aim &amp; fire · <kbd>R</kbd> reload</p>
+          </div>
+          <a class="play" href="https://github.com/vs4vijay/vibecoding/tree/main/dustline" aria-label="Run Dustline locally — source and quickstart">
+            <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
+            Run locally
+          </a>
+        </div>
+      </article>
+    </li>
+
   </ul>
 
   <section class="dev wrap" aria-labelledby="dev-title">
     <h2 class="dev__title" id="dev-title">In development</h2>
     <ul class="dev__chips">
       <li class="chip">Subway Surfers-like</li>
-      <li class="chip">Dustline</li>
       <li class="chip">Little Fighter 2 web</li>
     </ul>
   </section>

@@ -2,6 +2,11 @@
 
 A Counter-Strike-inspired multiplayer FPS running fully in the browser.
 
+> **Playing it:** Dustline needs its own WebSocket game server, so it isn't on
+> the static GitHub Pages site — run it locally (see [Development](#development)).
+> Listed in the [games hub](https://vs4vijay.github.io/vibecoding/) with a
+> "Run locally" card.
+
 ## Tech Stack
 
 - **Client**: Vite + TypeScript + Three.js (PWA)

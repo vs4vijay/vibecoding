@@ -16,8 +16,11 @@ without breaking the others.
 | Dave Dangerous | <https://vs4vijay.github.io/vibecoding/dave-dangerous/> | [`dave-dangerous/`](../dave-dangerous) | TS strict · Vite 5 | vitest |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
-status): [`subway-surfers/`](../subway-surfers), [`dustline/`](../dustline),
-[`lf2-web/`](../lf2-web).
+status): [`subway-surfers/`](../subway-surfers), [`lf2-web/`](../lf2-web).
+
+[`dustline/`](../dustline) is the registered exception: complete and playable,
+but it needs its own WebSocket game server, so it can't ship as a static Pages
+site — it gets a hub cabinet with a "Run locally" link instead of a Play URL.
 
 Each game folder is self-contained: its own `package.json` + lockfile, its own
 `AGENTS.md` (commands, invariants, gotchas), `README.md` (controls, quickstart,
@@ -97,6 +100,10 @@ Relative base is simpler; prefer it unless the game needs absolute URLs
 
 ## Gotchas (each one cost someone time)
 
+- **Server-backed games can't ship on Pages.** dustline runs its own
+  WebSocket game server (Bun + Hono), so no static `dist/` can represent it.
+  Register it anyway — hub cabinet with a "Run locally" link, table row with a
+  local-run entry — and don't add it to `games-pages-deploy.yml`.
 - **One Pages site per repo.** `upload-pages-artifact` puts artifact contents
   at the site root — that's why builds are staged into `site/<slug>/`
   subdirectories. A bare `dist/` artifact breaks subpath asset URLs (404s).
