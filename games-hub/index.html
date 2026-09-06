@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vibecoding — Games</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231b1e24'/%3E%3C/svg%3E" />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #0f1115; color: #e8eaed;
+      background-image:
+        radial-gradient(1200px 500px at 50% -10%, #1b2634 0%, transparent 60%),
+        radial-gradient(800px 400px at 85% 110%, #141d2b 0%, transparent 55%);
+    }
+    h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); margin: 0 0 0.5rem; letter-spacing: 0.02em; }
+    p.sub { color: #9aa4b2; margin: 0 0 2.2rem; text-align: center; max-width: 34rem; }
+    ul.grid {
+      list-style: none; margin: 0; padding: 0;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem; width: min(880px, 92vw);
+    }
+    ul.grid a {
+      display: block; padding: 1.4rem 1.2rem; border-radius: 12px;
+      border: 1px solid #262d38; background: #151a21;
+      color: inherit; text-decoration: none; transition: border-color 0.15s, transform 0.15s;
+    }
+    ul.grid a:hover { border-color: #3d7a5b; transform: translateY(-2px); }
+    ul.grid h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
+    ul.grid p { margin: 0; font-size: 0.85rem; color: #9aa4b2; line-height: 1.45; }
+    ul.grid .stack { display: inline-block; margin-top: 0.6rem; font-size: 0.72rem;
+      color: #6c8f7d; border: 1px solid #26352e; border-radius: 999px; padding: 0.15rem 0.6rem; }
+    footer { margin-top: 2.4rem; font-size: 0.75rem; color: #5b6572; }
+  </style>
+</head>
+<body>
+  <h1>🎮 Vibecoding Games</h1>
+  <p class="sub">Browser games in the vibecoding monorepo — TypeScript · Vite · three.js · Rapier. Deployed together to GitHub Pages by one shared workflow.</p>
+  <ul class="grid">
+    <li><a href="./lugaru-web/">
+      <h2>Lugaru Combat Prototype</h2>
+      <p>Third-person 3D arena combat: context-sensitive moves, timing reversals, simulated senses (scent/hearing), ragdoll physics. 3-wire tutorial + 3 waves.</p>
+      <span class="stack">three.js · Rapier</span>
+    </a></li>
+    <li><a href="./tank-racer/">
+      <h2>Tank Racer</h2>
+      <p>Top-down tank racing across terrain — drive, shoot, and survive.</p>
+      <span class="stack">three.js</span>
+    </a></li>
+    <li><a href="./zombie-highway/">
+      <h2>Undead Highway</h2>
+      <p>Endless zombie-driving arcade — swerve the highway, shoot the horde.</p>
+      <span class="stack">three.js</span>
+    </a></li>
+  </ul>
+  <footer>vs4vijay.github.io/vibecoding</footer>
+</body>
+</html>
