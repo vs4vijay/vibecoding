@@ -1,187 +1,202 @@
 <script lang="ts">
+import DropZone from '$lib/components/DropZone.svelte';
+import PreviewCard from '$lib/components/PreviewCard.svelte';
+import ProgressBar from '$lib/components/ProgressBar.svelte';
 import { db } from '$lib/db/db';
 import { commitImport } from '$lib/import/commit';
-import { type ImportPreview, buildPreview, decodeBytes } from '$lib/import/preview';
+import { type ImportState, errorMessage, transition } from '$lib/import/importState';
+import { type ImportPreview, decodeBytes, diffPreview } from '$lib/import/preview';
+import { extractTxtFromZip, sniffZipMagic } from '$lib/import/unzip';
 import { validateFile } from '$lib/import/validate';
 import type { WorkerResponse } from '$lib/import/workerProtocol';
 import { parseString } from '$lib/parser/parseFile';
 
-type Status = 'idle' | 'reading' | 'parsing' | 'preview' | 'committing' | 'done' | 'error';
-
-let status = $state<Status>('idle');
+let machine = $state<ImportState>({ status: 'idle', errorKey: null, hasPreview: false });
 let preview = $state<ImportPreview | null>(null);
-let error = $state<string | null>(null);
+let hashes = $state<string[]>([]);
+let newCount = $state(0);
+let skippedCount = $state(0);
+let existingChatName = $state<string | null>(null);
 let chatName = $state('');
-let doneInfo = $state<{ chatId: number; written: number } | null>(null);
-let dragging = $state(false);
+let doneInfo = $state<{ chatName: string; written: number } | null>(null);
+let unzipping = $state(false);
+let parseProgress = $state<{ done: number; total: number | null }>({ done: 0, total: null });
+let storeProgress = $state<{ done: number; total: number | null }>({ done: 0, total: null });
 
 let worker: Worker | null = null;
-let pendingFile: File | null = null;
-// biome-ignore lint/style/useConst: Svelte bind:this requires a let binding
-let fileInput = $state<HTMLInputElement | null>(null);
+// Retained source bytes for confirm re-parse (zip flows keep the winning
+// entry bytes — never re-inflate the zip on confirm; txt flows keep the
+// file bytes so confirm never re-reads the File).
+let pendingBytes: Uint8Array | null = null;
+
+const status = $derived(machine.status);
+const error = $derived(machine.errorKey ? errorMessage(machine.errorKey) : null);
+
+function send(e: Parameters<typeof transition>[1]) {
+	machine = transition(machine, e);
+}
 
 function terminateWorker() {
 	worker?.terminate();
 	worker = null;
 }
 
-function fail(message: string) {
+function fail(code: string) {
 	terminateWorker();
-	pendingFile = null;
+	pendingBytes = null;
 	preview = null;
-	error = message;
-	status = 'error';
+	hashes = [];
+	unzipping = false;
+	send({ type: 'error', code });
+}
+
+async function refreshDiff() {
+	if (!preview) return;
+	const name = chatName.trim() || preview.chatName;
+	const diff = await diffPreview(db, hashes, name);
+	newCount = diff.newCount;
+	skippedCount = diff.skippedCount;
+	existingChatName = diff.existingChat?.name ?? null;
 }
 
 function handleWorkerMessage(e: MessageEvent<WorkerResponse>) {
 	const msg = e.data;
 	if (msg.type === 'progress') {
-		status = 'parsing';
+		send({ type: 'worker-progress' });
+		parseProgress = { done: msg.done, total: msg.total ?? null };
 	} else if (msg.type === 'preview-result') {
 		preview = msg.preview;
+		hashes = msg.hashes;
 		chatName = msg.preview.chatName;
-		status = 'preview';
 		terminateWorker();
+		send({ type: 'preview-result' });
+		void refreshDiff();
 	} else {
-		fail(msg.message);
+		fail(msg.code || 'parse-failed');
 	}
 }
 
+function postToWorker(bytes: Uint8Array, fileName: string) {
+	// Transfer a copy — the retained pendingBytes must survive for confirm re-parse.
+	const transfer = bytes.slice();
+	const w = new Worker(new URL('$lib/import/parse.worker.ts', import.meta.url), {
+		type: 'module',
+	});
+	terminateWorker();
+	worker = w;
+	w.onmessage = handleWorkerMessage;
+	w.onerror = () => fail('parse-failed');
+	w.postMessage({ type: 'parse-preview', buffer: transfer.buffer, fileName }, [transfer.buffer]);
+}
+
 async function handleFiles(files: File[]) {
-	status = 'reading';
-	error = null;
+	send({ type: 'files-received' });
 	preview = null;
+	hashes = [];
 	doneInfo = null;
+	unzipping = false;
+	parseProgress = { done: 0, total: null };
+	storeProgress = { done: 0, total: null };
 	await new Promise((r) => requestAnimationFrame(r));
 
 	const file = files[0];
 	if (!file) {
-		status = 'idle';
+		send({ type: 'reset' });
 		return;
 	}
 	let kind: 'txt' | 'zip';
 	try {
 		kind = validateFile(file).kind;
 	} catch (err) {
-		fail(err instanceof Error ? err.message : 'Invalid file');
-		return;
-	}
-	if (kind === 'zip') {
-		fail('Zip imports land in the next update — please drop the .txt export for now.');
+		fail(err instanceof Error ? err.message : 'unsupported-type');
 		return;
 	}
 
-	pendingFile = file;
-	status = 'parsing';
 	try {
-		const buffer = await file.arrayBuffer();
-		const w = new Worker(new URL('$lib/import/parse.worker.ts', import.meta.url), {
-			type: 'module',
-		});
-		terminateWorker();
-		worker = w;
-		w.onmessage = handleWorkerMessage;
-		w.onerror = () => fail('parse-failed');
-		w.postMessage({ type: 'parse-preview', buffer, fileName: file.name }, [buffer]);
+		const raw = new Uint8Array(await file.arrayBuffer());
+		let entryBytes = raw;
+		let entryName = file.name;
+		if (kind === 'zip' || sniffZipMagic(raw)) {
+			// Zip listing is a millisecond-scale main-thread op; only the parse runs in the worker.
+			unzipping = true;
+			await new Promise((r) => requestAnimationFrame(r));
+			try {
+				const entry = extractTxtFromZip(raw);
+				entryBytes = entry.bytes;
+				entryName = entry.name;
+			} catch (err) {
+				fail(err instanceof Error ? err.message : 'corrupt-zip');
+				return;
+			} finally {
+				unzipping = false;
+			}
+		}
+		pendingBytes = entryBytes;
+		send({ type: 'worker-progress' });
+		postToWorker(entryBytes, entryName);
 	} catch (err) {
-		fail(err instanceof Error ? err.message : 'Could not read file');
+		fail(err instanceof Error ? err.message : 'parse-failed');
 	}
-}
-
-function onDrop(e: DragEvent) {
-	e.preventDefault();
-	dragging = false;
-	const files = [...(e.dataTransfer?.files ?? [])];
-	if (files.length) void handleFiles(files);
-}
-
-function onInputChange(e: Event) {
-	const input = e.currentTarget as HTMLInputElement;
-	const files = [...(input.files ?? [])];
-	input.value = '';
-	if (files.length) void handleFiles(files);
 }
 
 function onCancel() {
 	terminateWorker();
-	pendingFile = null;
+	pendingBytes = null;
 	preview = null;
-	status = 'idle';
+	hashes = [];
+	unzipping = false;
+	send({ type: 'cancel' });
 }
 
 async function onConfirm() {
-	if (!preview || !pendingFile) return;
-	status = 'committing';
+	if (!preview || !pendingBytes) return;
+	send({ type: 'confirm' });
 	await new Promise((r) => requestAnimationFrame(r));
 	try {
-		const bytes = new Uint8Array(await pendingFile.arrayBuffer());
-		const chat = parseString(decodeBytes(bytes));
+		// Deterministic re-parse of the retained source bytes on the main thread.
+		// Only a small preview object ever crossed postMessage; if profiling ever
+		// shows re-parse jank, the fallback is worker-posted record batches.
+		const chat = parseString(decodeBytes(pendingBytes));
 		const name = chatName.trim() || preview.chatName;
-		const result = await commitImport(db, name, chat);
-		doneInfo = result;
+		const result = await commitImport(db, name, chat, (written, total) => {
+			storeProgress = { done: written, total };
+		});
+		doneInfo = { chatName: name, written: result.written };
 		preview = null;
-		pendingFile = null;
-		status = 'done';
+		hashes = [];
+		pendingBytes = null;
+		send({ type: 'commit-resolve' });
 	} catch (err) {
-		fail(err instanceof Error ? err.message : 'Could not save chat');
+		fail(err instanceof Error ? err.message : 'parse-failed');
 	}
 }
 
-function formatDate(ts: number): string {
-	return new Date(ts).toLocaleString();
+function onChatName(name: string) {
+	chatName = name;
+	void refreshDiff();
 }
 </script>
 
 <main class="mx-auto max-w-2xl px-4 py-10">
 	<h1 class="text-2xl font-bold">Import WhatsApp chat</h1>
-	<p class="mt-1 text-sm text-gray-600">Drop a .txt export or pick a file. Preview first — nothing is saved until you confirm.</p>
+	<p class="mt-1 text-sm text-gray-600">
+		Drop a .txt or .zip export or pick a file. Preview first — nothing is saved until you confirm.
+	</p>
 
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		role="button"
-		tabindex="0"
-		aria-label="Drop WhatsApp export here"
-		class="mt-6 rounded-lg border-2 border-dashed p-8 text-center transition-colors {dragging
-			? 'border-blue-500 bg-blue-50'
-			: 'border-gray-300'}"
-		ondragover={(e) => {
-			e.preventDefault();
-			dragging = true;
-		}}
-		ondragenter={(e) => {
-			e.preventDefault();
-			dragging = true;
-		}}
-		ondragleave={() => (dragging = false)}
-		ondrop={onDrop}
-		onkeydown={(e) => {
-			if (e.key === 'Enter' || e.key === ' ') fileInput?.click();
-		}}
-	>
-		{#if status === 'reading' || status === 'parsing' || status === 'committing'}
-			<p aria-live="polite" class="text-gray-700">
-				{#if status === 'reading'}Reading file…{/if}
-				{#if status === 'parsing'}Parsing messages…{/if}
-				{#if status === 'committing'}Saving chat…{/if}
-			</p>
-		{:else}
-			<p>Drag &amp; drop your .txt export here or</p>
-			<button
-				type="button"
-				class="mt-2 rounded bg-blue-600 px-4 py-2 text-white"
-				onclick={() => fileInput?.click()}
-			>
-				Browse files
-			</button>
+	{#if status === 'idle' || status === 'reading'}
+		<DropZone busy={status === 'reading' && !unzipping} onfiles={(f) => void handleFiles(f)} />
+		{#if unzipping}
+			<p aria-live="polite" class="mt-2 text-sm text-gray-700">Unzipping archive…</p>
 		{/if}
-	</div>
-	<input
-		bind:this={fileInput}
-		type="file"
-		accept=".txt,.zip"
-		hidden
-		onchange={onInputChange}
-	/>
+	{/if}
+
+	{#if status === 'parsing'}
+		<ProgressBar done={parseProgress.done} total={parseProgress.total} label="Parsing messages" />
+	{/if}
+
+	{#if status === 'committing'}
+		<ProgressBar done={storeProgress.done} total={storeProgress.total} label="Saving chat" />
+	{/if}
 
 	{#if status === 'error' && error}
 		<div role="alert" class="mt-4 rounded border border-red-300 bg-red-50 p-4 text-red-800">
@@ -190,10 +205,7 @@ function formatDate(ts: number): string {
 			<button
 				type="button"
 				class="mt-2 rounded border px-3 py-1"
-				onclick={() => {
-					error = null;
-					status = 'idle';
-				}}
+				onclick={() => send({ type: 'reset' })}
 			>
 				Try again
 			</button>
@@ -201,72 +213,28 @@ function formatDate(ts: number): string {
 	{/if}
 
 	{#if status === 'preview' && preview}
-		<section aria-label="Import preview" class="mt-6 rounded-lg border p-4">
-			<h2 class="text-lg font-semibold">Preview</h2>
-			<dl class="mt-2 space-y-1 text-sm">
-				<div><dt class="inline font-medium">File: </dt><dd class="inline">{preview.fileName}</dd></div>
-				<div><dt class="inline font-medium">Messages: </dt><dd class="inline">{preview.total}</dd></div>
-				<div>
-					<dt class="inline font-medium">Date range: </dt><dd class="inline">
-						{#if preview.dateRange}
-							{formatDate(preview.dateRange.from)} – {formatDate(preview.dateRange.to)}
-						{:else}
-							Unknown
-						{/if}
-					</dd>
-				</div>
-				<div>
-					<dt class="inline font-medium">Participants: </dt><dd class="inline">
-						{preview.participants.join(', ') || 'None detected'}
-					</dd>
-				</div>
-			</dl>
-			<label class="mt-3 block text-sm">
-				<span class="font-medium">Chat name</span>
-				<input
-					type="text"
-					bind:value={chatName}
-					class="mt-1 block w-full rounded border px-2 py-1"
-				/>
-			</label>
-			{#if preview.capWarning}
-				<p class="mt-2 text-sm text-amber-700">{preview.capWarning}</p>
-			{/if}
-			<h3 class="mt-4 font-medium">Sample messages</h3>
-			<ul class="mt-1 space-y-2">
-				{#each preview.samples as s}
-					<li class="rounded bg-gray-50 p-2 text-sm">
-						<span class="font-medium">{s.sender}</span>
-						<span class="text-gray-500"> · {formatDate(s.timestamp)}</span>
-						<p class="mt-1 whitespace-pre-wrap">{s.text}</p>
-					</li>
-				{/each}
-			</ul>
-			<div class="mt-4 flex gap-2">
-				<button
-					type="button"
-					class="rounded bg-green-600 px-4 py-2 text-white"
-					onclick={() => void onConfirm()}
-				>
-					Confirm import
-				</button>
-				<button type="button" class="rounded border px-4 py-2" onclick={onCancel}>
-					Cancel
-				</button>
-			</div>
-		</section>
+		<PreviewCard
+			{preview}
+			{chatName}
+			{newCount}
+			{skippedCount}
+			{existingChatName}
+			onchatname={onChatName}
+			onconfirm={() => void onConfirm()}
+			oncancel={onCancel}
+		/>
 	{/if}
 
 	{#if status === 'done' && doneInfo}
 		<div role="status" class="mt-6 rounded border border-green-300 bg-green-50 p-4 text-green-900">
 			<p class="font-semibold">Import complete</p>
-			<p>{doneInfo.written} messages saved.</p>
+			<p>{doneInfo.written} messages saved to {doneInfo.chatName}.</p>
 			<button
 				type="button"
 				class="mt-2 rounded border px-3 py-1"
 				onclick={() => {
 					doneInfo = null;
-					status = 'idle';
+					send({ type: 'reset' });
 				}}
 			>
 				Import another
@@ -275,6 +243,7 @@ function formatDate(ts: number): string {
 	{/if}
 
 	<p class="mt-6 text-xs text-gray-500">
-		Nothing is written to your library until you confirm the preview.
+		Nothing is written to your library until you confirm the preview. Multi-chat zips import the
+		largest chat only for now.
 	</p>
 </main>
