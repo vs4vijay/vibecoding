@@ -51,6 +51,10 @@ export class ChatRepository {
 	async listChatsNewest(limit = 50): Promise<ChatRecord[]> {
 		return this.db.chats.orderBy('importedAt').reverse().limit(limit).toArray();
 	}
+
+	async findChatByName(name: string): Promise<ChatRecord | undefined> {
+		return this.db.chats.where('name').equals(name).first();
+	}
 }
 
 export class MessageRepository {
@@ -62,7 +66,10 @@ export class MessageRepository {
 	 * Dedup-before-write: pre-query existing dedupHash values, bulkAdd the
 	 * remainder in 500-row chunks with per-chunk BulkError isolation.
 	 */
-	async bulkSave(records: MessageRecord[]): Promise<number> {
+	async bulkSave(
+		records: MessageRecord[],
+		onProgress?: (written: number, total: number) => void
+	): Promise<number> {
 		if (records.length === 0) return 0;
 
 		const hashes = records.map((r) => r.dedupHash);
@@ -88,6 +95,7 @@ export class MessageRepository {
 					throw e;
 				}
 			}
+			onProgress?.(written, fresh.length);
 		}
 		return written;
 	}

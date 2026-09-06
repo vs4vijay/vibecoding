@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "build": "vite build",
+    "dev": "vite dev",
+    "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "biome check",
@@ -10,12 +13,20 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.1.2",
     "fake-indexeddb": "6.2.5",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.7.0",
+    "vite": "^8.2.2",
     "vitest": "^3.0.0"
   },
   "dependencies": {
-    "dexie": "4.4.5"
+    "@sveltejs/kit": "^2.70.3",
+    "dexie": "4.4.5",
+    "fflate": "0.8.3",
+    "svelte": "^5.57.0"
   }
 }

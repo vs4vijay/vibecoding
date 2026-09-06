@@ -11,5 +11,5 @@
     "lib": ["ES2022", "DOM"],
     "resolveJsonModule": true
   },
-  "include": ["src"]
+  "include": ["src", ".svelte-kit/types/**/*"]
 }
