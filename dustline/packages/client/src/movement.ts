@@ -175,12 +175,20 @@ function resolveLocalCollision(
   const newPos = { ...position };
   const newVel = { ...velocity };
 
+  // Overlaps that already exist before any movement are standing contacts
+  // (the player resting slightly sunk into the surface they stand on), not
+  // walls: the horizontal motion below did not create them, so the
+  // horizontal passes must not resolve them — otherwise standing on a floor
+  // snaps the player to the floor's boundary. The vertical pass still owns
+  // these contacts (landing, ground probe).
+  const startAABB = playerToAABB(position);
+
   // X axis
   newPos.x += velocity.x * dt;
   const playerAABBX = playerToAABB(newPos);
   for (const entity of entities) {
     const entityAABB = entityToAABB(entity);
-    if (intersectAABB(playerAABBX, entityAABB)) {
+    if (intersectAABB(playerAABBX, entityAABB) && !intersectAABB(startAABB, entityAABB)) {
       if (velocity.x > 0) {
         newPos.x = entityAABB.min.x - PLAYER_RADIUS - 0.01;
       } else if (velocity.x < 0) {
@@ -196,7 +204,7 @@ function resolveLocalCollision(
   const playerAABBZ = playerToAABB(newPos);
   for (const entity of entities) {
     const entityAABB = entityToAABB(entity);
-    if (intersectAABB(playerAABBZ, entityAABB)) {
+    if (intersectAABB(playerAABBZ, entityAABB) && !intersectAABB(startAABB, entityAABB)) {
       if (velocity.z > 0) {
         newPos.z = entityAABB.min.z - PLAYER_RADIUS - 0.01;
       } else if (velocity.z < 0) {
