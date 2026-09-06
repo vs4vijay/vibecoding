@@ -132,6 +132,7 @@ export async function initGame(canvas: HTMLCanvasElement) {
     onPlayerLeft: handlePlayerLeft,
     onKill: handleKill,
     onDeath: handleDeath,
+    onHit: handleHit,
     onMatchStart: handleMatchStart,
     onMatchEnd: handleMatchEnd,
     onError: console.error,
@@ -434,6 +435,10 @@ function handleDeath(killerId: string, weaponName: string): void {
   audio.death();
   const killer = currentSnapshot?.players.find(p => p.id === killerId);
   showDeathScreen(killer?.username || 'Unknown', weaponName);
+}
+
+function handleHit(_damage: number, _healthLeft: number, _shooterId: string): void {
+  audio.hitMarker();
 }
 
 function handleMatchStart(_matchId: string): void {

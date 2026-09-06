@@ -3,7 +3,8 @@ import { HISTORY_TICKS, PLAYER_HEIGHT, PLAYER_RADIUS } from '@dustline/shared';
 import type { ServerBullet, ServerPlayer } from './types.js';
 import { PositionHistory, rewoundHitboxToAABB, resolveRewindTick } from './lagcomp.js';
 import { findBulletHit } from './weapon.js';
-import { addPlayer, createGameState, queueInput, tick } from './engine.js';
+import { addPlayer, createGameState, onBulletHit, queueInput, tick } from './engine.js';
+import type { BulletHitEvent } from './engine.js';
 
 function makePlayer(id: string, x: number, y: number, z: number, lastInputSeq = 0): ServerPlayer {
   return {
@@ -261,6 +262,86 @@ describe('lag compensation (engine)', () => {
 
       expect(shooter.stats.shotsHit).toBe(0);
       expect(target.health).toBe(100);
+    });
+  });
+});
+
+describe('bullet-hit notifications (engine)', () => {
+  // Deterministic fire: fireWeapon derives spread from Math.random().
+  function withZeroSpread(fn: () => void): void {
+    const random = Math.random;
+    Math.random = () => 0.5; // (0.5 - 0.5) * 2 * spread === 0
+    try {
+      fn();
+    } finally {
+      Math.random = random;
+    }
+  }
+
+  it('fires listeners when a bullet lands, with post-damage victim state', () => {
+    withZeroSpread(() => {
+      const state = createGameState();
+      const shooter = addPlayer(state, 'shooter', 'T');
+      const target = addPlayer(state, 'target', 'CT');
+
+      shooter.position = { x: -20, y: 0.9, z: -25 };
+      target.position = { x: -15, y: 0.9, z: -25 };
+
+      const events: BulletHitEvent[] = [];
+      const off = onBulletHit(e => events.push(e));
+      try {
+        tick(state);
+        queueInput(state, shooter.id, makeInput({
+          seq: 1,
+          fire: true,
+          yaw: Math.PI / 2,
+          pitch: -0.334,
+        }));
+        tick(state);
+      } finally {
+        off();
+      }
+
+      expect(shooter.stats.shotsHit).toBe(1);
+      expect(events.length).toBe(1);
+      const event = events[0]!;
+      expect(event.shooter.id).toBe(shooter.id);
+      expect(event.victim.id).toBe(target.id);
+      expect(event.damage).toBeGreaterThan(0);
+      expect(event.headshot).toBe(false);
+      expect(event.killed).toBe(false);
+      // Listener fires after damage: victim health already reflects the hit.
+      expect(event.victim.health).toBe(target.health);
+      expect(event.victim.health).toBeLessThan(100);
+    });
+  });
+
+  it('fires no listeners when the shot misses', () => {
+    withZeroSpread(() => {
+      const state = createGameState();
+      const shooter = addPlayer(state, 'shooter', 'T');
+      const target = addPlayer(state, 'target', 'CT');
+
+      shooter.position = { x: -20, y: 0.9, z: -25 };
+      target.position = { x: -15, y: 0.9, z: -20 }; // off the ray
+
+      const events: BulletHitEvent[] = [];
+      const off = onBulletHit(e => events.push(e));
+      try {
+        tick(state);
+        queueInput(state, shooter.id, makeInput({
+          seq: 1,
+          fire: true,
+          yaw: Math.PI / 2,
+          pitch: -0.334,
+        }));
+        tick(state);
+      } finally {
+        off();
+      }
+
+      expect(shooter.stats.shotsHit).toBe(0);
+      expect(events.length).toBe(0);
     });
   });
 });

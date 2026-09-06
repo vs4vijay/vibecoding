@@ -10,6 +10,7 @@ const onPlayerJoined = (player: PlayerState) => {};
 const onPlayerLeft = (playerId: string) => {};
 const onKill = (killerId: string, victimId: string, weapon: string) => {};
 const onDeath = (killerId: string, weapon: string) => {};
+const onHit = (damage: number, healthLeft: number, shooterId: string) => {};
 const onMatchStart = (matchId: string) => {};
 const onMatchEnd = (tScore: number, ctScore: number, winner: Team) => {};
 const onError = (message: string) => {};
@@ -20,6 +21,7 @@ export function setCallbacks(callbacks: {
   onPlayerLeft: (playerId: string) => void;
   onKill: (killerId: string, victimId: string, weapon: string) => void;
   onDeath: (killerId: string, weapon: string) => void;
+  onHit: (damage: number, healthLeft: number, shooterId: string) => void;
   onMatchStart: (matchId: string) => void;
   onMatchEnd: (tScore: number, ctScore: number, winner: Team) => void;
   onError: (message: string) => void;
@@ -34,6 +36,7 @@ let cb: {
   onPlayerLeft: (playerId: string) => void;
   onKill: (killerId: string, victimId: string, weapon: string) => void;
   onDeath: (killerId: string, weapon: string) => void;
+  onHit: (damage: number, healthLeft: number, shooterId: string) => void;
   onMatchStart: (matchId: string) => void;
   onMatchEnd: (tScore: number, ctScore: number, winner: Team) => void;
   onError: (message: string) => void;
@@ -112,6 +115,10 @@ function handleServerMessage(event: MessageEvent): void {
         break;
       case 'death':
         cb?.onDeath(msg.killerId, msg.weaponName);
+        break;
+      case 'hit':
+        // Bullet landed on a player — only ever sent to the shooter.
+        cb?.onHit(msg.damage, msg.healthLeft, msg.shooterId);
         break;
       case 'matchStart':
         cb?.onMatchStart(msg.matchId);

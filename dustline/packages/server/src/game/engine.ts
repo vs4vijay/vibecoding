@@ -35,6 +35,44 @@ export function onMatchEnd(listener: MatchEndListener): void {
   matchEndListeners.push(listener);
 }
 
+/** Payload for bullet-hit listeners (see onBulletHit). */
+export interface BulletHitEvent {
+  bullet: ServerBullet;
+  shooter: ServerPlayer;
+  victim: ServerPlayer;
+  damage: number;
+  headshot: boolean;
+  killed: boolean;
+}
+
+export type BulletHitListener = (event: BulletHitEvent) => void;
+
+const bulletHitListeners: BulletHitListener[] = [];
+
+/**
+ * Register a listener fired when a player's bullet lands on another player
+ * (after damage + stats are applied, so victim health is post-hit). Returns
+ * an unsubscribe function. Listener errors are contained so they can never
+ * break the tick loop.
+ */
+export function onBulletHit(listener: BulletHitListener): () => void {
+  bulletHitListeners.push(listener);
+  return () => {
+    const i = bulletHitListeners.indexOf(listener);
+    if (i >= 0) bulletHitListeners.splice(i, 1);
+  };
+}
+
+function emitBulletHit(event: BulletHitEvent): void {
+  for (const listener of bulletHitListeners) {
+    try {
+      listener(event);
+    } catch (err) {
+      console.error('bullet-hit listener failed:', err);
+    }
+  }
+}
+
 export function createGameState(): ServerGameState {
   return {
     match: {
@@ -67,6 +105,13 @@ export function removePlayer(state: ServerGameState, playerId: string): void {
   state.players.delete(playerId);
 }
 
+/**
+ * NOTE: despite the name, inputs are NOT queued for the next tick — they are
+ * processed SYNCHRONOUSLY at message-arrival time (seq stamped, movement
+ * simulated, fire resolved). Lag-comp rewind math depends on this timing:
+ * the bullet's rewind tick is resolved against the history at this exact
+ * moment (see resolveShooterRewindTick below).
+ */
 export function queueInput(state: ServerGameState, playerId: string, input: InputState): void {
   const player = state.players.get(playerId);
   if (!player) return;
@@ -309,6 +354,19 @@ function processBullets(state: ServerGameState): void {
           shooter.stats.kills++;
           result.player.stats.deaths++;
         }
+
+        // Hit confirmation for the shooter's client (connection.ts maps this
+        // to a {type:'hit'} message on the shooter's websocket). A killing
+        // shot may also produce the kill/death flow; the shooter getting both
+        // a hit and a kill notification is fine.
+        emitBulletHit({
+          bullet,
+          shooter,
+          victim: result.player,
+          damage,
+          headshot: result.headshot,
+          killed: result.player.isDead,
+        });
       }
     }
   }

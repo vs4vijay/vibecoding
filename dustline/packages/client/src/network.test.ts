@@ -72,3 +72,38 @@ describe('client pong reply', () => {
     }
   });
 });
+
+describe('client hit confirmation', () => {
+  it('dispatches {type:"hit"} to the onHit callback with the message fields', async () => {
+    const realLog = console.log;
+    console.log = () => {}; // silence network.ts connection logs
+    try {
+      const network = await import('./network.js');
+      const hits: { damage: number; healthLeft: number; shooterId: string }[] = [];
+      network.setCallbacks2({
+        onSnapshot: () => {},
+        onPlayerJoined: () => {},
+        onPlayerLeft: () => {},
+        onKill: () => {},
+        onDeath: () => {},
+        onMatchStart: () => {},
+        onMatchEnd: () => {},
+        onError: () => {},
+        onHit: (damage, healthLeft, shooterId) => hits.push({ damage, healthLeft, shooterId }),
+      });
+
+      const connected = network.connect('Tester', 'T');
+      const ws = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!;
+      ws.onopen?.();
+      ws.receive({ type: 'joined', playerId: 'p_1' });
+      await connected;
+
+      ws.receive({ type: 'hit', damage: 12, healthLeft: 80, shooterId: 'p_1' });
+      expect(hits).toEqual([{ damage: 12, healthLeft: 80, shooterId: 'p_1' }]);
+
+      network.disconnect();
+    } finally {
+      console.log = realLog;
+    }
+  });
+});

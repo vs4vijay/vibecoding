@@ -1,6 +1,6 @@
 import type { ClientMessage, ServerMessage, Team } from '@dustline/shared';
 import type { ServerGameState } from '../game/types.js';
-import { createGameState, addPlayer, removePlayer, queueInput, tick, onMatchEnd } from '../game/engine.js';
+import { createGameState, addPlayer, removePlayer, queueInput, tick, onMatchEnd, onBulletHit } from '../game/engine.js';
 import { toPlayerState } from '../game/player.js';
 import { applyRttSample } from '../game/rtt.js';
 import { persistMatchEnd, persistDisconnectStats } from '../db/repository.js';
@@ -24,6 +24,14 @@ let gameState = createGameState();
 // Match-end persistence (best-effort: the repository swallows DB errors).
 onMatchEnd((state, winner) => {
   void persistMatchEnd(state, winner);
+});
+
+// Hit confirmations: when a player's bullet lands, tell the SHOOTER so their
+// client can flash the hit marker (client network.ts 'hit' case → audio
+// hitMarker()). Fired after damage is applied, so healthLeft is the victim's
+// post-hit health (0 on a kill). The victim's socket gets nothing here.
+onBulletHit(({ shooter, victim, damage }) => {
+  sendToPlayer(shooter.id, { type: 'hit', damage, healthLeft: victim.health, shooterId: shooter.id });
 });
 
 function startGameLoop(): void {
@@ -196,6 +204,16 @@ export function handleMessage(ws: Bun.ServerWebSocket<any>, message: string | Bu
 function send(ws: Bun.ServerWebSocket<any>, message: ServerMessage): void {
   if (ws.readyState === 1) {
     ws.send(JSON.stringify(message));
+  }
+}
+
+/** Send a message to the websocket(s) joined as the given player, if any. */
+function sendToPlayer(playerId: string, message: ServerMessage): void {
+  for (const [ws, data] of clients) {
+    if (data.playerId === playerId) {
+      send(ws, message);
+      return;
+    }
   }
 }
 
