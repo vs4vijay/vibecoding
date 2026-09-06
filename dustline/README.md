@@ -70,8 +70,8 @@ export const client = new PGlite('./data/dustline.db');
 # Build both packages
 bun run build
 
-# Start production server
-bun run start
+# Start production server (serves the built client + WebSocket)
+NODE_ENV=production bun run start
 ```
 
 ## Game Controls
