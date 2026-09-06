@@ -25,6 +25,16 @@ export function generateId(): string {
   return crypto.randomUUID();
 }
 
+/** Called when a match transitions to 'ended' (e.g. for persistence). */
+export type MatchEndListener = (state: ServerGameState, winner: Team) => void;
+
+const matchEndListeners: MatchEndListener[] = [];
+
+/** Register a listener fired when a match ends. Listener errors are contained. */
+export function onMatchEnd(listener: MatchEndListener): void {
+  matchEndListeners.push(listener);
+}
+
 export function createGameState(): ServerGameState {
   return {
     match: {
@@ -200,7 +210,7 @@ function startMatch(state: ServerGameState): void {
   }
 }
 
-function endMatch(state: ServerGameState, winner: Team): void {
+export function endMatch(state: ServerGameState, winner: Team): void {
   state.match.status = 'ended';
   state.match.endTime = Date.now();
   if (winner === 'T') {
@@ -208,7 +218,17 @@ function endMatch(state: ServerGameState, winner: Team): void {
   } else if (winner === 'CT') {
     state.match.ctScore++;
   }
-  
+
+  // Notify listeners (persistence). Errors are contained per listener so
+  // they can never break the tick loop.
+  for (const listener of matchEndListeners) {
+    try {
+      listener(state, winner);
+    } catch (err) {
+      console.error('match-end listener failed:', err);
+    }
+  }
+
   // Schedule next match
   setTimeout(() => {
     resetMatch(state);

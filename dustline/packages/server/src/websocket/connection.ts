@@ -1,8 +1,9 @@
 import type { ClientMessage, ServerMessage, Team } from '@dustline/shared';
 import type { ServerGameState } from '../game/types.js';
-import { createGameState, addPlayer, removePlayer, queueInput, tick } from '../game/engine.js';
+import { createGameState, addPlayer, removePlayer, queueInput, tick, onMatchEnd } from '../game/engine.js';
 import { toPlayerState } from '../game/player.js';
 import { applyRttSample } from '../game/rtt.js';
+import { persistMatchEnd, persistDisconnectStats } from '../db/repository.js';
 import config from '../config.js';
 
 /** How often the server probes each connection's round-trip time. */
@@ -19,6 +20,11 @@ interface ClientData {
 
 const clients = new Map<Bun.ServerWebSocket<any>, ClientData>();
 let gameState = createGameState();
+
+// Match-end persistence (best-effort: the repository swallows DB errors).
+onMatchEnd((state, winner) => {
+  void persistMatchEnd(state, winner);
+});
 
 function startGameLoop(): void {
   function loop() {
@@ -68,6 +74,22 @@ export function handleClose(ws: Bun.ServerWebSocket<any>): void {
     data.pingTimer = null;
   }
   if (data?.playerId) {
+    const player = gameState.players.get(data.playerId);
+    // Best-effort persistence of a live-match leaver's per-match stats.
+    // Skipped outside 'live': during warmup the stats are stale from a
+    // banked match (they reset at startMatch), and after a match end they
+    // were already persisted by the match-end hook.
+    if (player && gameState.match.status === 'live') {
+      void persistDisconnectStats({
+        username: player.username,
+        kills: player.stats.kills,
+        deaths: player.stats.deaths,
+        headshots: player.stats.headshots,
+        shotsFired: player.stats.shotsFired,
+        shotsHit: player.stats.shotsHit,
+        damageDealt: player.stats.damageDealt,
+      });
+    }
     removePlayer(gameState, data.playerId);
     broadcast({
       type: 'playerLeft',
