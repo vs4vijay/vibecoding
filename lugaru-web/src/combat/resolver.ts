@@ -1,0 +1,207 @@
+/**
+ * resolveAction — the one pure function that decides what a button press
+ * means [spec §3.1].
+ *
+ * Inputs are plain snapshots (CombatantSnapshot / WorldContext), never class
+ * instances; no three/Rapier anywhere under src/combat/. No I/O, no clock,
+ * no RNG — same inputs always yield the same output, so AI (Task 16) can
+ * simulate it headless.
+ *
+ * Priority order (brief): stealthKill → reverse → context (pickup/body/clean)
+ * → stance table → null. Returns null when nothing applies; never throws.
+ */
+
+import type {
+  ActionButton,
+  CombatantSnapshot,
+  ResolveResult,
+  TargetSnapshot,
+  WorldContext,
+} from './types';
+import { MOVES } from '../data/moves';
+import { WEAPONS } from '../data/weapons';
+import {
+  LEG_CANNON_AHEAD_HALF_RAD,
+  REVERSE_PRESS_WINDOW_MS,
+} from '../data/tuning';
+
+// Snapshot types re-exported so consumers import the whole resolver surface
+// from one module (types.ts remains the owning declaration).
+export type {
+  ActionButton,
+  CombatantSnapshot,
+  MoveId,
+  ResolveResult,
+  Stance,
+  TargetSnapshot,
+  WorldContext,
+} from './types';
+
+
+export function resolveAction(
+  input: { button: ActionButton; heldAttack?: boolean },
+  actor: CombatantSnapshot,
+  worldCtx: WorldContext,
+): ResolveResult | null {
+  switch (input.button) {
+    case 'attack':
+      return resolveAttack(input, actor);
+    case 'jump':
+      return resolveJump(actor, worldCtx);
+    case 'crouch':
+      return resolveCrouch(actor, worldCtx);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Attack button [spec §3.1 row 1]
+// ---------------------------------------------------------------------------
+
+function resolveAttack(
+  input: { button: ActionButton; heldAttack?: boolean },
+  a: CombatantSnapshot,
+): ResolveResult | null {
+  const t = a.nearestTarget;
+
+  // Stealth kill outranks every other attack resolution [spec §3.7].
+  // Behind = the attacker stands in the TARGET's rear cone: the target does
+  // not face us (TargetSnapshot.facingMe is the victim-facing view; the
+  // exact ±60° rear geometry is re-gated at fire time by tryStealthKill
+  // [Task 18]). Standing attacker, LIVING target — grounded meat is
+  // soccerKick's job; offering the kill on a body would just whiff-lock.
+  if (
+    a.stance === 'standing' &&
+    t &&
+    t.unaware &&
+    !t.isDowned &&
+    !t.facingMe &&
+    t.dist <= MOVES.stealthKill.rangeM
+  ) {
+    return { kind: 'move', id: 'stealthKill' };
+  }
+  // Held attack chains doublePunch during the first punch's recovery.
+  // A crouched fighter keeps sweep intent instead of chaining.
+  if (
+    input.heldAttack &&
+    !isCrouchDown(a) &&
+    a.currentMove?.id === 'punch' &&
+    a.currentMove.phase === 'recovery'
+  ) {
+    return { kind: 'move', id: 'doublePunch' };
+  }
+  // Context attacks beat the plain stance table.
+  if (t?.isDowned && t.dist <= MOVES.soccerKick.rangeM) return { kind: 'move', id: 'soccerKick' };
+  if (t?.airborne && t.dist <= MOVES.airGrab.rangeM) return { kind: 'move', id: 'airGrab' };
+
+  // Wall kick when a wall is close enough to bounce off.
+  if (a.wallProximityM < (MOVES.wallKick.requiresWallWithinM ?? Infinity)) {
+    return { kind: 'move', id: 'wallKick' };
+  }
+  // Stance table — crouched sweep and running kick are unconditional rows.
+  if (a.stance === 'crouched') return { kind: 'move', id: 'legSweep' };
+  if (a.isRunning || a.stance === 'running') return { kind: 'move', id: 'runningKick' };
+
+  // Armed fighters swing their weapon; the swing's reach is the weapon's.
+  // This replaces the plain punch for any fighter with a weapon [Task 13].
+  if (a.hasWeapon !== null && a.hasWeapon !== 'none') {
+    const reach = WEAPONS[a.hasWeapon].reachM;
+    if (!t || t.dist > reach) return null;
+    return { kind: 'move', id: 'slash' };
+  }
+
+  // Standing punch needs a target in reach; bare open-field presses do
+  // nothing [spec §3.1 last row].
+  if (!t || t.dist > MOVES.punch.rangeM) return null;
+  return { kind: 'move', id: 'punch' };
+}
+
+// ---------------------------------------------------------------------------
+// Jump button [spec §3.1 row 2]
+// ---------------------------------------------------------------------------
+
+function resolveJump(a: CombatantSnapshot, ctx: WorldContext): ResolveResult {
+  if (ctx.airborneSelf || a.stance === 'airborne') return { kind: 'move', id: 'flip' };
+
+  const t = a.nearestTarget;
+  if (
+    (a.isRunning || a.stance === 'running') &&
+    t &&
+    t.relAngle >= -LEG_CANNON_AHEAD_HALF_RAD &&
+    t.relAngle <= LEG_CANNON_AHEAD_HALF_RAD &&
+    t.dist <= MOVES.legCannon.rangeM
+  ) {
+    return { kind: 'move', id: 'legCannon' };
+  }
+
+  if (a.stance === 'crouched') return { kind: 'move', id: 'hop' };
+  return { kind: 'move', id: 'jump' };
+}
+
+// ---------------------------------------------------------------------------
+// Crouch button — reverse > context > slide-stop [spec §3.1 row 3]
+// ---------------------------------------------------------------------------
+
+function resolveCrouch(a: CombatantSnapshot, ctx: WorldContext): ResolveResult | null {
+  // Mid-air flip: both canonical triggers land here — jump-air via
+  // resolveJump, crouch-air per the plan's context table row.
+  if (ctx.airborneSelf || a.stance === 'airborne') return { kind: 'move', id: 'flip' };
+
+  // Reversal: timed crouch press vs an incoming attack inside its reversal
+  // window while facing back at the attacker [spec §3.2]. Long-held crouch
+  // is sneak state, not a reverse attempt.
+  if (isFreshCrouchPress(a)) {
+    const rev = findReversal(a);
+    if (rev) return rev;
+  }
+
+  if (a.stance === 'crouched') {
+    // Context priority: pickup > body throw > blade cleaning (brief).
+    if (ctx.weaponOnGroundNearby) return { kind: 'move', id: 'pickupOrContext' };
+    if (ctx.downedBodyNearby) return { kind: 'move', id: 'bodyThrow' };
+    if (a.hasWeapon && a.bladeBloody) return { kind: 'move', id: 'cleanBlade' };
+    // Crouched with nothing to do stays put.
+    return null;
+  }
+
+  if (a.isRunning || a.stance === 'running') return { kind: 'move', id: 'slideStop' };
+  return null;
+}
+
+/**
+ * The defender reverses iff the incoming attack sits inside its move's
+ * `reversalWindow` (absolute ms from attacker's move start) while they face
+ * us. A failed check is a whiffed duck — resolveCrouch falls through and
+ * returns null here; the controller just enters crouch stance [§3.2].
+ */
+function findReversal(a: CombatantSnapshot): { kind: 'reverse'; targetId: string } | null {
+  const t = a.nearestTarget;
+  const inc = t?.incomingAttack;
+  if (!t || !inc) return null;
+
+  const def = MOVES[inc.moveId];
+  const win = def?.reversalWindow;
+  if (!win) return null;
+
+  const elapsed =
+    inc.phase === 'startup'
+      ? inc.phaseMsElapsed
+      : inc.phase === 'active'
+        ? def.startupMs + inc.phaseMsElapsed
+        : def.startupMs + def.activeMs + inc.phaseMsElapsed;
+
+  if (elapsed < win.from || elapsed > win.to) return null;
+  if (!t.facingMe) return null;
+
+  return { kind: 'reverse', targetId: t.id };
+}
+
+/** True for a timed press: fresh enough to count as a reverse attempt. */
+function isFreshCrouchPress(a: CombatantSnapshot): boolean {
+  return a.crouchHeldMs <= REVERSE_PRESS_WINDOW_MS;
+}
+
+/** True while the button is physically down at all (suppresses chaining). */
+function isCrouchDown(a: CombatantSnapshot): boolean {
+  return a.crouchHeldMs > 0;
+}
+
