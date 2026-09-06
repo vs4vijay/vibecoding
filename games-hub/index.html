@@ -140,6 +140,15 @@
     --ink:#200d0a;
     --marquee-bg:#16211a;
   }
+  .cab--dave{
+    --accent:#ff3366;
+    --accent-soft:rgba(255,51,102,.14);
+    --accent-line:rgba(255,51,102,.42);
+    --genre:#ff3366;
+    --label:#ffb3c9;
+    --ink:#1a0a0c;
+    --marquee-bg:#2a0a0e;
+  }
 
   .cab__marquee{
     position:relative;
@@ -343,8 +352,7 @@
 </head>
 <body>
 
-<header class="hero wrap">
-  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 3 cabinets online</p>
+  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 4 cabinets online</p>
   <h1 class="hero__title">Vibecoding <span class="hero__hollow">Arcade</span></h1>
   <p class="hero__sub">Browser games built with AI — procedural everything, zero assets, no installs. <strong>Click a cabinet and play.</strong></p>
 </header>
@@ -478,6 +486,48 @@
             <p class="cab__keys"><kbd>WASD</kbd> move · attack / reverse / counter buttons · context-sensitive</p>
           </div>
           <a class="play" href="https://vs4vijay.github.io/vibecoding/lugaru-web/" aria-label="Play Lugaru Combat Prototype">
+            <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
+            Play
+          </a>
+        </div>
+      </article>
+    <li>
+      <article class="cab cab--dave" aria-labelledby="cab-dave-title">
+        <div class="cab__marquee">
+          <svg class="motif" viewBox="0 0 120 100" width="148" height="123" role="img" aria-label="Pixel hat and scarf emblem for Dave Dangerous" focusable="false">
+            <defs>
+              <radialGradient id="glowD" cx="50%" cy="50%" r="62%">
+                <stop offset="0%" stop-color="#ff3366" stop-opacity=".32"/>
+                <stop offset="100%" stop-color="#ff3366" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="120" height="100" fill="url(#glowD)"/>
+            <!-- Pixel hat -->
+            <rect x="45" y="25" width="30" height="10" fill="#ff3366"/>
+            <rect x="40" y="35" width="40" height="8" fill="#ff3366"/>
+            <!-- Pixel scarf -->
+            <rect x="55" y="43" width="6" height="25" fill="#ff6b8a"/>
+            <rect x="49" y="48" width="6" height="20" fill="#ff6b8a"/>
+            <!-- Pixel eyes -->
+            <rect x="48" y="45" width="4" height="4" fill="#fff"/>
+            <rect x="58" y="45" width="4" height="4" fill="#fff"/>
+            <!-- Pixel mouth -->
+            <rect x="50" y="52" width="4" height="3" fill="#000"/>
+            <rect x="56" y="52" width="4" height="3" fill="#000"/>
+            <!-- Pixel shoes -->
+            <rect x="42" y="78" width="10" height="6" fill="#fff"/>
+            <rect x="68" y="78" width="10" height="6" fill="#fff"/>
+          </svg>
+        </div>
+        <div class="cab__body">
+          <p class="cab__genre">Run · Jump · Collect</p>
+          <h2 class="cab__title" id="cab-dave-title">Dave Dangerous</h2>
+          <p class="cab__desc">Classic platformer inspired by Dangerous Dave. Run, jump, and collect treasure while avoiding pitfalls and obstacles in procedurally generated levels.</p>
+          <div class="cab__panel">
+            <span class="cab__panel-label">Controls</span>
+            <p class="cab__keys"><kbd>←</kbd>/<kbd>→</kbd> move · <kbd>↑</kbd> jump · <kbd>Z</kbd> interact</p>
+          </div>
+          <a class="play" href="https://vs4vijay.github.io/vibecoding/dave-dangerous/" aria-label="Play Dave Dangerous">
             <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
             Play
           </a>

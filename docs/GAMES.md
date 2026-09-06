@@ -13,10 +13,10 @@ without breaking the others.
 | Undead Highway | <https://vs4vijay.github.io/vibecoding/zombie-highway/> | [`zombie-highway/`](../zombie-highway) | TS strict · Vite 8 · three.js | vitest (node env) |
 | Tank Racer | <https://vs4vijay.github.io/vibecoding/tank-racer/> | [`tank-racer/`](../tank-racer) | TS strict · Vite 8 · three.js | bun test (pure logic) |
 | Lugaru Combat Prototype | <https://vs4vijay.github.io/vibecoding/lugaru-web/> | [`lugaru-web/`](../lugaru-web) | TS strict · Vite · three.js · Rapier | vitest |
+| Dave Dangerous | <https://vs4vijay.github.io/vibecoding/dave-dangerous/> | [`dave-dangerous/`](../dave-dangerous) | TS strict · Vite 5 | vitest |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
-status): [`dave-dangerous/`](../dave-dangerous) (Vite 5 + vitest),
-[`subway-surfers/`](../subway-surfers), [`cs-clone/`](../cs-clone),
+status): [`subway-surfers/`](../subway-surfers), [`cs-clone/`](../cs-clone),
 [`lf2-web/`](../lf2-web).
 
 Each game folder is self-contained: its own `package.json` + lockfile, its own
