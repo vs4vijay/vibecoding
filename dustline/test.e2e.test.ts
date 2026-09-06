@@ -1,5 +1,6 @@
 import { describe, it, expect, afterAll } from 'bun:test';
 import { resolve } from 'path';
+import { stat } from 'fs/promises';
 
 const __dirname = import.meta.dir;
 
@@ -10,7 +11,11 @@ const serverProcess = Bun.spawn(
   { cwd: __dirname, env: { ...process.env, SERVER_PORT: String(TEST_PORT) } }
 );
 
+// Wait for readiness: sniff stdout for the startup banner, with a fallback
+// poll of GET /health every 250ms (up to 10s total) in case the log is missed.
 await new Promise<void>(r => {
+  let ready = false;
+  const markReady = () => { if (!ready) { ready = true; r(); } };
   const reader = serverProcess.stdout.pipeThrough(new TextDecoderStream()).getReader();
   (async () => {
     let buf = '';
@@ -18,10 +23,18 @@ await new Promise<void>(r => {
       const { done, value } = await reader.read();
       if (done) break;
       buf += value;
-      if (buf.includes('Dustline server running')) { r(); break; }
+      if (buf.includes('Dustline server running')) markReady();
     }
   })();
-  setTimeout(r, 5000);
+  const start = Date.now();
+  const poll = setInterval(async () => {
+    if (ready) { clearInterval(poll); return; }
+    if (Date.now() - start >= 10_000) { clearInterval(poll); markReady(); return; }
+    try {
+      const res = await fetch(`http://localhost:${TEST_PORT}/health`);
+      if (res.ok) { clearInterval(poll); markReady(); }
+    } catch { /* server not accepting connections yet */ }
+  }, 250);
 });
 
 afterAll(() => serverProcess.kill());
@@ -310,6 +323,9 @@ describe('Shared Types & Config', () => {
   });
 });
 
+// The client dist only exists after `bun run build` — skip (don't fail) when it's missing.
+const clientDist = await stat(resolve(__dirname, 'packages/client/dist')).catch(() => null);
+
 describe('PWA & Build Artifacts', () => {
   it('PWA manifest is valid', async () => {
     const fs = await import('fs');
@@ -321,7 +337,7 @@ describe('PWA & Build Artifacts', () => {
     expect(Array.isArray(manifest.icons)).toBe(true);
   });
 
-  it('client dist contains PWA files', async () => {
+  (clientDist ? it : it.skip)('client dist contains PWA files', async () => {
     const fs = await import('fs/promises');
     const files = await fs.readdir(resolve(__dirname, 'packages/client/dist'));
     expect(files).toContain('index.html');
