@@ -12,11 +12,12 @@ without breaking the others.
 |---|---|---|---|---|
 | Undead Highway | <https://vs4vijay.github.io/vibecoding/zombie-highway/> | [`zombie-highway/`](../zombie-highway) | TS strict · Vite 8 · three.js | vitest (node env) |
 | Tank Racer | <https://vs4vijay.github.io/vibecoding/tank-racer/> | [`tank-racer/`](../tank-racer) | TS strict · Vite 8 · three.js | bun test (pure logic) |
+| Lugaru Combat Prototype | <https://vs4vijay.github.io/vibecoding/lugaru-web/> | [`lugaru-web/`](../lugaru-web) | TS strict · Vite · three.js · Rapier | vitest |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
 status): [`dave-dangerous/`](../dave-dangerous) (Vite 5 + vitest),
-[`lugaru-web/`](../lugaru-web), [`subway-surfers/`](../subway-surfers),
-[`cs-clone/`](../cs-clone), [`lf2-web/`](../lf2-web).
+[`subway-surfers/`](../subway-surfers), [`cs-clone/`](../cs-clone),
+[`lf2-web/`](../lf2-web).
 
 Each game folder is self-contained: its own `package.json` + lockfile, its own
 `AGENTS.md` (commands, invariants, gotchas), `README.md` (controls, quickstart,
@@ -39,9 +40,12 @@ plan).
 - Pages is enabled repo-wide with `build_type: workflow`, serving from
   `https://vs4vijay.github.io/vibecoding/`.
 - **URL pattern:** `https://vs4vijay.github.io/vibecoding/<game-slug>/`
-- Triggers: push to `main` touching any game's files or the workflow itself,
-  plus manual `workflow_dispatch`. New games **must** be added to the
-  `paths:` filter or their pushes won't deploy.
+- **Site root** (`/`) is the games hub — a static landing page in
+  [`games-hub/index.html`](../games-hub/index.html) (no build step; the
+  workflow copies it to `site/`). Every deployed game gets a card there.
+- Triggers: push to `main` touching any game's files, the hub, or the
+  workflow itself, plus manual `workflow_dispatch`. New games **must** be
+  added to the `paths:` filter or their pushes won't deploy.
 
 ### Base-path handling (two equivalent options)
 
@@ -83,8 +87,11 @@ Relative base is simpler; prefer it unless the game needs absolute URLs
 8. **Verify the deploy:** `gh run watch <id>`, then `curl` the page URL and
    every referenced asset (expect HTTP 200 + correct `<title>`), and confirm
    the other games still return 200 (clobber detection).
-9. **Register the game:** add a row to the table at the top of this file and
-   to the Games section of the root `README.md`.
+9. **Register the game:** add a card to
+   [`games-hub/index.html`](../games-hub/index.html) (match the existing
+   card structure — inline SVG motif, accent colors, play URL), a row to the
+   table at the top of this file, and to the Games section of the root
+   `README.md`.
 
 ---
 

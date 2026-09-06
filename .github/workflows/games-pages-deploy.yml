@@ -6,8 +6,10 @@
 # would clobber each other's URLs.
 #
 # Layout on Pages:
+#   /                   <- games-hub/ landing page (static, no build)
 #   /tank-racer/       <- tank-racer/dist      (built with BASE_PATH)
 #   /zombie-highway/   <- zombie-highway/dist  (vite base "./", subpath-safe)
+#   /lugaru-web/       <- lugaru-web/dist      (vite base "./", subpath-safe)
 
 name: Deploy Games to Pages
 
@@ -17,6 +19,8 @@ on:
     paths:
       - "tank-racer/**"
       - "zombie-highway/**"
+      - "lugaru-web/**"
+      - "games-hub/**"
       - ".github/workflows/games-pages-deploy.yml"
   workflow_dispatch:
 
@@ -59,14 +63,24 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
+      - name: Build lugaru-web
+        working-directory: lugaru-web
+        # vite.config.ts sets base "./" so the build works under any subpath
+        # (/vibecoding/lugaru-web/) with no BASE_PATH env needed.
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Stage site (preserve per-game URL prefixes)
         run: |
           mkdir -p site
+          cp -r games-hub/. site/
           cp -r tank-racer/dist site/tank-racer
           cp -r zombie-highway/dist site/zombie-highway
+          cp -r lugaru-web/dist site/lugaru-web
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
