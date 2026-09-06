@@ -5,6 +5,11 @@ divided desert highway at dusk; zombies lurk on the shoulders, telegraph, and
 leap at your car. Shoot them off, graze them into obstacles, or dodge — but
 keep the weight balanced or the car flips.
 
+## Play online
+
+The latest build is deployed to GitHub Pages:
+<https://vs4vijay.github.io/vibecoding/zombie-highway/>
+
 ## Quickstart
 
 ```sh
