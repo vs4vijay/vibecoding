@@ -1,6 +1,7 @@
 // src/render/Renderer.ts
 import { PHYSICS } from "../core/types";
 import { PALETTE_0, PALETTE_1, SPRITE_RECTS, buildSpriteAtlas } from "./sprites";
+import { TILE_NAMES } from "./Tiles";
 
 export function scaleToFit(vw: number, vh: number): number {
   const s = Math.floor(Math.min(vw / PHYSICS.LOGICAL_W, vh / PHYSICS.LOGICAL_H));
@@ -42,9 +43,10 @@ export class Renderer {
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   }
   drawTile(id: number, tx: number, ty: number): void {
-    this.drawRects(tx * PHYSICS.TILE * this.scale, ty * PHYSICS.TILE * this.scale, id);
+    const name = TILE_NAMES[id];
+    if (!name) return;
+    this.drawSprite(name, tx * PHYSICS.TILE, ty * PHYSICS.TILE);
   }
-  private drawRects(px: number, py: number, id: number): void { /* placeholder — replaced by drawSprite in Task 15 */ }
 
   drawSprite(name: string, px: number, py: number, flipX = false): void {
     const r = SPRITE_RECTS.get(name);
