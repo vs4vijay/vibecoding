@@ -98,7 +98,50 @@ Relative base is simpler; prefer it unless the game needs absolute URLs
 
 ---
 
+## Renaming a game — checklist
+
+Rename a game folder, its brand, and its URLs in one sweep. This happened
+twice (zombie-highway → undead-driver, lugaru-web → lugaru-combat); both
+missed something on the first pass, so follow every line:
+
+1. **Rename the folder + commit the move first**, on its own:
+   `git mv <old-slug> <new-slug>` (or plain `mv` + `git add -A`). Do **not**
+   push a bare delete followed by a later add — the shared workflow checks out
+   each pushed commit, and a commit whose `working-directory: <old-slug>`
+   no longer exists fails CI (`No such file or directory`) and breaks the
+   whole site deploy.
+2. **Update the workflow** (`.github/workflows/games-pages-deploy.yml`): the
+   build step's `working-directory:`, the `cp -r <slug>/dist site/<slug>`
+   line, and any `<old-slug>/**` entry in `paths:`. Same commit as the move.
+3. **Update the hub card** in `games-hub/index.html`: the `<a class="play">`
+   href, `aria-label`, motif SVG `aria-label`, and the cabinet class
+   (`cab--<slug>`). The first rename **dropped the whole Undead card** from
+   the hub without anyone noticing — diff the hub file across the rename
+   commit and count cards.
+4. **Update the game's own title** — `index.html` `<title>` (browser tab +
+   share previews) and `package.json` `name`. Both renames shipped the old
+   title on first pass.
+5. **Update docs:** the live-games table in this file, the Games section of
+   root `README.md`, and any cross-references elsewhere in the repo
+   (`grep -r "<old-slug>" .` should return nothing).
+6. **Verify end-to-end:** `gh run watch <id>`, then check the new play URL
+   and the hub return 200 with the new `<title>` / card, and the old URL
+   404s (it must — no redirect exists yet).
+
+Keep the old `<old-slug>` URL broken deliberately — nothing should still
+link to it. If you want continuity, add a redirect page under the old slug
+(one static HTML + one `cp` + one `paths:` entry), but that's optional.
+
+---
+
 ## Gotchas (each one cost someone time)
+
+- **HTML breaks silently in CI.** The hub lost its `<header class="hero">`
+  opening tag once (`45a1da62`); every build/deploy still passed because the
+  hub has no build step — it's copied verbatim. The page just rendered
+  unstyled. After any hub edit, check the structure live (browser, not
+  curl): hero block present, correct number of cards, title centered. The
+  curl "verify the deploy" step catches 404s, not CSS/HTML regressions.
 
 - **Server-backed games can't ship on Pages.** dustline runs its own
   WebSocket game server (Bun + Hono), so no static `dist/` can represent it.
@@ -124,3 +167,8 @@ Relative base is simpler; prefer it unless the game needs absolute URLs
   the same level. Obstacle/spawn cadence fixed in *distance* makes crash
   points quasi-deterministic even with random patterns — don't mistake that
   for a seeding bug.
+- **Pages deploy lags the run success.** `gh run watch` green ≠ bytes live.
+  The CDN edge can serve the previous deploy for a minute or two after
+  "Deploy to GitHub Pages" completes — a single immediate check can
+  false-negative on the exact fix you shipped. Retry with a cache-busting
+  query (`?cb=<timestamp>`) before assuming the deploy failed.
