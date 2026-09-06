@@ -74,6 +74,15 @@ describe('Health Check', () => {
   });
 });
 
+describe('Leaderboard endpoint (end-to-end)', () => {
+  it('GET /leaderboard returns 200 with an array on the real server (boot schema ensured)', async () => {
+    const res = await fetch(`http://localhost:${TEST_PORT}/leaderboard`);
+    expect(res.ok).toBe(true);
+    const body = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+  });
+});
+
 describe('Player Join & Snapshot', () => {
   it('single player joins and gets valid snapshot', async () => {
     const { ws, playerId, initialSnapshot } = await joinGame('SoloBot', 'T');
