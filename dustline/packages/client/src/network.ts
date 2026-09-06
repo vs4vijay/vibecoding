@@ -116,6 +116,10 @@ function handleServerMessage(event: MessageEvent): void {
       case 'matchStart':
         cb?.onMatchStart(msg.matchId);
         break;
+      case 'ping':
+        // Echo the server's RTT-probe timestamp back unchanged.
+        send({ type: 'pong', t: msg.t });
+        break;
       case 'matchEnd':
         cb?.onMatchEnd(msg.tScore, msg.ctScore, msg.winner);
         break;
