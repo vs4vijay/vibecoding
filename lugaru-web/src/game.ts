@@ -4,7 +4,7 @@ import { Timescale } from './core/timescale';
 import { ChaseCamera } from './render/camera';
 import { createScene, type SceneBundle } from './render/scene';
 import { DebugStats } from './render/debugStats';
-import { FxParticles, HEAVY_LAND_MIN_FALL_MPS, WindParticles, PickupVisuals } from './render/fx';
+import { FxParticles, HEAVY_LAND_MIN_FALL_MPS, WindParticles, PickupVisuals, BloodDecals } from './render/fx';
 import { addBoulders, addBushes, addGrassTufts, type SwayField } from './render/scene';
 import { SPECIES } from './data/species';
 import { buildRig, type Rig } from './actors/skeleton';
@@ -23,8 +23,13 @@ import { throwKnife } from './combat/weaponsLogic';
 import {
   CONTEXT_CROUCH_PICKUP_MS,
   HITSTOP_MS,
+  HITSTOP_KO_MS,
   KO_SLOWMO_SCALE,
   KO_SLOWMO_MS,
+  MAX_RAGDOLLS,
+  VIGNETTE_HP_FRACTION,
+  LEG_CANNON_FOV_KICK_DEG,
+  LEG_CANNON_FOV_RECOVER_MS,
   WORLD_RNG_SEED,
   PICKUP_REACH_M,
   RUN_STANCE_SPEED,
@@ -43,7 +48,7 @@ import { emitHearing, type HearingEvent } from './ai/perception';
 import { Brain, type BrainSenses, type BrainWorld } from './ai/brain';
 import { DIFFICULTY } from './ai/difficulty';
 import { mulberry32 } from './core/rng';
-import { spawnRagdoll, type RagdollHandle } from './actors/ragdoll';
+import { spawnRagdoll, cullSettledRagdolls, type RagdollHandle } from './actors/ragdoll';
 
 import type { Difficulty } from './types';
 import { WAVES } from './data/waves';
@@ -162,6 +167,7 @@ export class Game {
   private readonly debug: DebugStats | null;
 
   private readonly fx: FxParticles;
+  private readonly bloodDecals: BloodDecals;
 
   private readonly playerSim: FighterSim;
   private readonly playerRig: Rig;
@@ -223,6 +229,8 @@ export class Game {
   private readonly resultsOverlay: ResultsOverlay;
   private readonly pauseOverlay: PauseOverlay;
   private readonly deathOverlay: HTMLDivElement;
+  private readonly vignetteOverlay: HTMLDivElement;
+  private lastSatStr = '';
   private readonly clearedBanner: HTMLDivElement;
   private readonly markerMesh: THREE.Mesh;
 
@@ -284,6 +292,7 @@ export class Game {
       : null;
 
     this.fx = new FxParticles(this.sceneBundle.scene);
+    this.bloodDecals = new BloodDecals(this.sceneBundle.scene);
 
     // --- Input ---
     this.input = new InputManager();
@@ -339,6 +348,15 @@ export class Game {
     deathHint.textContent = 'R — restart wave  |  Esc — menu';
     this.deathOverlay.appendChild(deathHint);
     uiRoot.appendChild(this.deathOverlay);
+
+    // Damage vignette — radial gradient darkening + desaturation [spec §3.4].
+    this.vignetteOverlay = document.createElement('div');
+    Object.assign(this.vignetteOverlay.style, {
+      position: 'absolute', inset: '0', pointerEvents: 'none',
+      background: 'radial-gradient(ellipse at center, transparent 50%, rgba(80,0,0,0.8) 100%)',
+      opacity: '0', zIndex: '5', transition: 'opacity 0.15s',
+    });
+    uiRoot.appendChild(this.vignetteOverlay);
 
     this.clearedBanner = document.createElement('div');
     this.clearedBanner.className = 'lg-banner hidden';
@@ -422,6 +440,7 @@ export class Game {
     }
     this.input.detach();
     this.fx.dispose();
+    this.bloodDecals.dispose();
     this.windFx.dispose();
     this.pickupFx.dispose();
     this.bushSway.dispose();
@@ -526,6 +545,9 @@ export class Game {
     this.playerSim.setScoreLedger(new ScoreLedger());
     this.resetPlayer();
     this.clearAllActors();
+    this.canvas.style.filter = '';
+    this.lastSatStr = '';
+    this.vignetteOverlay.style.opacity = '0';
     if (this.drops) spawnPickups(this.drops);
     this.startWave(0);
     this.setMode('arena');
@@ -680,11 +702,17 @@ export class Game {
     s.durability = undefined;
     s.bloodiedWeapon = undefined;
     s.flags = { bleeding: false, limping: false, unconscious: false, invulnerableAirFlipMs: 0 };
+    this.canvas.style.filter = '';
+    this.lastSatStr = '';
+    this.vignetteOverlay.style.opacity = '0';
     // Drop the previous ragdoll handle so a settled corpse can't keep
     // writing the revived rig's bone matrices.
     if (this.playerRagdoll) {
       const i = this.ragdolls.indexOf(this.playerRagdoll);
-      if (i >= 0) this.ragdolls.splice(i, 1);
+      if (i >= 0) {
+        this.ragdolls.splice(i, 1);
+        this.playerRagdoll.dispose();
+      }
       this.playerRagdoll = null;
     }
     this.playerKoHandled = false;
@@ -829,6 +857,24 @@ export class Game {
     } else {
       this.markerMesh.visible = false;
     }
+
+    // Blood decals fade.
+    this.bloodDecals.update(realDtMs * scale);
+
+    // Damage vignette + desaturation [spec §3.4].
+    const hpFrac = Math.max(0, this.playerSim.state.hp) / SPECIES.rabbit.maxHp;
+    const vDepth = hpFrac <= VIGNETTE_HP_FRACTION ? 1 - hpFrac / VIGNETTE_HP_FRACTION : 0;
+    const alpha = vDepth * 0.85;
+    const alphaStr = alpha.toFixed(3);
+    if (alphaStr !== this.lastSatStr) {
+      this.lastSatStr = alphaStr;
+      this.vignetteOverlay.style.opacity = alphaStr;
+      const sat = 1 - vDepth * 0.55;
+      this.canvas.style.filter = sat < 0.99 ? `saturate(${sat.toFixed(3)})` : '';
+    }
+
+    // Ragdoll culling — oldest settled beyond cap removed [Task 20].
+    cullSettledRagdolls(this.ragdolls, MAX_RAGDOLLS);
 
     this.updateRender(realDtMs * scale);
     this.debug?.frame(realDtMs);
@@ -1124,6 +1170,7 @@ export class Game {
     return [
       `mode: ${this.mode} diff: ${this.difficulty}${this.godMode ? ' GOD' : ''}`,
       `wind: ${deg.toFixed(0)}deg str ${this.wind.strength.toFixed(2)}  wall: ${wallLine}`,
+      `rev: ${this.playerSim.reversalStats.successes}/${this.playerSim.reversalStats.attempts}`,
       `enemies: ${enemyLine}`,
     ].join('\n');
   }
@@ -1148,8 +1195,18 @@ export class Game {
     }
     if (!applied) return;
     this.lastHitDir = { x: hit.dirVector.x, y: 0, z: hit.dirVector.z };
-    this.timescale.hitstop(HITSTOP_MS);
-    if (victim.flags.bleeding && !wasBleeding) this.fx.spawnBloodPuff(victim.pos);
+    // KO hits get extra hitstop [Task 20: 140ms vs 90ms standard].
+    const isKoHit = victim.hp <= 0;
+    this.timescale.hitstop(isKoHit ? HITSTOP_KO_MS : HITSTOP_MS);
+    if (victim.flags.bleeding && !wasBleeding) {
+      this.fx.spawnBloodPuff(victim.pos);
+      this.bloodDecals.spawn(victim.pos);
+    }
+
+    // Leg cannon FOV kick [Task 20].
+    if (hit.moveId === 'legCannon') {
+      this.chaseCam.kickFov(LEG_CANNON_FOV_KICK_DEG, LEG_CANNON_FOV_RECOVER_MS);
+    }
 
     if (this.mode === 'tutorial' && hit.attackerId === this.playerSim.state.id) {
       if (hit.moveId === 'punch' || hit.moveId === 'doublePunch') {
@@ -1282,6 +1339,7 @@ export class Game {
     ragdolls: readonly RagdollHandle[];
     world: FighterSimWorld;
     fx: FxParticles;
+    bloodDecals: BloodDecals;
     wind: WindSystem;
     bushField: BushField;
     brain: Brain | undefined;
@@ -1299,6 +1357,7 @@ export class Game {
       ragdolls: this.ragdolls,
       world: this.world,
       fx: this.fx,
+      bloodDecals: this.bloodDecals,
       wind: this.wind,
       bushField: this.bushField,
       brain: this.enemies[0]?.brain ?? undefined,

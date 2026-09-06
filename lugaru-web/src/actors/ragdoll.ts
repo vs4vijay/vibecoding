@@ -35,6 +35,8 @@ export interface RagdollHandle {
   settled: boolean;
   /** Read body transforms and write them into the rig's bone matrices. */
   update(): void;
+  /** Remove all rigid bodies from the physics world. */
+  dispose(): void;
 }
 
 export interface Impulse {
@@ -296,6 +298,7 @@ export function spawnRagdoll(
     bones: {} as Record<BoneName, RagdollBonePose>,
     settled: false,
     update() { /* filled below */ },
+    dispose() { for (const b of bodies.values()) world.raw.removeRigidBody(b); },
   };
   for (const geo of Object.values(bones)) {
     const body = bodies.get(geo.name)!;
@@ -349,4 +352,24 @@ export function spawnRagdoll(
   };
 
   return handle;
+}
+// ---------------------------------------------------------------------------
+// Ragdoll culling [Task 20] — oldest settled ragdolls culled beyond cap.
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove settled ragdolls beyond `max` from the list, oldest first.
+ * Culled ragdolls have their rigid bodies removed from the physics world.
+ */
+export function cullSettledRagdolls(ragdolls: RagdollHandle[], max: number): void {
+  while (ragdolls.length > max) {
+    // Find the oldest settled ragdoll (scan from front = oldest).
+    let idx = -1;
+    for (let i = 0; i < ragdolls.length; i++) {
+      if (ragdolls[i].settled) { idx = i; break; }
+    }
+    if (idx < 0) break; // none settled yet — keep all
+    ragdolls[idx].dispose();
+    ragdolls.splice(idx, 1);
+  }
 }

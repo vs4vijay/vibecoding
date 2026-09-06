@@ -364,3 +364,31 @@ export const PICKUP_REACH_M = 1.5;
  * so a hold can never read as a reverse attempt, and once per hold episode.
  */
 export const CONTEXT_CROUCH_PICKUP_MS = 250;
+// --- Polish pass [Task 20] -------------------------------------------------
+
+/**
+ * Hitstop freeze on a KO-ing hit (ms) — longer than standard HITSTOP_MS
+ * so the finishing blow lands with extra punch.
+ */
+export const HITSTOP_KO_MS = 140;
+
+/** Blood decal pool size (ground planes that persist and fade). */
+export const BLOOD_DECAL_POOL_SIZE = 32;
+
+/** Blood decal fade duration (ms). */
+export const BLOOD_DECAL_FADE_MS = 20_000;
+
+/** Max simultaneous ragdolls; oldest settled ones culled beyond this. */
+export const MAX_RAGDOLLS = 6;
+
+/**
+ * Screen desaturation + vignette activates when player hp fraction drops
+ * below this value [spec §3.4 diegetic health].
+ */
+export const VIGNETTE_HP_FRACTION = 0.4;
+
+/** Camera FOV kick (degrees) on a leg cannon hit. */
+export const LEG_CANNON_FOV_KICK_DEG = 6;
+
+/** Camera FOV kick recovery duration (ms). */
+export const LEG_CANNON_FOV_RECOVER_MS = 500;

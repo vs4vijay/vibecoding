@@ -304,6 +304,12 @@ export class FighterSim {
    * (Task 18 owns STEALTH_KILL).
    */
   private ledger: LedgerView | null = null;
+  /**
+   * Reversal debug counters [Task 20 tuning session] — attempts = crouch
+   * presses routed to a reversal check; successes = reversals that landed.
+   * Read-only; the game layer surfaces them in the F3 overlay.
+   */
+  readonly reversalStats = { attempts: 0, successes: 0 };
 
   /** Total score accumulated in this fighter's ledger (0 when unset). */
   get scoreTotal(): number {
@@ -674,6 +680,7 @@ export class FighterSim {
     );
     if (action === null) return; // plain duck: crouch stance via integrate()
     if (action.kind === 'reverse') {
+      this.reversalStats.attempts++;
       this.executeReversal(action.targetId);
       return;
     }
@@ -711,7 +718,7 @@ export class FighterSim {
       elapsedMs: attacker.moveElapsedMs,
     });
     if (outcome !== 'success') return; // early/late/notFacing → whiffed duck
-
+    this.reversalStats.successes++;
     // SUCCESS [spec §3.2]: the incoming attack dies mid-swing. Attacker is
     // cancelled into hitstun whose duration IS the counter-reversal window
     // (startCounter reads it); defender plays the short reversal animation.

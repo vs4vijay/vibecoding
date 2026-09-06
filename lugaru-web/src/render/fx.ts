@@ -11,7 +11,7 @@
  */
 
 import * as THREE from 'three';
-import { HEAVY_LAND_MIN_FALL_MPS } from '../data/tuning';
+import { HEAVY_LAND_MIN_FALL_MPS, BLOOD_DECAL_POOL_SIZE, BLOOD_DECAL_FADE_MS } from '../data/tuning';
 import { heightAt } from '../world/terrain';
 import type { WeaponDropClass } from '../world/projectiles';
 export { HEAVY_LAND_MIN_FALL_MPS };
@@ -399,5 +399,84 @@ export class PickupVisuals {
       : new THREE.MeshStandardMaterial({ color, flatShading: true });
     this.mats.push(m);
     return m;
+  }
+}
+// ---------------------------------------------------------------------------
+// Blood decals [Task 20] — ground planes that fade over BLOOD_DECAL_FADE_MS.
+// 32 pre-allocated meshes, spawned on bleed; oldest recycled when the pool
+// fills.
+// ---------------------------------------------------------------------------
+
+const DECAL_SIZE = 0.9;
+
+export class BloodDecals {
+  private readonly scene: THREE.Scene;
+  private readonly meshes: THREE.Mesh[] = [];
+  private readonly lifes: Float32Array = new Float32Array(BLOOD_DECAL_POOL_SIZE);
+  private nextSlot = 0;
+  /** Tiny LCG — deterministic visual jitter without touching the sim rng. */
+  private lcgState = 0xdeadbeef;
+
+  constructor(scene: THREE.Scene) {
+    this.scene = scene;
+    const geo = new THREE.PlaneGeometry(DECAL_SIZE, DECAL_SIZE);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x6a1212,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    for (let i = 0; i < BLOOD_DECAL_POOL_SIZE; i++) {
+      const mesh = new THREE.Mesh(geo, mat.clone());
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = -1e4;
+      mesh.visible = false;
+      scene.add(mesh);
+      this.meshes.push(mesh);
+    }
+  }
+
+  /** Spawn a blood decal at the given ground position. */
+  spawn(pos: { x: number; y: number; z: number }): void {
+    const slot = this.nextSlot;
+    this.nextSlot = (this.nextSlot + 1) % BLOOD_DECAL_POOL_SIZE;
+    const mesh = this.meshes[slot];
+    mesh.position.set(pos.x, pos.y + 0.03, pos.z);
+    mesh.rotation.z = this.rand() * Math.PI * 2;
+    const s = 0.7 + this.rand() * 0.6;
+    mesh.scale.setScalar(s);
+    mesh.visible = true;
+    (mesh.material as THREE.MeshBasicMaterial).opacity = 0.55;
+    this.lifes[slot] = BLOOD_DECAL_FADE_MS;
+  }
+
+  /** Fade active decals; call once per rendered frame. */
+  update(dtMs: number): void {
+    for (let i = 0; i < BLOOD_DECAL_POOL_SIZE; i++) {
+      if (this.lifes[i] <= 0) continue;
+      this.lifes[i] -= dtMs;
+      if (this.lifes[i] <= 0) {
+        this.meshes[i].visible = false;
+        continue;
+      }
+      const t = 1 - this.lifes[i] / BLOOD_DECAL_FADE_MS;
+      (this.meshes[i].material as THREE.MeshBasicMaterial).opacity = 0.55 * (1 - t);
+    }
+  }
+
+  dispose(): void {
+    for (const m of this.meshes) {
+      this.scene.remove(m);
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+    }
+    this.meshes.length = 0;
+  }
+
+  /** Next seeded pseudo-random in [0, 1). */
+  private rand(): number {
+    this.lcgState = (Math.imul(this.lcgState, 1664525) + 1013904223) | 0;
+    return (this.lcgState >>> 8) / 0x1000000;
   }
 }

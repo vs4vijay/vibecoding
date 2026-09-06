@@ -3,6 +3,7 @@ import { heightAt } from '../world/terrain';
 
 const HEAD_HEIGHT = 1.4;
 const BASE_DISTANCE = 4.6;
+const BASE_FOV = 60;
 const PITCH_MIN = -0.15 * Math.PI;
 const PITCH_MAX = 0.45 * Math.PI;
 
@@ -17,6 +18,10 @@ export class ChaseCamera {
   private readonly camera: THREE.PerspectiveCamera;
   private readonly desired = new THREE.Vector3();
   private readonly offset = new THREE.Vector3();
+  /** FOV kick state — remaining degrees + time to recover. */
+  private fovKickDeg = 0;
+  private fovRecoverMsLeft = 0;
+  private fovRecoverTotalMs = 1;
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
@@ -60,6 +65,25 @@ export class ChaseCamera {
     const minY = heightAt(this.camera.position.x, this.camera.position.z) + 0.4;
     if (this.camera.position.y < minY) this.camera.position.y = minY;
 
+    // FOV kick recovery — linear decay back to BASE_FOV.
+    if (this.fovRecoverMsLeft > 0) {
+      const dtMs = dtSec * 1000;
+      const prev = this.fovRecoverMsLeft;
+      this.fovRecoverMsLeft = Math.max(0, this.fovRecoverMsLeft - dtMs);
+      const t = 1 - this.fovRecoverMsLeft / prev; // 0→1 over recovery
+      this.camera.fov = BASE_FOV + this.fovKickDeg * (1 - t);
+      this.camera.updateProjectionMatrix();
+    }
+
     this.camera.lookAt(targetPos.x, headY, targetPos.z + Math.sin(targetHeading));
+  }
+
+  /** Kick the FOV by `deg` degrees, recovering linearly over `recoverMs`. */
+  kickFov(deg: number, recoverMs: number): void {
+    this.fovKickDeg = deg;
+    this.fovRecoverMsLeft = recoverMs;
+    this.fovRecoverTotalMs = recoverMs;
+    this.camera.fov = BASE_FOV + deg;
+    this.camera.updateProjectionMatrix();
   }
 }
