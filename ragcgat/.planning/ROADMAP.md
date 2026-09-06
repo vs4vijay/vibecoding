@@ -89,9 +89,18 @@ Plans:
   5. User can confirm or cancel the import; cancellation cleans up any partial data
   6. Import progress is visible — immediate spinner on drop, progress bar during parse/store
 
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 **Notes**: First phase with user-facing UI. Parsing runs in a Web Worker (off-main-thread). Prevents data corruption via deterministic dedup hashing from Phase 1.
+
+Plans:
+**Wave 1**
+
+- [x] 03-01-PLAN.md — Tracer Slice: additive SvelteKit + Tailwind scaffold, worker parse, preview shell, confirm-commit for .txt, install checkpoint (tracer-first, Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 03-02-PLAN.md — Zip + Upsert + Progress: fflate extraction with bomb caps, new-vs-skipped diff, component extraction, progress bar, error states (Wave 2)
 
 ---
 
@@ -147,6 +156,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Parser Library | 3/3 | Complete | 2026-09-06 |
 | 2. Storage Layer | 2/2 | Complete | 2026-09-06 |
-| 3. Import Feature | 0/0 | Not started | - |
+| 3. Import Feature | 2/2 | Complete | 2026-09-06 |
 | 4. Chat Browsing | 0/0 | Not started | - |
 | 5. Full-Text Search | 0/0 | Not started | - |
