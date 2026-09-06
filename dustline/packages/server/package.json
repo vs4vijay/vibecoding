@@ -1,5 +1,5 @@
 {
-  "name": "@cs-clone/server",
+  "name": "@dustline/server",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "db:migrate": "bun src/db/migrate.ts"
   },
   "dependencies": {
-    "@cs-clone/shared": "workspace:*",
+    "@dustline/shared": "workspace:*",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.31.0",
     "hono": "^4.4.0",

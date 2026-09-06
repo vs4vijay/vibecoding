@@ -12,7 +12,7 @@ const configSchema = z.object({
   nodeEnv: z.enum(['development', 'production', 'test']).default('development'),
 
   // Database
-  databaseUrl: z.string().default('./data/cs-clone.db'),
+  databaseUrl: z.string().default('./data/dustline.db'),
 
   // Game
   maxPlayers: z.coerce.number().int().min(2).max(64).default(16),

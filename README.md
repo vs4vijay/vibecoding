@@ -317,7 +317,7 @@ single combined workflow (`.github/workflows/games-pages-deploy.yml`).
 | **Tank Racer** | [vs4vijay.github.io/vibecoding/tank-racer](https://vs4vijay.github.io/vibecoding/tank-racer/) | [`tank-racer/`](./tank-racer) | TypeScript, Vite, three.js |
 | **Lugaru Combat Prototype** | [vs4vijay.github.io/vibecoding/lugaru-web](https://vs4vijay.github.io/vibecoding/lugaru-web/) | [`lugaru-web/`](./lugaru-web) | TypeScript, Vite, three.js, Rapier |
 
-In development: [`dave-dangerous/`](./dave-dangerous), [`subway-surfers/`](./subway-surfers), [`cs-clone/`](./cs-clone), [`lf2-web/`](./lf2-web).
+In development: [`dave-dangerous/`](./dave-dangerous), [`subway-surfers/`](./subway-surfers), [`dustline/`](./dustline), [`lf2-web/`](./lf2-web).
 
 Building a new game? Follow the playbook: [docs/GAMES.md](./docs/GAMES.md) —
 scaffolding conventions, test/verification expectations, the deployment

@@ -1,6 +1,6 @@
-# CS Clone - Browser-Based Counter-Strike Clone
+# Dustline — Browser Tactical FPS
 
-A multiplayer first-person shooter built for the browser using Three.js, Bun, and PGLite.
+A Counter-Strike-inspired multiplayer FPS running fully in the browser.
 
 ## Tech Stack
 
@@ -12,7 +12,7 @@ A multiplayer first-person shooter built for the browser using Three.js, Bun, an
 ## Architecture
 
 ```
-cs-clone/
+dustline/
 ├── packages/
 │   ├── shared/        # Shared types, constants, messages
 │   ├── server/        # Game server (WebSocket, game loop, database)
@@ -33,7 +33,7 @@ cs-clone/
 
 ```bash
 # Clone the repo
-cd cs-clone
+cd dustline
 
 # Install dependencies
 bun install
@@ -49,8 +49,8 @@ cp .env.example .env
 bun run dev
 
 # Or run separately:
-bun run --filter server dev    # Server: http://localhost:3000, ws://localhost:3000/ws
-bun run --filter client dev    # Client: http://localhost:5173
+bun run --filter @dustline/server dev    # Server: http://localhost:3000, ws://localhost:3000/ws
+bun run --filter @dustline/client dev    # Client: http://localhost:5173
 ```
 
 ### Database

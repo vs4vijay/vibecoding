@@ -1,4 +1,4 @@
-import type { Team, Vec3, Vec2, WeaponState } from '@cs-clone/shared';
+import type { Team, Vec3, Vec2, WeaponState } from '@dustline/shared';
 import {
   PLAYER_MAX_HEALTH,
   PLAYER_MAX_ARMOR,
@@ -10,10 +10,10 @@ import {
   WEAPONS,
   createDefaultWeaponState,
   DEFAULT_MAP,
-} from '@cs-clone/shared';
+} from '@dustline/shared';
 import type { ServerPlayer } from './types.js';
 import { resolvePlayerCollision } from './collision.js';
-import type { EntityState } from '@cs-clone/shared';
+import type { EntityState } from '@dustline/shared';
 
 let nextPlayerId = 1;
 
@@ -196,7 +196,7 @@ export function switchWeapon(player: ServerPlayer, slot: 'primary' | 'secondary'
   }
 }
 
-export function toPlayerState(player: ServerPlayer): import('@cs-clone/shared').PlayerState {
+export function toPlayerState(player: ServerPlayer): import('@dustline/shared').PlayerState {
   return {
     id: player.id,
     username: player.username,

@@ -7,8 +7,8 @@ import {
   WEAPONS,
   PLAYER_HEIGHT,
   DEFAULT_MAP,
-} from '@cs-clone/shared';
-import type { GameSnapshot, InputState, Team } from '@cs-clone/shared';
+} from '@dustline/shared';
+import type { GameSnapshot, InputState, Team } from '@dustline/shared';
 import type { ServerGameState, ServerPlayer, ServerBullet, QueuedInput } from './types.js';
 import {
   createPlayer,

@@ -1,5 +1,5 @@
-import type { WeaponState, Team, MatchState } from '@cs-clone/shared';
-import { WEAPONS } from '@cs-clone/shared';
+import type { WeaponState, Team, MatchState } from '@dustline/shared';
+import { WEAPONS } from '@dustline/shared';
 
 interface HUDState {
   health: number;

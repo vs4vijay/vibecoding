@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'logo-192.png'],
       manifest: {
-        name: 'CS Clone',
-        short_name: 'CS',
-        description: 'Browser-based Counter-Strike Clone',
+        name: 'Dustline',
+        short_name: 'Dustline',
+        description: 'Browser-based tactical FPS',
         theme_color: '#1a1a2e',
         background_color: '#1a1a2e',
         display: 'fullscreen',

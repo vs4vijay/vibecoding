@@ -1,5 +1,5 @@
 {
-  "name": "@cs-clone/client",
+  "name": "@dustline/client",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "three": "^0.163.0"
   },
   "devDependencies": {
-    "@cs-clone/shared": "workspace:*",
+    "@dustline/shared": "workspace:*",
     "@types/three": "^0.163.0",
     "typescript": "^5.4.5",
     "vite": "^5.2.11",

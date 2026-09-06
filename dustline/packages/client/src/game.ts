@@ -2,11 +2,11 @@ import * as THREE from 'three';
 import type {
   Vec3, Vec2, PlayerState, GameSnapshot, InputState, Team, MatchState,
   WeaponState, EntityState,
-} from '@cs-clone/shared';
+} from '@dustline/shared';
 import {
   WEAPONS, PLAYER_HEIGHT, PLAYER_RADIUS, DEFAULT_MAP,
   createDefaultWeaponState,
-} from '@cs-clone/shared';
+} from '@dustline/shared';
 import { connect, sendInput, sendRespawn, getPlayerId, setCallbacks2 } from './network.js';
 import { initUI } from './ui.js';
 

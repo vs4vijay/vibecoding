@@ -16,7 +16,7 @@ without breaking the others.
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
 status): [`dave-dangerous/`](../dave-dangerous) (Vite 5 + vitest),
-[`subway-surfers/`](../subway-surfers), [`cs-clone/`](../cs-clone),
+[`subway-surfers/`](../subway-surfers), [`dustline/`](../dustline),
 [`lf2-web/`](../lf2-web).
 
 Each game folder is self-contained: its own `package.json` + lockfile, its own

@@ -58,5 +58,5 @@ const server = Bun.serve({
   },
 });
 
-console.log(`🎮 CS Clone Server running at ${server.url}`);
+console.log(`🎮 Dustline server running at ${server.url}`);
 console.log(`📊 WebSocket: ws://${config.serverHost}:${config.serverPort}/ws`);

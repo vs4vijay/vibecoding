@@ -1,4 +1,4 @@
-import type { ClientMessage, ServerMessage, Team } from '@cs-clone/shared';
+import type { ClientMessage, ServerMessage, Team } from '@dustline/shared';
 import type { ServerGameState } from '../game/types.js';
 import { createGameState, addPlayer, removePlayer, queueInput, tick } from '../game/engine.js';
 import { toPlayerState } from '../game/player.js';

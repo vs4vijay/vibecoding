@@ -18,7 +18,7 @@ await new Promise<void>(r => {
       const { done, value } = await reader.read();
       if (done) break;
       buf += value;
-      if (buf.includes('CS Clone Server running')) { r(); break; }
+      if (buf.includes('Dustline server running')) { r(); break; }
     }
   })();
   setTimeout(r, 5000);

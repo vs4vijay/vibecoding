@@ -1,4 +1,4 @@
-import type { Vec3, Vec2, Team, WeaponState, PlayerState, MatchState, EntityState, BulletState, PlayerStats, MapData } from '@cs-clone/shared';
+import type { Vec3, Vec2, Team, WeaponState, PlayerState, MatchState, EntityState, BulletState, PlayerStats, MapData } from '@dustline/shared';
 
 export interface ServerPlayer {
   id: string;

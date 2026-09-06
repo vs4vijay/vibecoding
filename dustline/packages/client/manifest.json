@@ -1,7 +1,7 @@
 {
-  "name": "CS Clone",
-  "short_name": "CS",
-  "description": "Browser-based Counter-Strike Clone",
+  "name": "Dustline",
+  "short_name": "Dustline",
+  "description": "Browser-based tactical FPS",
   "start_url": "/",
   "display": "fullscreen",
   "background_color": "#1a1a2e",

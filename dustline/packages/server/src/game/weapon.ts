@@ -1,5 +1,5 @@
-import { WEAPONS, PLAYER_HEIGHT } from '@cs-clone/shared';
-import type { WeaponState, Vec3, Vec2 } from '@cs-clone/shared';
+import { WEAPONS, PLAYER_HEIGHT } from '@dustline/shared';
+import type { WeaponState, Vec3, Vec2 } from '@dustline/shared';
 import type { ServerPlayer } from './types.js';
 
 export function canFire(weapon: WeaponState, now: number): boolean {

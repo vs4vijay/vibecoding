@@ -1,5 +1,5 @@
-import type { Vec3, EntityState } from '@cs-clone/shared';
-import { PLAYER_RADIUS, PLAYER_HEIGHT } from '@cs-clone/shared';
+import type { Vec3, EntityState } from '@dustline/shared';
+import { PLAYER_RADIUS, PLAYER_HEIGHT } from '@dustline/shared';
 
 export interface AABB {
   min: Vec3;

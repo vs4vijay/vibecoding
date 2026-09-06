@@ -1,4 +1,4 @@
-import type { ClientMessage, ServerMessage, GameSnapshot, InputState, Team, PlayerState } from '@cs-clone/shared';
+import type { ClientMessage, ServerMessage, GameSnapshot, InputState, Team, PlayerState } from '@dustline/shared';
 
 let ws: WebSocket | null = null;
 let connected = false;

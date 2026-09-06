@@ -1,0 +1,20 @@
+{
+  "name": "dustline",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter @dustline/shared build && concurrently \"bun run --filter @dustline/shared dev\" \"bun run --filter @dustline/server dev\" \"bun run --filter @dustline/client dev\"",
+    "build": "bun run --filter @dustline/shared build && bun run --filter @dustline/client build && bun run --filter @dustline/server build",
+    "test": "bun test test.e2e.test.ts",
+    "start": "bun run --filter @dustline/server start",
+    "db:generate": "bun run --filter @dustline/server db:generate",
+    "db:migrate": "bun run --filter @dustline/server db:migrate"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.2",
+    "concurrently": "^8.2.2"
+  }
+}
