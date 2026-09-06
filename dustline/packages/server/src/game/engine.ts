@@ -58,7 +58,15 @@ export function removePlayer(state: ServerGameState, playerId: string): void {
 
 export function queueInput(state: ServerGameState, playerId: string, input: InputState): void {
   const player = state.players.get(playerId);
-  if (!player || player.isDead) return;
+  if (!player) return;
+
+  // Ack the input seq even when the input cannot be simulated (player dead):
+  // the client trims its prediction queue for seqs <= lastInputSeq, so
+  // dropping an input silently would leave it pending forever.
+  if (input.seq > player.lastInputSeq) {
+    player.lastInputSeq = input.seq;
+  }
+  if (player.isDead) return;
 
   processPlayerInput(
     player,

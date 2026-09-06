@@ -43,6 +43,7 @@ export function createPlayer(
     secondaryWeapon: createDefaultWeaponState('glock'),
     currentWeaponSlot: 'primary',
     inputSeq: 0,
+    lastInputSeq: 0,
     stats: {
       kills: 0,
       deaths: 0,
@@ -212,5 +213,6 @@ export function toPlayerState(player: ServerPlayer): import('@dustline/shared').
     secondaryWeapon: player.secondaryWeapon ? { ...player.secondaryWeapon } : null,
     currentWeaponSlot: player.currentWeaponSlot,
     inputSeq: player.inputSeq,
+    lastInputSeq: player.lastInputSeq,
   };
 }

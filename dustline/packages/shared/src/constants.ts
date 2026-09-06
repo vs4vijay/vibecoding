@@ -5,6 +5,10 @@ export const TICK_INTERVAL_MS = 1000 / TICK_RATE;
 export const SNAPSHOT_RATE = 30;
 export const SNAPSHOT_INTERVAL_MS = 1000 / SNAPSHOT_RATE;
 
+// How long the client takes to visually ease a server correction into the
+// predicted local state, so reconciliation does not snap the camera.
+export const CORRECTION_LERP_MS = 100;
+
 export const MAX_PLAYERS = 16;
 export const WARMUP_DURATION_MS = 30000;
 export const MATCH_DURATION_MS = 120000;

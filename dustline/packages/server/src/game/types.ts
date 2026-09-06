@@ -16,6 +16,8 @@ export interface ServerPlayer {
   secondaryWeapon: WeaponState | null;
   currentWeaponSlot: 'primary' | 'secondary';
   inputSeq: number;
+  /** Highest client input seq processed (acked back via snapshots). */
+  lastInputSeq: number;
   stats: PlayerStats;
   respawnTimer: number;
   lastInputTime: number;

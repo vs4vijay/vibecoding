@@ -48,6 +48,8 @@ export interface PlayerState {
   secondaryWeapon: WeaponState | null;
   currentWeaponSlot: 'primary' | 'secondary';
   inputSeq: number;
+  /** Highest client input seq the server has processed for this player. */
+  lastInputSeq?: number;
 }
 
 export interface BulletState {

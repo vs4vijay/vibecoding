@@ -209,6 +209,57 @@ describe('Game Engine', () => {
     expect(p.health).toBe(0);
     expect(p.isDead).toBe(true);
   });
+
+  it('queueInput stamps lastInputSeq so snapshots ack the highest processed input seq', async () => {
+    const engine = await import('./packages/server/src/game/engine.ts');
+    const playerMod = await import('./packages/server/src/game/player.ts');
+    const gs = engine.createGameState();
+    const p = engine.addPlayer(gs, 'SeqAck', 'T');
+
+    const mkInput = (seq: number) => ({
+      forward: false, backward: false, left: false, right: false,
+      jump: false, walk: false, fire: false, reload: false,
+      weaponSlot: null, yaw: 0, pitch: 0, seq, timestamp: 0,
+    });
+
+    // Snapshot state starts with nothing acked
+    expect(playerMod.toPlayerState(p).lastInputSeq).toBe(0);
+
+    engine.queueInput(gs, p.id, mkInput(3) as any);
+    expect(p.lastInputSeq).toBe(3);
+
+    engine.queueInput(gs, p.id, mkInput(7) as any);
+    expect(p.lastInputSeq).toBe(7);
+
+    // Out-of-order / duplicate lower seq must not regress the ack
+    engine.queueInput(gs, p.id, mkInput(5) as any);
+    expect(p.lastInputSeq).toBe(7);
+
+    // The ack travels on the wire via the snapshot player state
+    expect(playerMod.toPlayerState(p).lastInputSeq).toBe(7);
+  });
+
+  it('queueInput acks inputs received while dead so the client prediction queue can drain', async () => {
+    const engine = await import('./packages/server/src/game/engine.ts');
+    const playerMod = await import('./packages/server/src/game/player.ts');
+    const gs = engine.createGameState();
+    const p = engine.addPlayer(gs, 'DeadAck', 'T');
+
+    playerMod.damagePlayer(p, 999);
+    expect(p.isDead).toBe(true);
+
+    const input = {
+      forward: true, backward: false, left: false, right: false,
+      jump: false, walk: false, fire: false, reload: false,
+      weaponSlot: null, yaw: 0, pitch: 0, seq: 9, timestamp: 0,
+    };
+    engine.queueInput(gs, p.id, input as any);
+
+    // The input is not simulated (dead), but it is acked — otherwise the
+    // client would replay it forever against the respawned state.
+    expect(p.isDead).toBe(true);
+    expect(p.lastInputSeq).toBe(9);
+  });
 });
 
 describe('Collision & Raycast', () => {
