@@ -55,11 +55,13 @@ bun run --filter @dustline/client dev    # Client: http://localhost:5173
 
 ### Database
 
-The server uses PGLite (in-memory Postgres) by default. For persistent storage, update `packages/server/src/db/index.ts`:
+The server runs PGLite (embedded Postgres) **in memory** by default — `packages/server/src/db/index.ts` creates `new PGlite()` with no path, and the schema is created at boot (`ensureSchema()`), so every restart starts fresh.
+
+The `DATABASE_URL` variable (default `./data/dustline.db`, see `.env.example`) is used by drizzle-kit for migrations (`packages/server/drizzle.config.ts`). To keep stats across server restarts, pass a directory path to PGLite:
 
 ```typescript
-// Persistent storage
-export const client = new PGlite('./data/cs-db');
+// packages/server/src/db/index.ts — persistent storage
+export const client = new PGlite('./data/dustline.db');
 ```
 
 ### Production Build
@@ -85,6 +87,8 @@ bun run start
 | Space | Jump |
 | Shift | Walk (sneak) |
 | Tab | Scoreboard |
+| M | Mute/unmute sound |
+| L | Leaderboard panel |
 
 ## Game Features
 
@@ -93,6 +97,10 @@ bun run start
 - 🔫 Two weapons (AK-47, Glock)
 - ❤️ Health + Armor system
 - 💀 Respawn system
+- 🔮 Client-side prediction with server reconciliation (movement stays responsive despite latency)
+- 🕐 Server-side lag compensation (shots are hit-tested against where targets were, timed via app-level ping/pong RTT)
+- 🔊 Procedural WebAudio sound effects (mute with `M`)
+- 🏆 Persistent player stats and leaderboard (`L` panel, `GET /leaderboard?limit=20`)
 - 📊 Scoreboard (Tab)
 - 🗺️ Minimap
 - ⏱️ Match timer
@@ -125,6 +133,7 @@ kills: id, match_id, killer_id, victim_id, weapon, headshot, created_at
 | `input` | Send movement/fire input (60Hz) |
 | `respawn` | Respawn after death |
 | `switchTeam` | Change team |
+| `pong` | Reply to the server's RTT probe (used for lag compensation) |
 
 ### Server → Client
 
@@ -134,8 +143,12 @@ kills: id, match_id, killer_id, victim_id, weapon, headshot, created_at
 | `joined` | Confirmation of joining + initial state |
 | `playerJoined` | New player connected |
 | `playerLeft` | Player disconnected |
+| `hit` | You damaged a player (damage + health left) |
 | `kill` | Player killed another |
 | `death` | You were killed |
+| `chat` | Chat message |
+| `error` | Server error message |
+| `ping` | RTT probe (client replies `pong`) |
 | `matchStart` | Match started |
 | `matchEnd` | Match ended with scores |
 
@@ -160,7 +173,7 @@ Use Drizzle ORM in `packages/server/src/db/` with the schema from `schema.ts`.
 | `SERVER_PORT` | Server HTTP port | `3000` |
 | `SERVER_HOST` | Server bind address | `0.0.0.0` |
 | `NODE_ENV` | Environment | `development` |
-| `DATABASE_URL` | Database path | `:memory:` |
+| `DATABASE_URL` | Database path (drizzle-kit migrations) | `./data/dustline.db` |
 | `MAX_PLAYERS` | Max players per server | `16` |
 | `TICK_RATE` | Server tick rate (Hz) | `60` |
 | `MATCH_DURATION_MS` | Match duration | `120000` |
@@ -168,13 +181,9 @@ Use Drizzle ORM in `packages/server/src/db/` with the schema from `schema.ts`.
 
 ## Known Issues & TODO
 
-- [ ] Client-side prediction and server reconciliation
-- [ ] Lag compensation
 - [ ] Better player models (skins, animations)
-- [ ] Sound effects
 - [ ] More maps
 - [ ] Matchmaking system
-- [ ] Persistent leaderboard
 - [ ] Anti-cheat measures
 - [ ] Voice chat
 - [ ] Grenade/weapon attachments
