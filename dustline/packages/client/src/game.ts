@@ -8,7 +8,7 @@ import {
   createDefaultWeaponState,
 } from '@dustline/shared';
 import { connect, sendInput, sendRespawn, getPlayerId, setCallbacks2 } from './network.js';
-import { initUI, toggleLeaderboard, escapeHtml } from './ui.js';
+import { initUI, toggleLeaderboard, escapeHtml, showHitmarker, setDamageFlash, setCrosshairSpread } from './ui.js';
 import { createPredictor } from './prediction.js';
 import { applyLocalInput, extractLocalState, SIMULATION_DT, type LocalSimState } from './movement.js';
 import { createAudio } from './audio.js';
@@ -100,6 +100,21 @@ const audio = createAudio();
 
 // Weapon model (visible gun)
 let weaponGroup: THREE.Group;
+// ─── Procedural game feel (pooled; no per-shot allocation) ───
+let muzzleLight: THREE.PointLight | null = null;
+const TRACER_COUNT = 8;
+const TRACER_LIFE = 0.09;
+const tracers: { line: THREE.Line; life: number }[] = [];
+let tracerIndex = 0;
+let impactFlash: THREE.Mesh | null = null;
+let impactLife = 0;
+const IMPACT_LIFE = 0.08;
+let bobPhase = 0;
+// Reused scratch objects so per-shot visuals never allocate.
+const _muzzle = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _end = new THREE.Vector3();
+const _ray = new THREE.Raycaster();
 
 // Minimap context
 let minimapCtx: CanvasRenderingContext2D | null = null;
@@ -138,6 +153,7 @@ export async function initGame(canvas: HTMLCanvasElement) {
   setupLighting();
   buildMap();
   createWeaponModel();
+  createEffects();
   setupInput();
   setupResize();
 
@@ -270,6 +286,104 @@ function createWeaponModel(): void {
   weaponGroup.position.set(0.25, -0.2, -0.4);
   camera.add(weaponGroup);
   scene.add(camera);
+}
+// ─── Procedural effects ─────────────────────────────────────
+/** Preallocate the muzzle light, tracer pool, and impact quad. Called once. */
+function createEffects(): void {
+  muzzleLight = new THREE.PointLight(0xffc36b, 0, 8, 1.6);
+  muzzleLight.position.set(0, 0.01, -0.55);
+  weaponGroup.add(muzzleLight);
+
+  for (let i = 0; i < TRACER_COUNT; i++) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xffe08a,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const line = new THREE.Line(geo, mat);
+    line.visible = false;
+    line.frustumCulled = false;
+    scene.add(line);
+    tracers.push({ line, life: 0 });
+  }
+
+  impactFlash = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.35, 0.35),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd27a,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+  );
+  impactFlash.visible = false;
+  scene.add(impactFlash);
+}
+
+/** Fire-and-forget visuals for one local shot. No allocation on the hot path. */
+function onLocalFire(): void {
+  if (!weaponGroup || !muzzleLight || !impactFlash) return;
+  muzzleLight.intensity = 3;
+
+  // Muzzle world position + camera forward; raycast for the impact point.
+  muzzleLight.getWorldPosition(_muzzle);
+  camera.getWorldDirection(_dir);
+  _ray.set(camera.position, _dir);
+  _ray.far = 100;
+  const hits = _ray.intersectObjects(worldMeshes, false);
+  if (hits.length > 0) _end.copy(hits[0].point);
+  else _end.copy(_muzzle).addScaledVector(_dir, 40);
+
+  const tracer = tracers[tracerIndex];
+  tracerIndex = (tracerIndex + 1) % TRACER_COUNT;
+  const pos = tracer.line.geometry.getAttribute('position') as THREE.BufferAttribute;
+  pos.setXYZ(0, _muzzle.x, _muzzle.y, _muzzle.z);
+  pos.setXYZ(1, _end.x, _end.y, _end.z);
+  pos.needsUpdate = true;
+  tracer.life = 1;
+  tracer.line.visible = true;
+
+  if (hits.length > 0) {
+    impactFlash.position.copy(_end);
+    impactFlash.quaternion.copy(camera.quaternion);
+    impactLife = 1;
+    impactFlash.visible = true;
+  }
+}
+
+/** Per-frame decay for muzzle light, tracers, and impact flash. */
+function updateEffects(dt: number): void {
+  if (muzzleLight && muzzleLight.intensity > 0) {
+    muzzleLight.intensity = Math.max(0, muzzleLight.intensity - dt * 40);
+  }
+  for (const tracer of tracers) {
+    if (tracer.life <= 0) continue;
+    tracer.life = Math.max(0, tracer.life - dt / TRACER_LIFE);
+    (tracer.line.material as THREE.LineBasicMaterial).opacity = tracer.life;
+    tracer.line.visible = tracer.life > 0;
+  }
+  if (impactFlash && impactLife > 0) {
+    impactLife = Math.max(0, impactLife - dt / IMPACT_LIFE);
+    (impactFlash.material as THREE.MeshBasicMaterial).opacity = impactLife * 0.9;
+    impactFlash.visible = impactLife > 0;
+  }
+}
+
+/** Crosshair gap in px from weapon spread + fresh-fire bloom. Null-safe. */
+function updateCrosshairSpread(): void {
+  const weapon = localPlayer.currentWeaponSlot === 'primary'
+    ? localPlayer.primaryWeapon
+    : localPlayer.secondaryWeapon;
+  const type = weapon ? WEAPONS[weapon.typeId] : undefined;
+  const timeSinceFire = weapon ? Date.now() - weapon.lastFireTime : Infinity;
+  const bloom = timeSinceFire < 150 ? (1 - timeSinceFire / 150) * 10 : 0;
+  setCrosshairSpread(4 + (type ? type.spread * 150 : 0) + bloom);
 }
 
 function getSensitivity(): number {
@@ -406,6 +520,14 @@ function handleSnapshot(snapshot: GameSnapshot): void {
     predictor.onServerSnapshot(self, self.lastInputSeq ?? 0);
 
     const wasDead = localPlayer.isDead ?? false;
+    // Damage taken: snapshot-only edge (server-authoritative health/armor).
+    // Fires the CSS fade exactly once per damage event, never per-frame.
+    const prevHealth = localPlayer.health ?? 100;
+    const prevArmor = localPlayer.armor ?? 0;
+    const lost = Math.max(0, prevHealth - self.health) + Math.max(0, prevArmor - self.armor);
+    if (lost > 0 && !self.isDead) {
+      setDamageFlash(Math.min(0.8, Math.max(0.25, lost / 50)));
+    }
     Object.assign(localPlayer, {
       health: self.health,
       armor: self.armor,
@@ -422,6 +544,7 @@ function handleSnapshot(snapshot: GameSnapshot): void {
     if (weapon && prevWeapon) {
       if (weapon.lastFireTime > prevWeapon.lastFireTime) {
         audio.shot(weapon.typeId);
+        onLocalFire();
       }
       if (weapon.isReloading && !prevWeapon.isReloading) {
         audio.reload();
@@ -472,15 +595,16 @@ function handleKill(killerId: string, victimId: string, weaponName: string): voi
     addKillFeedEntry(`${killer.username} [${weaponName}] ${victim.username}`);
   }
 }
-
 function handleDeath(killerId: string, weaponName: string): void {
   audio.death();
+  setDamageFlash(0.85);
   const killer = currentSnapshot?.players.find(p => p.id === killerId);
   showDeathScreen(killer?.username || 'Unknown', weaponName);
 }
 
 function handleHit(_damage: number, _healthLeft: number, _shooterId: string): void {
   audio.hitMarker();
+  showHitmarker();
 }
 
 function handleMatchStart(_matchId: string): void {
@@ -607,7 +731,7 @@ function updateHUD(): void {
   updateWeaponModel();
 }
 
-function updateWeaponModel(): void {
+function updateWeaponModel(dt = 0): void {
   if (!weaponGroup) return;
 
   const weapon = localPlayer.currentWeaponSlot === 'primary'
@@ -645,6 +769,13 @@ function updateWeaponModel(): void {
   } else {
     weaponGroup.position.y = -0.2;
   }
+
+  // Weapon bob: amplitude scales with horizontal speed, zero when dead.
+  const speed = Math.hypot(localPlayer.velocity?.x ?? 0, localPlayer.velocity?.z ?? 0);
+  const amp = localPlayer.isDead ? 0 : Math.min(1, speed / 4) * 0.012;
+  bobPhase += dt * (4 + speed * 1.6);
+  weaponGroup.position.x = 0.25 + Math.sin(bobPhase) * amp;
+  if (!weapon.isReloading) weaponGroup.position.y += -Math.abs(Math.cos(bobPhase)) * amp;
 }
 
 function drawMinimap(): void {
@@ -806,6 +937,10 @@ function renderLoop(): void {
   // Update minimap periodically
   drawMinimap();
 
+  // Procedural game feel: effect decay, weapon bob/recoil, crosshair spread.
+  updateEffects(dt);
+  updateWeaponModel(dt);
+  updateCrosshairSpread();
   // Render
   renderer.render(scene, camera);
 }
