@@ -114,6 +114,11 @@ const sections = $derived(win ? groupForRender(win.pages) : []);
 		<div bind:this={scrollEl} class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
 			{#if win === null}
 				<p class="text-center text-sm text-gray-500 dark:text-gray-400" role="status">Loading…</p>
+			{:else if sections.length === 0}
+				<div class="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
+					<p class="text-sm text-gray-500 dark:text-gray-400">This conversation has no messages.</p>
+					<p class="text-xs text-gray-400 dark:text-gray-500">Import a chat export to populate it.</p>
+				</div>
 			{:else}
 				<div bind:this={sentinelEl} class="h-px"></div>
 				{#if win.hasMore}

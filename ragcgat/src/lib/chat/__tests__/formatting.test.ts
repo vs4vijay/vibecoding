@@ -83,3 +83,12 @@ describe('senderColor', () => {
 		expect(used.size).toBeGreaterThan(1);
 	});
 });
+
+describe('SENDER_PALETTE dark pairing (Pitfall 7)', () => {
+	it('every palette entry carries a light and a dark text utility', () => {
+		for (const entry of SENDER_PALETTE) {
+			expect(entry).toMatch(/\btext-\S+-\d{3}\b/);
+			expect(entry).toMatch(/\bdark:text-\S+-\d{3}\b/);
+		}
+	});
+});
