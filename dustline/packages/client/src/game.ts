@@ -13,6 +13,7 @@ import { createPredictor } from './prediction.js';
 import { applyLocalInput, extractLocalState, SIMULATION_DT, type LocalSimState } from './movement.js';
 import { createAudio } from './audio.js';
 import { createTicker } from './timestep.js';
+import { cameraAnglesFromRotation, clampSensitivity, DEFAULT_SENSITIVITY } from './look.js';
 
 // ─── Globals ──────────────────────────────────────────────
 let scene: THREE.Scene;
@@ -271,6 +272,23 @@ function createWeaponModel(): void {
   scene.add(camera);
 }
 
+function getSensitivity(): number {
+  const slider = document.getElementById('sensitivityInput') as HTMLInputElement | null;
+  if (slider) return clampSensitivity(parseFloat(slider.value));
+  try {
+    const stored = localStorage.getItem('dustline:sensitivity');
+    if (stored !== null) return clampSensitivity(parseFloat(stored));
+  } catch {
+    // storage unavailable (private mode) — fall through to default
+  }
+  return DEFAULT_SENSITIVITY;
+}
+
+function updateLockHint(): void {
+  const joined = !(document.getElementById('hud')?.classList.contains('hidden') ?? true);
+  document.getElementById('lockHint')?.classList.toggle('hidden', !joined || isPointerLocked);
+}
+
 // ─── Input Handling ───────────────────────────────────────
 function setupInput(): void {
   const canvas = renderer.domElement;
@@ -286,12 +304,17 @@ function setupInput(): void {
 
   document.addEventListener('pointerlockchange', () => {
     isPointerLocked = document.pointerLockElement === canvas;
+    updateLockHint();
+  });
+
+  document.addEventListener('pointerlockerror', () => {
+    updateLockHint();
   });
 
   // Mouse movement
   document.addEventListener('mousemove', (e) => {
     if (!isPointerLocked) return;
-    const sensitivity = 0.002;
+    const sensitivity = getSensitivity();
     if (localPlayer.rotation) {
       localPlayer.rotation.x -= e.movementX * sensitivity;
       localPlayer.rotation.y = Math.max(
@@ -343,7 +366,7 @@ function setupInput(): void {
 
   // Mouse buttons
   document.addEventListener('mousedown', (e) => {
-    if (e.button === 0) input.fire = true;
+    if (e.button === 0 && isPointerLocked) input.fire = true;
   });
   document.addEventListener('mouseup', (e) => {
     if (e.button === 0) input.fire = false;
@@ -775,8 +798,9 @@ function renderLoop(): void {
       renderState.position.z
     );
     camera.rotation.order = 'YXZ';
-    camera.rotation.x = localPlayer.rotation?.x || 0;
-    camera.rotation.y = localPlayer.rotation?.y || 0;
+    const { pitch, yaw } = cameraAnglesFromRotation(localPlayer.rotation ?? { x: 0, y: 0 });
+    camera.rotation.x = pitch;
+    camera.rotation.y = yaw;
   }
 
   // Update minimap periodically
