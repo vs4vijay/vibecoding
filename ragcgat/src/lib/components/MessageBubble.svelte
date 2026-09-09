@@ -4,7 +4,7 @@ import { eventKind } from '$lib/chat/placeholders';
 import type { MessageRecord } from '$lib/db/db';
 import MediaPlaceholder from './MediaPlaceholder.svelte';
 
-const { message }: { message: MessageRecord } = $props();
+const { message, showSender = true }: { message: MessageRecord; showSender?: boolean } = $props();
 
 const event = $derived(eventKind(message.type));
 const color = $derived(event ? '' : senderColor(message.sender));
@@ -18,7 +18,7 @@ const color = $derived(event ? '' : senderColor(message.sender));
 	</div>
 {:else}
 	<div class="mb-2 flex flex-col items-start" data-msg>
-		<span class="mb-0.5 text-xs font-semibold {color}">{message.sender}</span>
+		{#if showSender}<span class="mb-0.5 text-xs font-semibold {color}">{message.sender}</span>{/if}
 		<div class="max-w-[75%] rounded-lg bg-gray-100 px-3 py-2 dark:bg-gray-700">
 			{#if message.type === 'media'}
 				<MediaPlaceholder mediaType={message.mediaType} />

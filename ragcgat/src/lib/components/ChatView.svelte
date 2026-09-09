@@ -1,10 +1,18 @@
 <script lang="ts">
-import { browser } from '$app/environment';
-import { PAGE_SIZE, type WindowState, assertRenderBudget, cursorOf, emptyWindow, prependPage } from '$lib/chat/windows';
+import {
+	PAGE_SIZE,
+	type WindowState,
+	assertRenderBudget,
+	cursorOf,
+	emptyWindow,
+	groupForRender,
+	prependPage,
+} from '$lib/chat/windows';
 import type { ChatRecord } from '$lib/db/db';
 import { db } from '$lib/db/db';
 import { MessageRepository } from '$lib/db/repositories';
 import { tick } from 'svelte';
+import DateSeparator from './DateSeparator.svelte';
 import MessageBubble from './MessageBubble.svelte';
 
 const {
@@ -19,13 +27,17 @@ let win = $state<WindowState | null>(null);
 let loadingOlder = $state(false);
 // biome-ignore lint/style/useConst: Svelte bind:this requires a let binding
 let scrollEl = $state<HTMLElement | null>(null);
+// biome-ignore lint/style/useConst: Svelte bind:this requires a let binding
+let sentinelEl = $state<HTMLElement | null>(null);
 
 const messages = new MessageRepository(db);
 
-// Capped window (shell): newest PAGE_SIZE rows plus an explicit Load older
-// button. No scroll sentinel, no anchor correction, no trim machinery —
-// virtualization is 04-02. All Dexie contact stays behind the browser guard
-// in $effect (prerender has no IndexedDB).
+// One shared IntersectionObserver per ChatView (Pitfall 6: zero per-bubble observers).
+// No {@html} anywhere — escaped interpolation only (T-04-01 / Pitfall 5).
+// No flex-col-reverse (Pitfall 2) — chronological DOM, scrollTop pinned to scrollHeight.
+
+// Capped window: newest PAGE_SIZE rows via keyset read, trimmed to MAX_RENDERED_PAGES.
+// Dexie contact stays behind the browser guard in $effect (prerender has no IndexedDB).
 $effect(() => {
 	const chatId = chat?.id;
 	if (!browser || typeof chatId !== 'number') {
@@ -35,36 +47,62 @@ $effect(() => {
 	let cancelled = false;
 	win = null;
 	void (async () => {
-		// Repository returns newest-first; reverse to chronological for render.
 		const newestFirst = await messages.getLatestWindow(chatId, PAGE_SIZE);
 		if (cancelled) return;
 		const next = prependPage(emptyWindow(chatId), [...newestFirst].reverse());
 		assertRenderBudget(next);
 		win = next;
 		await tick();
-		// Pin to the newest message: chronological DOM, explicit scrollTop.
+		// Pin to the newest message: chronological DOM, explicit scrollTop
+		// (never flex-col-reverse), only after Svelte flushed the rows.
 		if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+		void setupSentinel();
 	})();
 	return () => {
 		cancelled = true;
+		activeObserver?.disconnect();
+		activeObserver = null;
 	};
 });
+
+async function setupSentinel() {
+	// Disconnect any prior observer (chat change or re-setup).
+	activeObserver?.disconnect();
+	const el = sentinelEl;
+	if (!el) return;
+	const obs = new IntersectionObserver(
+		(entries) => {
+			if (entries[0]?.isIntersecting) {
+				void loadOlder();
+			}
+		},
+		{ root: scrollEl, threshold: 0 },
+	);
+	obs.observe(el);
+	activeObserver = obs;
+}
 
 async function loadOlder() {
 	const current = win;
 	if (!browser || !current || loadingOlder || !current.hasMore) return;
 	const cursor = cursorOf(current);
 	if (!cursor) return;
+	const prevHeight = scrollEl?.scrollHeight ?? 0;
+	const prevTop = scrollEl?.scrollTop ?? 0;
 	loadingOlder = true;
 	try {
 		const olderNewestFirst = await messages.getOlderPage(current.chatId, cursor, PAGE_SIZE);
 		const next = prependPage(current, [...olderNewestFirst].reverse());
 		assertRenderBudget(next);
 		win = next;
+		await tick();
+		if (scrollEl) scrollEl.scrollTop = prevTop + (scrollEl.scrollHeight - prevHeight);
 	} finally {
 		loadingOlder = false;
 	}
 }
+
+const sections = $derived(win ? groupForRender(win.pages) : []);
 </script>
 
 <div class="flex h-full min-h-0 flex-col">
@@ -77,6 +115,7 @@ async function loadOlder() {
 			{#if win === null}
 				<p class="text-center text-sm text-gray-500 dark:text-gray-400" role="status">Loading…</p>
 			{:else}
+				<div bind:this={sentinelEl} class="h-px"></div>
 				{#if win.hasMore}
 					<button
 						type="button"
@@ -87,9 +126,10 @@ async function loadOlder() {
 						{loadingOlder ? 'Loading…' : 'Load older'}
 					</button>
 				{/if}
-				{#each win.pages as page (page[0]?.id)}
-					{#each page as message (message.id)}
-						<MessageBubble {message} />
+				{#each sections as section (section.label)}
+					<DateSeparator label={section.label} />
+					{#each section.messages as group (group.message.id)}
+						<MessageBubble message={group.message} showSender={group.showSender} />
 					{/each}
 				{/each}
 			{/if}
