@@ -179,6 +179,15 @@ export function setDamageFlash(intensity: number): void {
   void el.offsetWidth;
   el.style.transition = '';
 }
+/** Reset the damage vignette to 0. Call on respawn/heal. Null-safe. */
+export function resetDamageFlash(): void {
+  const el = document.getElementById('damageVignette') as HTMLElement | null;
+  if (!el) return;
+  el.style.transition = 'none';
+  el.style.opacity = '0';
+  void el.offsetWidth;
+  el.style.transition = '';
+}
 
 /** Set crosshair gap in px via the `--spread` var. Null-safe. */
 export function setCrosshairSpread(px: number): void {

@@ -8,7 +8,7 @@ import {
   createDefaultWeaponState,
 } from '@dustline/shared';
 import { connect, sendInput, sendRespawn, getPlayerId, setCallbacks2 } from './network.js';
-import { initUI, toggleLeaderboard, escapeHtml, showHitmarker, setDamageFlash, setCrosshairSpread } from './ui.js';
+import { initUI, toggleLeaderboard, escapeHtml, showHitmarker, setDamageFlash, resetDamageFlash, setCrosshairSpread } from './ui.js';
 import { createPredictor } from './prediction.js';
 import { applyLocalInput, extractLocalState, SIMULATION_DT, type LocalSimState } from './movement.js';
 import { createAudio } from './audio.js';
@@ -530,6 +530,10 @@ function handleSnapshot(snapshot: GameSnapshot): void {
     if (lost > 0 && !self.isDead) {
       setDamageFlash(Math.min(0.8, Math.max(0.25, lost / 50)));
     }
+    // Reset vignette on respawn or heal.
+    if (self.health > prevHealth || (wasDead && !self.isDead)) {
+      resetDamageFlash();
+    }
     Object.assign(localPlayer, {
       health: self.health,
       armor: self.armor,
@@ -728,9 +732,6 @@ function updateHUD(): void {
 
   // Update minimap
   drawMinimap();
-
-  // Update weapon model
-  updateWeaponModel();
 }
 
 function updateWeaponModel(dt = 0): void {
@@ -752,17 +753,6 @@ function updateWeaponModel(dt = 0): void {
   } else {
     bodyMesh.scale.set(1, 1, 1);
   }
-
-  // Recoil animation
-  const timeSinceFire = Date.now() - weapon.lastFireTime;
-  if (timeSinceFire < 100) {
-    weaponGroup.position.z = -0.4 + (1 - timeSinceFire / 100) * 0.05;
-    weaponGroup.rotation.x = (1 - timeSinceFire / 100) * 0.1;
-  } else {
-    weaponGroup.position.z = -0.4;
-    weaponGroup.rotation.x = 0;
-  }
-
   // Reload animation
   if (weapon.isReloading) {
     const elapsed = Date.now() - weapon.reloadStartTime;
@@ -960,6 +950,7 @@ export async function connectAndPlay(username: string, team: Team): Promise<void
   // Show HUD, hide login
   document.getElementById('loginScreen')?.classList.add('hidden');
   document.getElementById('hud')?.classList.remove('hidden');
+  updateLockHint();
 }
 
 export function getLocalPlayer(): Partial<PlayerState> {

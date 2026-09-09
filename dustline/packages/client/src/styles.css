@@ -419,11 +419,6 @@ canvas#minimap {
 }
 
 /* HUD team accents */
-#health-panel.low-hp .health-bar { border-color: #ff0000; animation: lowHpPulse 0.8s ease-in-out infinite; }
-
-@keyframes lowHpPulse {
-  50% { background: rgba(120, 0, 0, 0.75); }
-}
 
 #timer-panel {
   padding: 4px 18px 6px;
@@ -433,7 +428,6 @@ canvas#minimap {
 }
 
 .kill-entry { border-right: 3px solid #f39c12; }
-.kill-entry.victim-ct { border-right-color: #3498db; }
 
 #scoreboard, #leaderboardPanel { border-top: 3px solid #f39c12; }
 #scoreboard.team-ct, #leaderboardPanel.team-ct { border-top-color: #3498db; }
