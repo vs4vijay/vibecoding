@@ -110,6 +110,7 @@ let impactFlash: THREE.Mesh | null = null;
 let impactLife = 0;
 const IMPACT_LIFE = 0.08;
 let bobPhase = 0;
+let recoilKick = 0; // 1 on local fire, decays per-frame; applied as gun kick
 // Reused scratch objects so per-shot visuals never allocate.
 const _muzzle = new THREE.Vector3();
 const _dir = new THREE.Vector3();
@@ -328,6 +329,7 @@ function createEffects(): void {
 
 /** Fire-and-forget visuals for one local shot. No allocation on the hot path. */
 function onLocalFire(): void {
+  recoilKick = 1;
   if (!weaponGroup || !muzzleLight || !impactFlash) return;
   muzzleLight.intensity = 3;
 
@@ -776,6 +778,12 @@ function updateWeaponModel(dt = 0): void {
   bobPhase += dt * (4 + speed * 1.6);
   weaponGroup.position.x = 0.25 + Math.sin(bobPhase) * amp;
   if (!weapon.isReloading) weaponGroup.position.y += -Math.abs(Math.cos(bobPhase)) * amp;
+
+  // Recoil kick: set to 1 by onLocalFire, decays per-frame, zero when dead.
+  recoilKick = Math.max(0, recoilKick - dt * 8);
+  const kick = localPlayer.isDead ? 0 : recoilKick;
+  weaponGroup.position.z -= kick * 0.06;
+  weaponGroup.rotation.x += kick * 0.12;
 }
 
 function drawMinimap(): void {
