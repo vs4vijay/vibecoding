@@ -9,7 +9,7 @@ Five phases delivering a local-first WhatsApp chat archive: build a format-toler
 - [x] **Phase 1: Parser Library** - Build format-tolerant WhatsApp export parser with type definitions
 - [x] **Phase 2: Storage Layer** - IndexedDB schema, repositories, and batch persistence
 - [ ] **Phase 3: Import Feature** - Drag-drop import with Web Worker parsing and preview-before-commit
-- [ ] **Phase 4: Chat Browsing** - Conversation sidebar, chat-style bubble UI, and virtual scrolling
+- [x] **Phase 4: Chat Browsing** - Conversation sidebar, chat-style bubble UI, and virtual scrolling
 - [ ] **Phase 5: Full-Text Search** - Keyword search across and within conversations with result navigation
 
 ## Phase Details
@@ -125,11 +125,11 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 04-01-PLAN.md — Tracer Slice: v3 lastMessageAt migration, liveQuery queries, sidebar, capped bubble view with placeholders, dark mode shell (tracer-first, Wave 1)
+- [x] 04-01-PLAN.md — Tracer Slice: v3 lastMessageAt migration, liveQuery queries, sidebar, capped bubble view with placeholders, dark mode shell (tracer-first, Wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-02-PLAN.md — Virtualization & Polish: paged windowing with 200-node budget, scroll anchoring, date dividers, sender colors, empty states (Wave 2)
+- [x] 04-02-PLAN.md — Virtualization & Polish: paged windowing with 200-node budget, scroll anchoring, date dividers, sender colors, empty states (Wave 2)
 
 ---
 
@@ -166,5 +166,5 @@ Plans:
 | 1. Parser Library | 3/3 | Complete | 2026-09-06 |
 | 2. Storage Layer | 2/2 | Complete | 2026-09-06 |
 | 3. Import Feature | 2/2 | Complete | 2026-09-06 |
-| 4. Chat Browsing | 0/0 | Not started | - |
+| 4. Chat Browsing | 2/2 | Complete | 2026-09-09 |
 | 5. Full-Text Search | 0/0 | Not started | - |
