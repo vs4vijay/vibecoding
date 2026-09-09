@@ -38,18 +38,40 @@ export class ChatRepository {
 		importedAt?: number;
 		messageCount?: number;
 		participants?: string[];
+		lastMessageAt?: number;
+		lastSnippet?: string;
+		lastSender?: string;
 	}): Promise<number> {
+		const importedAt = input.importedAt ?? Date.now();
 		const record: ChatRecord = {
 			name: input.name,
-			importedAt: input.importedAt ?? Date.now(),
+			importedAt,
+			// v3 denormalized stats default to "nothing newer than the import" so
+			// every new row is indexable by lastMessageAt, even for pre-v3 callers.
+			lastMessageAt: input.lastMessageAt ?? importedAt,
+			lastSnippet: input.lastSnippet ?? '',
+			lastSender: input.lastSender ?? '',
 			messageCount: input.messageCount ?? 0,
 			participants: input.participants ?? [],
 		};
 		return (await this.db.chats.add(record)) as number;
 	}
 
+	/**
+	 * Sidebar order: message recency via the v3 lastMessageAt index — never a
+	 * client sort. Instances whose schema predates v3 (legacy v1/v2 databases)
+	 * fall back to the importedAt index; production always registers v3 via
+	 * applyMigrations (wired onto the singleton in db.ts).
+	 */
 	async listChatsNewest(limit = 50): Promise<ChatRecord[]> {
-		return this.db.chats.orderBy('importedAt').reverse().limit(limit).toArray();
+		const hasLastMessageIndex = this.db.chats.schema.indexes.some((idx) => idx.name === 'lastMessageAt');
+		const ordered = hasLastMessageIndex ? this.db.chats.orderBy('lastMessageAt') : this.db.chats.orderBy('importedAt');
+		return ordered.reverse().limit(limit).toArray();
+	}
+
+	/** Patch denormalized stats (lastMessageAt/lastSnippet/lastSender/messageCount) on one chat. */
+	async updateChatStats(chatId: number, patch: Partial<ChatRecord>): Promise<void> {
+		await this.db.chats.update(chatId, patch);
 	}
 
 	async findChatByName(name: string): Promise<ChatRecord | undefined> {
@@ -66,10 +88,7 @@ export class MessageRepository {
 	 * Dedup-before-write: pre-query existing dedupHash values, bulkAdd the
 	 * remainder in 500-row chunks with per-chunk BulkError isolation.
 	 */
-	async bulkSave(
-		records: MessageRecord[],
-		onProgress?: (written: number, total: number) => void
-	): Promise<number> {
+	async bulkSave(records: MessageRecord[], onProgress?: (written: number, total: number) => void): Promise<number> {
 		if (records.length === 0) return 0;
 
 		const hashes = records.map((r) => r.dedupHash);

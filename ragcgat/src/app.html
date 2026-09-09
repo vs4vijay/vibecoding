@@ -3,6 +3,18 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- Pre-paint theme init: applies the dark class before first paint so
+		     dark users never see a white flash (FOUC guard). Key + allow-list are
+		     shared with src/lib/chat/theme.ts. -->
+		<script>
+			(function () {
+				try {
+					var t = localStorage.getItem('ragchat:theme');
+					if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches))
+						document.documentElement.classList.add('dark');
+				} catch (e) {}
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

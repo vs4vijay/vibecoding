@@ -1,7 +1,16 @@
 <script lang="ts">
+import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
+import { page } from '$app/state';
+import { observeChats } from '$lib/chat/queries';
+import { parseChatParam, serializeChatParam } from '$lib/chat/selection';
+import ChatSidebar from '$lib/components/ChatSidebar.svelte';
+import ChatView from '$lib/components/ChatView.svelte';
 import DropZone from '$lib/components/DropZone.svelte';
 import PreviewCard from '$lib/components/PreviewCard.svelte';
 import ProgressBar from '$lib/components/ProgressBar.svelte';
+import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+import type { ChatRecord } from '$lib/db/db';
 import { db } from '$lib/db/db';
 import { commitImport } from '$lib/import/commit';
 import { type ImportState, errorMessage, transition } from '$lib/import/importState';
@@ -10,6 +19,33 @@ import { extractTxtFromZip, sniffZipMagic } from '$lib/import/unzip';
 import { validateFile } from '$lib/import/validate';
 import type { WorkerResponse } from '$lib/import/workerProtocol';
 import { parseString } from '$lib/parser/parseFile';
+
+// --- Browse shell (OQ2: persistent top-level tabs, Browse default once a
+// chat exists). Selection syncs both ways with ?chat=<id>: parsed from the
+// page store for deep links, written via goto on sidebar clicks.
+let tab = $state<'browse' | 'import' | null>(null);
+let chats = $state<ChatRecord[]>([]);
+const activeTab = $derived(tab ?? (chats.length > 0 ? 'browse' : 'import'));
+const selectedId = $derived(parseChatParam(page.url.searchParams.get('chat')));
+const selectedChat = $derived(chats.find((c) => c.id === selectedId));
+
+// One liveQuery here for tab default + selected-chat resolution; the
+// sidebar owns its own subscription (per-subscriber liveQuery).
+$effect(() => {
+	if (!browser) return;
+	return observeChats((rows) => {
+		chats = rows;
+	});
+});
+
+function openChat(id: number) {
+	if (id === selectedId) return;
+	void goto(`?chat=${serializeChatParam(id)}`, { noScroll: true, keepFocus: true });
+}
+
+function switchTab(next: 'browse' | 'import') {
+	tab = next;
+}
 
 let machine = $state<ImportState>({ status: 'idle', errorKey: null, hasPreview: false });
 let preview = $state<ImportPreview | null>(null);
@@ -177,7 +213,48 @@ function onChatName(name: string) {
 }
 </script>
 
-<main class="mx-auto max-w-2xl px-4 py-10">
+<div class="flex min-h-screen flex-col bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+	<header class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+		<h1 class="text-lg font-bold">RagChat</h1>
+		<nav class="flex items-center gap-2" aria-label="Main">
+			<button
+				type="button"
+				aria-current={activeTab === 'browse' ? 'page' : undefined}
+				class="rounded px-3 py-1 text-sm {activeTab === 'browse'
+					? 'bg-green-600 text-white'
+					: 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'}"
+				onclick={() => switchTab('browse')}
+			>
+				Browse
+			</button>
+			<button
+				type="button"
+				aria-current={activeTab === 'import' ? 'page' : undefined}
+				class="rounded px-3 py-1 text-sm {activeTab === 'import'
+					? 'bg-green-600 text-white'
+					: 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'}"
+				onclick={() => switchTab('import')}
+			>
+				Import
+			</button>
+			<ThemeToggle />
+		</nav>
+	</header>
+
+	{#if activeTab === 'browse'}
+		<div class="mx-auto flex min-h-0 w-full max-w-6xl flex-1">
+			<aside
+				class="w-72 shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700"
+				aria-label="Conversations"
+			>
+				<ChatSidebar selectedId={selectedId} onselect={openChat} />
+			</aside>
+			<section class="min-w-0 flex-1">
+				<ChatView chat={selectedChat} {selectedId} />
+			</section>
+		</div>
+	{:else}
+	<main class="mx-auto max-w-2xl px-4 py-10">
 	<h1 class="text-2xl font-bold">Import WhatsApp chat</h1>
 	<p class="mt-1 text-sm text-gray-600">
 		Drop a .txt or .zip export or pick a file. Preview first — nothing is saved until you confirm.
@@ -247,3 +324,5 @@ function onChatName(name: string) {
 		largest chat only for now.
 	</p>
 </main>
+	{/if}
+</div>

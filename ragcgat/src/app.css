@@ -1,1 +1,7 @@
 @import "tailwindcss";
+
+/* Class-based dark mode for Tailwind v4 (CSS-first config). Syntax confirmed
+   against the installed tailwindcss 4.3.3: functional @custom-variant at-rule
+   with selector args. The .dark class is toggled by applyTheme() and by the
+   pre-paint init script in app.html. */
+@custom-variant dark (&:where(.dark, .dark *));
