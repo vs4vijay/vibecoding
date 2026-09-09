@@ -19,7 +19,9 @@
       <div class="crosshair-line crosshair-bottom"></div>
       <div class="crosshair-line crosshair-left"></div>
       <div class="crosshair-line crosshair-right"></div>
+      <div id="hitmarker"><span></span><span></span><span></span><span></span></div>
     </div>
+    <div id="lockHint" class="hidden">Click to capture mouse — Esc releases</div>
 
     <!-- Bottom-left: Health & Armor -->
     <div id="health-panel">
@@ -60,6 +62,7 @@
     <!-- Minimap -->
     <canvas id="minimap" width="180" height="180"></canvas>
   </div>
+  <div id="damageVignette"></div>
 
   <!-- Kill Feed Overlay -->
   <div id="deathScreen" class="hidden">
@@ -120,6 +123,14 @@
           <option value="CT">Counter-Terrorist</option>
         </select>
       </div>
+      <div class="form-group">
+        <label for="sensitivityInput">Mouse sensitivity</label>
+        <input type="range" id="sensitivityInput" min="0.0005" max="0.01" step="0.0005" value="0.002" />
+      </div>
+      <ul class="controls-list">
+        <li><b>WASD</b> move · <b>Mouse</b> look · <b>Click</b> fire</li>
+        <li><b>R</b> reload · <b>1–3</b> weapons · <b>Tab</b> score · <b>L</b> leaders</li>
+      </ul>
       <button id="connectBtn">Connect</button>
     </div>
   </div>

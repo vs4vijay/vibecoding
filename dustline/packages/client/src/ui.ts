@@ -158,3 +158,31 @@ export function escapeHtml(text: string): string {
   };
   return text.replace(/[&<>"']/g, ch => entities[ch] ?? ch);
 }
+
+// ─── Hitmarker / damage feedback / crosshair spread ───
+/** Flash the hitmarker X; retrigger-safe via reflow. Null-safe. */
+export function showHitmarker(): void {
+  const el = document.getElementById('hitmarker');
+  if (!el) return;
+  el.classList.remove('show');
+  void el.offsetWidth; // force reflow so the animation restarts
+  el.classList.add('show');
+}
+
+/** Set the red edge-vignette opacity (0–1). Null-safe; CSS fades it out. */
+export function setDamageFlash(intensity: number): void {
+  const el = document.getElementById('damageVignette') as HTMLElement | null;
+  if (!el) return;
+  const v = Math.min(1, Math.max(0, intensity));
+  el.style.transition = 'none';
+  el.style.opacity = v.toFixed(2);
+  void el.offsetWidth;
+  el.style.transition = '';
+}
+
+/** Set crosshair gap in px via the `--spread` var. Null-safe. */
+export function setCrosshairSpread(px: number): void {
+  const el = document.getElementById('crosshair') as HTMLElement | null;
+  if (!el) return;
+  el.style.setProperty('--spread', `${Math.max(0, px)}px`);
+}

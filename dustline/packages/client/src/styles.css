@@ -24,24 +24,58 @@ canvas#gameCanvas {
 }
 
 #crosshair {
+  --spread: 4px;
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  width: 20px;
-  height: 20px;
+  width: 0;
+  height: 0;
 }
 
 .crosshair-line {
   position: absolute;
-  background: #00ff00;
-  opacity: 0.8;
+  background: #4dff4d;
+  opacity: 0.9;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
 }
 
-.crosshair-top { width: 2px; height: 6px; left: 50%; top: 0; transform: translateX(-50%); }
-.crosshair-bottom { width: 2px; height: 6px; left: 50%; bottom: 0; transform: translateX(-50%); }
-.crosshair-left { height: 2px; width: 6px; top: 50%; left: 0; transform: translateY(-50%); }
-.crosshair-right { height: 2px; width: 6px; top: 50%; right: 0; transform: translateY(-50%); }
+.crosshair-top { width: 2px; height: 7px; left: -1px; top: calc(-7px - var(--spread)); }
+.crosshair-bottom { width: 2px; height: 7px; left: -1px; top: var(--spread); }
+.crosshair-left { width: 7px; height: 2px; top: -1px; left: calc(-7px - var(--spread)); }
+.crosshair-right { width: 7px; height: 2px; top: -1px; left: var(--spread); }
+
+#hitmarker {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  left: -13px;
+  top: -13px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#hitmarker span {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 2px;
+  height: 8px;
+  margin-top: -4px;
+  background: #fff;
+  box-shadow: 0 0 3px rgba(255, 0, 0, 0.9);
+}
+
+#hitmarker span:nth-child(1) { transform: rotate(45deg) translateY(-11px); }
+#hitmarker span:nth-child(2) { transform: rotate(135deg) translateY(-11px); }
+#hitmarker span:nth-child(3) { transform: rotate(225deg) translateY(-11px); }
+#hitmarker span:nth-child(4) { transform: rotate(315deg) translateY(-11px); }
+
+#hitmarker.show { animation: hitPop 0.28s ease-out; }
+
+@keyframes hitPop {
+  0% { opacity: 1; transform: scale(0.7); }
+  100% { opacity: 0; transform: scale(1.25); }
+}
 
 /* Health & Armor */
 #health-panel {
@@ -357,3 +391,64 @@ canvas#minimap {
 .login-container button:hover {
   background: #2980b9;
 }
+
+/* Capture hint pill */
+#lockHint {
+  position: absolute;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid #f39c12;
+  border-radius: 999px;
+  color: #ffd98a;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Damage vignette (opacity driven from JS) */
+#damageVignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 0, 0, 0.55) 100%);
+  transition: opacity 0.35s ease-out;
+}
+
+/* HUD team accents */
+#health-panel.low-hp .health-bar { border-color: #ff0000; animation: lowHpPulse 0.8s ease-in-out infinite; }
+
+@keyframes lowHpPulse {
+  50% { background: rgba(120, 0, 0, 0.75); }
+}
+
+#timer-panel {
+  padding: 4px 18px 6px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+}
+
+.kill-entry { border-right: 3px solid #f39c12; }
+.kill-entry.victim-ct { border-right-color: #3498db; }
+
+#scoreboard, #leaderboardPanel { border-top: 3px solid #f39c12; }
+#scoreboard.team-ct, #leaderboardPanel.team-ct { border-top-color: #3498db; }
+
+.login-container { border-top: 3px solid #f39c12; }
+.login-container h1 { letter-spacing: 6px; text-transform: uppercase; }
+
+.controls-list {
+  list-style: none;
+  margin: 4px 0 12px;
+  color: #888;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.controls-list b { color: #ccc; }
+
+.form-group input[type="range"] { padding: 0; accent-color: #f39c12; cursor: pointer; }

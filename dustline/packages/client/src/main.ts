@@ -35,3 +35,16 @@ usernameInput.addEventListener('keydown', (e) => {
 
 // Focus username on load
 usernameInput.focus();
+
+// Sensitivity slider persistence (game.ts reads the live value)
+const SENS_KEY = 'dustline:sensitivity';
+const sensInput = document.getElementById('sensitivityInput') as HTMLInputElement | null;
+if (sensInput) {
+  try {
+    const saved = localStorage.getItem(SENS_KEY);
+    if (saved !== null && Number.isFinite(Number(saved))) sensInput.value = saved;
+  } catch { /* storage unavailable — keep default */ }
+  sensInput.addEventListener('input', () => {
+    try { localStorage.setItem(SENS_KEY, sensInput.value); } catch { /* ignore */ }
+  });
+}
