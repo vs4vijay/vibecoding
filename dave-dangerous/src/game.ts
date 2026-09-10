@@ -33,6 +33,8 @@ export class Game {
   private flow: GameFlow = GAME_FLOW_KEYS.playing;
   private rng: RNG;
   private inBonus = false;
+  private paused = false;
+  private clearTimer = 0;
 
   constructor(container: HTMLElement) {
     const scale = scaleToFit(window.innerWidth, window.innerHeight);
@@ -61,6 +63,14 @@ export class Game {
         e.preventDefault();
         this.debug.toggle();
       }
+      if (e.code === "KeyP" || e.code === "Escape") {
+        e.preventDefault();
+        this.togglePause();
+      }
+      if (e.code === "KeyM") {
+        e.preventDefault();
+        this.toggleMute();
+      }
       if (e.code === "KeyR" && this.flow === GAME_FLOW_KEYS.gameover) {
         e.preventDefault();
         this.restart();
@@ -88,7 +98,12 @@ export class Game {
 
   private update(_dt: number): void {
     const world = this.world;
-    if (!world) return;
+    if (!world || this.paused) return;
+    if (this.clearTimer > 0) {
+      this.clearTimer--;
+      if (this.clearTimer === 0) this.finishClear();
+      return;
+    }
     const input = this.input.read(); // consumes the fire edge
     jetpackHeld = input.jetpack;
     if (this.flow === GAME_FLOW_KEYS.gameover) {
@@ -131,9 +146,7 @@ export class Game {
     }
     this.hud.draw(this.state);
     this.debug.draw(world);
-    if (this.flow === GAME_FLOW_KEYS.gameover) {
-      r.drawText("GAME OVER — Press R to restart", 5, 96);
-    }
+    this.syncCards();
   }
 
   private onDeath(): void {
@@ -154,13 +167,21 @@ export class Game {
 
   private onComplete(): void {
     SaveState.persist(this.state.snapshot());
+    this.clearTimer = 150; // freeze on the LEVEL CLEAR card, then finishClear() advances
+  }
+
+  /** delayed second half of onComplete: advance once the clear card has shown */
+  finishClear(): void {
+    this.clearTimer = 0;
     this.inBonus = !this.inBonus;
     this.startLevel(1); // table picked by inBonus: LEVELS[1] or BONUS_ROOMS[1]
   }
 
-  private restart(): void {
+  restart(): void {
     this.state.reset(1); // lives/score are drained after game over — start fresh
     this.inBonus = false;
+    this.paused = false;
+    this.clearTimer = 0;
     this.startLevel(1);
   }
 
@@ -170,6 +191,41 @@ export class Game {
     on("jetpack:pickup", () => this.audio.playSfx("jetpack"));
     on("oneup:pickup", () => this.audio.playSfx("oneup"));
     on("level:complete", () => this.audio.playSfx("warp"));
+  }
+
+  togglePause(): boolean {
+    if (this.flow !== GAME_FLOW_KEYS.playing || this.clearTimer > 0) return this.paused;
+    this.paused = !this.paused;
+    return this.paused;
+  }
+
+  resume(): void {
+    this.paused = false;
+  }
+
+  toggleMute(): boolean {
+    this.audio.setMuted(!this.audio.muted);
+    return this.audio.muted;
+  }
+
+  private card(id: string): HTMLElement | null {
+    return typeof document === "undefined" ? null : document.getElementById(id);
+  }
+
+  /** show/hide DOM cards to match flow state; called every frame, no-ops without DOM */
+  private syncCards(): void {
+    const show = (id: string, visible: boolean): void => {
+      const el = this.card(id);
+      if (el) el.hidden = !visible;
+    };
+    show("dd-pause", this.paused);
+    show("dd-clear", this.clearTimer > 0);
+    const over = this.flow === GAME_FLOW_KEYS.gameover;
+    show("dd-over", over);
+    if (over) {
+      const score = this.card("dd-over-score");
+      if (score) score.textContent = `Score ${this.state.score} — press R or hit Restart`;
+    }
   }
 }
 

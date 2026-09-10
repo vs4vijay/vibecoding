@@ -38,6 +38,10 @@ export class Renderer {
     this.canvas.width = PHYSICS.LOGICAL_W * this.scale;
     this.canvas.height = PHYSICS.LOGICAL_H * this.scale;
   }
+  fillRect(px: number, py: number, w: number, h: number, color: string): void {
+    this.ctx.fillStyle = color;
+    this.ctx.fillRect(px * this.scale, py * this.scale, w * this.scale, h * this.scale);
+  }
   clear(): void {
     this.ctx.fillStyle = "#000";
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
