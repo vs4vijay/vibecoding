@@ -18,7 +18,12 @@ My Current Tooling:
 - cmux
 - Superset.sh
 - herdr
-- cmux
+  - herdr plugin install plannotator/herdr-annotate
+  - https://colliepwa.dev/install
+    - herdr plugin install AltanS/collie
+    - herdr plugin action invoke start --plugin herdr.collie
+- paseo
+- orca - `brew install --cask stablyai/orca/orca`
 - Skills
   - Playwright CLI Skills
   - Superpowers
@@ -65,11 +70,15 @@ pi install npm:pi-subagents
 pi install npm:pi-context-view
 pi install npm:pi-mcp-adapter
 pi install npm:context-mode
+pi install npm:pi-freeflow
 pi install npm:@narumitw/pi-chrome-devtools
 pi install npm:@narumitw/pi-statusline
 pi install npm:@narumitw/pi-btw
+pi install git:github.com/DietrichGebert/ponytail
 pi install git:github.com/obra/superpowers
 pi install git:github.com/cathrynlavery/diagram-design
+pi install npm:@plannotator/pi-extension
+
 
 
 export LLAMA_SERVER_URL=http://127.0.0.1:11000 # or change in ~/.pi/agents/settings.json
@@ -83,6 +92,10 @@ export LLAMA_SERVER_URL=http://127.0.0.1:11000 # or change in ~/.pi/agents/setti
 bun install -g @oh-my-pi/pi-coding-agent
 
 omp plugin install context-mode
+omp plugin install pi-freeflow
+omp install git:github.com/obra/superpowers
+omp install git:github.com/DietrichGebert/ponytail
+omp install npm:pi-provider-kiro
 
 # export AZURE_OPENAI_BASE_URL="..../v1"
 # export AZURE_OPENAI_API_KEY="YOUR_AZURE_OPENAI_API_KEY"
@@ -222,12 +235,10 @@ https://github.com/mksglu/context-mode
 gnhf
 
 Mnemosyne
-
-https://github.com/thedotmack/claude-mem
-
 https://github.com/rohitg00/agentmemory
-
+https://github.com/supermemoryai/supermemory
 https://github.com/MemPalace/mempalace
+https://github.com/thedotmack/claude-mem
 
 uv tool install -U batrachian-toad
 
@@ -286,6 +297,18 @@ chrome-devtools-mcp
 codeburn
 
 https://github.com/cathrynlavery/diagram-design
+
+bun install -g cline
+
+OpenChambers
+
+https://github.com/apmantza/pi-free
+
+https://github.com/AltanS/collie
+
+https://github.com/kunchenguid/firstmate
+
+OpenClaude
 
 ```
 
