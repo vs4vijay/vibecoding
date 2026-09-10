@@ -61,7 +61,7 @@ weapons throw; the boulder slows you down (`carrierSpeedMul`).
 
 ## Testing & determinism
 
-    bun test                            # full suite (176 tests)
+    bun test                            # full suite (208 tests)
     bun run build                       # typecheck + determinism gate + sprite gate + vite build
     bun scripts/soak.ts                 # 40 × 8-bot FFA soak (termination, NaN guard)
     bun scripts/ttk.ts                  # bot-duel length measurement
