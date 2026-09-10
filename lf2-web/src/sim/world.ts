@@ -118,7 +118,8 @@ export function stepWorld(prev: WorldState, inputs: InputFrame[], ctx: SimContex
   // FSM-spawned projectiles (special shots, throws) increment the slice's id
   // counter — write it back or ids repeat and collide with the pickup ids
   // drawn later in this tick (dropWeaponPickup / spawnPickup).
-  w.nextEntityId = tickWorld.nextEntityId;
+  // Always defined: tickWorld is constructed with nextEntityId above; the optional type is for fighter.ts's other callers.
+  w.nextEntityId = tickWorld.nextEntityId!;
 
   resolveHits(w, ctx.sheets, events, ctx.weapons);
   resolveProjectiles(w, ctx.sheets, events);
