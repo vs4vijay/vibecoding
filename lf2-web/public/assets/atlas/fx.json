@@ -1,0 +1,65 @@
+[
+	{
+		"name": "fx_blade_wave",
+		"x": 1,
+		"y": 1,
+		"w": 32,
+		"h": 32
+	},
+	{
+		"name": "fx_energy_shot",
+		"x": 34,
+		"y": 1,
+		"w": 32,
+		"h": 32
+	},
+	{
+		"name": "fx_flame_ball",
+		"x": 67,
+		"y": 1,
+		"w": 32,
+		"h": 32
+	},
+	{
+		"name": "fx_freeze_pillar",
+		"x": 1,
+		"y": 34,
+		"w": 32,
+		"h": 32
+	},
+	{
+		"name": "fx_heal_orb",
+		"x": 34,
+		"y": 34,
+		"w": 32,
+		"h": 32
+	},
+	{
+		"name": "fx_ice_bolt",
+		"x": 67,
+		"y": 34,
+		"w": 32,
+		"h": 32
+	},
+	{
+		"name": "fx_meteor_core",
+		"x": 1,
+		"y": 67,
+		"w": 32,
+		"h": 32
+	},
+	{
+		"name": "fx_prism_lance",
+		"x": 34,
+		"y": 67,
+		"w": 32,
+		"h": 32
+	},
+	{
+		"name": "fx_shuriken",
+		"x": 67,
+		"y": 67,
+		"w": 32,
+		"h": 32
+	}
+]

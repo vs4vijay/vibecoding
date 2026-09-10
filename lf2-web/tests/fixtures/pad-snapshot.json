@@ -1,0 +1,25 @@
+{
+  "id": "test-pad-0",
+  "index": 0,
+  "connected": true,
+  "axes": [1, 0],
+  "buttons": [
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": true, "value": 1 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 },
+    { "pressed": false, "value": 0 }
+  ]
+}

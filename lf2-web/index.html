@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>LF2 Web</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    #stage { display: grid; place-items: center; height: 100%; }
+    canvas { image-rendering: pixelated; outline: none; }
+    #ui {
+      position: fixed; inset: 0; pointer-events: none;
+      font-family: "Courier New", monospace; color: #fff;
+    }
+    #ui > * { pointer-events: auto; }
+
+    /* --- scenes ------------------------------------------------------- */
+    .scene {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: rgba(0, 0, 0, 0.55);
+    }
+    .scene.battle { background: transparent; pointer-events: none; }
+    .title .logo { font-size: 72px; letter-spacing: 12px; color: #FFD24A;
+      text-shadow: 4px 4px 0 #803C00; margin-bottom: 8px; }
+    .title .press-attack { font-size: 22px; letter-spacing: 6px; margin-bottom: 24px; }
+    .panel-title { font-size: 30px; letter-spacing: 6px; margin-bottom: 18px; color: #fff; }
+    .hint { font-size: 13px; opacity: 0.75; margin-top: 16px; }
+    .seed { font-size: 15px; letter-spacing: 3px; color: #9AA0A6; margin-top: 10px; }
+
+    /* --- cards & menus -------------------------------------------------- */
+    .card {
+      min-width: 280px; padding: 14px 28px; text-align: center;
+      font-size: 20px; letter-spacing: 3px; cursor: pointer;
+      border: 2px solid #666; background: #111; user-select: none;
+    }
+    .card:hover, .card.selected { border-color: #FFD24A; color: #FFD24A; }
+
+    /* --- character select ----------------------------------------------- */
+    .char-grid { display: grid; grid-template-columns: repeat(3, 140px); gap: 10px; }
+    .char-cell {
+      height: 96px; border: 2px solid #555; background: #101010;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; text-align: center; word-break: break-all;
+    }
+    .char-cell.picked { border-color: #fff; box-shadow: inset 0 0 0 1px #888; }
+    .chips { display: flex; gap: 12px; min-height: 26px; }
+    .chip {
+      display: inline-block; padding: 3px 10px; font-size: 12px;
+      border: 2px solid #fff; background: #000;
+    }
+
+    /* --- overlays (pause / remap) ---------------------------------------- */
+    .overlay {
+      position: absolute; inset: 0; pointer-events: auto;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 12px; background: rgba(0, 0, 0, 0.82);
+    }
+    .menu-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .title-menu { flex-direction: column; align-items: center; gap: 10px; margin-top: 8px; }
+    .title-item { min-width: 240px; }
+    .controls-table { display: flex; flex-direction: column; gap: 8px; max-width: 720px; }
+    .controls-row { display: flex; gap: 16px; font-size: 14px; }
+    .controls-player { min-width: 36px; color: #FFD24A; }
+    .controls-binds { opacity: 0.85; word-break: break-word; }
+    .remap .card.action { min-width: 120px; font-size: 14px; }
+    .remap .hint { max-width: 70ch; text-align: center; }
+  </style>
+</head>
+<body>
+  <div id="stage" tabindex="0"><canvas id="game" width="960" height="540" tabindex="1"></canvas></div>
+  <!-- Scene roots mount here at runtime; the error overlay also lives here. -->
+  <div id="ui"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

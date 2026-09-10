@@ -1,0 +1,6 @@
+{
+  "knife":        { "kind": "thrown", "meleeDamage": 12, "throwDamage": 28, "throwVy": -4.0, "durability": 3, "breakOnThrowImpact": true,  "carrierSpeedMul": 1.0,  "repickupDelayTicks": 20 },
+  "baseball-bat": { "kind": "melee",  "meleeDamage": 26, "throwDamage": 14, "throwVy": -3.0, "durability": 8, "breakOnThrowImpact": false, "carrierSpeedMul": 0.95, "repickupDelayTicks": 20 },
+  "boulder":      { "kind": "heavy",  "meleeDamage": 34, "throwDamage": 45, "throwVy": -7.0, "durability": 1, "breakOnThrowImpact": true,  "carrierSpeedMul": 0.55, "repickupDelayTicks": 60 },
+  "box":          { "kind": "heavy",  "meleeDamage": 18, "throwDamage": 22, "throwVy": -5.0, "durability": 2, "breakOnThrowImpact": true,  "carrierSpeedMul": 0.75, "repickupDelayTicks": 30 }
+}

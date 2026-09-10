@@ -1,0 +1,59 @@
+{
+  "id": "brawler",
+  "maxHp": 240, "maxMp": 100, "mpRegenPerTick": 0.05,
+  "walkSpeed": 2.2, "runSpeed": 5.0, "jumpImpulse": -8.5,
+  "grabMoveId": "grappleSlam",
+  "roles": { "dashAttack": "flyingKnee", "neutralAttack": "punch1" },
+  "moves": {
+    "punch1": { "frames": [
+      { "sprite": "br_p1_windup", "durationTicks": 3, "vx": 0.6, "vy": 0, "vz": 0 },
+      { "sprite": "br_p1_active", "durationTicks": 4, "vx": 1.4, "vy": 0, "vz": 0,
+        "cancelInto": ["punch2"],
+        "hitbox": { "x": 26, "y": -34, "z": 0, "w": 30, "h": 18, "d": 44,
+          "damage": 8, "knockback": { "vx": 1.5, "vy": 0 }, "hitstunTicks": 14,
+          "type": "light", "priority": 10 } },
+      { "sprite": "br_p1_recover", "durationTicks": 5, "vx": 0, "vy": 0, "vz": 0,
+        "cancelInto": ["punch2"] } ] },
+    "punch2": { "frames": [
+      { "sprite": "br_p2_windup", "durationTicks": 3, "vx": 0.6, "vy": 0, "vz": 0 },
+      { "sprite": "br_p2_active", "durationTicks": 4, "vx": 1.8, "vy": 0, "vz": 0,
+        "cancelInto": ["punch3"],
+        "hitbox": { "x": 27, "y": -34, "z": 0, "w": 32, "h": 18, "d": 44,
+          "damage": 10, "knockback": { "vx": 2.0, "vy": 0 }, "hitstunTicks": 16,
+          "type": "light", "priority": 10 } },
+      { "sprite": "br_p2_recover", "durationTicks": 6, "vx": 0, "vy": 0, "vz": 0,
+        "cancelInto": ["punch3"] } ] },
+    "punch3": { "frames": [
+      { "sprite": "br_p3_windup", "durationTicks": 5, "vx": 0.4, "vy": 0, "vz": 0 },
+      { "sprite": "br_p3_active", "durationTicks": 4, "vx": 2.2, "vy": 0, "vz": 0,
+        "hitbox": { "x": 28, "y": -36, "z": 0, "w": 34, "h": 24, "d": 44,
+          "damage": 16, "knockback": { "vx": 3.5, "vy": -6.0 }, "hitstunTicks": 24,
+          "type": "heavy", "priority": 12 } },
+      { "sprite": "br_p3_recover", "durationTicks": 9, "vx": 0, "vy": 0, "vz": 0 } ] },
+    "flyingKnee": { "frames": [
+      { "sprite": "br_knee_crouch", "durationTicks": 2, "vx": 3.0, "vy": 0, "vz": 0 },
+      { "sprite": "br_knee_active", "durationTicks": 8, "vx": 5.0, "vy": 0, "vz": 0,
+        "hitbox": { "x": 24, "y": -38, "z": 0, "w": 30, "h": 22, "d": 44,
+          "damage": 18, "knockback": { "vx": 3.0, "vy": -6.0 }, "hitstunTicks": 30,
+          "type": "heavy", "priority": 20 } },
+      { "sprite": "br_knee_land", "durationTicks": 6, "vx": 0, "vy": 0, "vz": 0 } ] },
+    "energyBlast": { "sequence": "D>A", "frames": [
+      { "sprite": "br_blast_windup", "durationTicks": 6, "vx": 0, "vy": 0, "vz": 0, "mpCost": 25 },
+      { "sprite": "br_blast_cast", "durationTicks": 4, "vx": 0, "vy": 0, "vz": 0,
+        "spawnProjectile": { "projectileId": "energyShot", "offsetX": 28, "offsetY": -36 } },
+      { "sprite": "br_blast_recover", "durationTicks": 8, "vx": 0, "vy": 0, "vz": 0 } ] },
+    "grappleSlam": { "frames": [
+      { "sprite": "br_grab_reach", "durationTicks": 3, "vx": 1.2, "vy": 0, "vz": 0 },
+      { "sprite": "br_grab_hold", "durationTicks": 4, "vx": 0, "vy": 0, "vz": 0,
+        "hitbox": { "x": 18, "y": -36, "z": 0, "w": 22, "h": 30, "d": 40,
+          "damage": 0, "knockback": { "vx": 0, "vy": 0 }, "hitstunTicks": 0,
+          "type": "grab", "priority": 25 } },
+      { "sprite": "br_grab_slam", "durationTicks": 10, "vx": 0, "vy": 0, "vz": 0 } ] }
+  },
+  "projectiles": {
+    "energyShot": { "sprite": "fx_energy_shot", "size": { "w": 24, "h": 14, "d": 14 },
+      "velocityVx": 7.0, "gravity": 0, "ttlTicks": 130, "pierce": false,
+      "damage": 15, "knockback": { "vx": 3.0, "vy": -1.0 }, "hitstunTicks": 18,
+      "type": "projectile", "priority": 15 }
+  }
+}

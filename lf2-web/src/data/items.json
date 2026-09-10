@@ -1,0 +1,4 @@
+{
+  "milk": { "effect": "healHp",    "amount": 90, "consumeTicks": 30, "shelfLifeTicks": 1200 },
+  "beer": { "effect": "restoreMp", "amount": 60, "consumeTicks": 30, "shelfLifeTicks": 1200 }
+}

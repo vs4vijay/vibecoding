@@ -1,0 +1,14 @@
+{
+  "id": "rooftop-night",
+  "bounds": { "w": 1600, "h": 480, "d": 120 },
+  "walls": { "left": 0, "right": 1600, "restitution": 0.4 },
+  "layers": [
+    { "atlasKey": "bg_rooftop_sky",   "parallax": 0.15, "baselineY": 96 },
+    { "atlasKey": "bg_rooftop_city",  "parallax": 0.4,  "baselineY": 208 },
+    { "atlasKey": "bg_rooftop_floor", "parallax": 1.0,  "baselineY": 420 }
+  ],
+  "drops": {
+    "firstDropTick": 600, "intervalTicks": 720, "intervalJitterTicks": 180,
+    "table": { "milk": 2, "beer": 2, "knife": 3, "baseball-bat": 3, "boulder": 1, "box": 4 }
+  }
+}

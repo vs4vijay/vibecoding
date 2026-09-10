@@ -1,0 +1,55 @@
+ART — Kenney game assets, CC0 1.0 Universal (https://kenney.nl)
+================================================================
+Fighter sprites ....... Tiny Dungeon     (kenney.nl/assets/tiny-dungeon)
+Weapon/item icons ..... Roguelike/RPG pack (kenney.nl/assets/roguelike-rpg-pack)
+Blast/hit FX .......... Particle Pack    (kenney.nl/assets/particle-pack)
+Stage tiles/backdrops . Pixel Platformer (kenney.nl/assets/pixel-platformer)
+Downloaded 2026-09-06; each pack's License.txt states CC0 1.0 Universal:
+  tiny-dungeon ....... https://kenney.nl/media/pages/assets/tiny-dungeon/f8422efb44-1674742415/kenney_tiny-dungeon.zip
+  roguelike-rpg-pack . https://kenney.nl/media/pages/assets/roguelike-rpg-pack/12c03cd78b-1677697420/kenney_roguelike-rpg-pack.zip
+  particle-pack ...... https://kenney.nl/media/pages/assets/particle-pack/f8fe0f8cb8-1677578741/kenney_particle-pack.zip
+  pixel-platformer ... https://kenney.nl/media/pages/assets/pixel-platformer/33bb4921eb-1696667883/kenney_pixel-platformer.zip
+Packed by scripts/build-atlases.ts on 2026-09-06; frame names owned by src/data.
+Curation notes: fighter cells are Tiny Dungeon 16px sprites (tilemap_packed.png)
+scaled ×3 with per-archetype palette remaps (see the CLOTHING_TARGETS table in
+scripts/build-atlases.ts); melee windup/active frames composite weapon overlays.
+props/fx/bg mix the other three packs (boulder + beer stein from Roguelike/RPG;
+fx colorized from the grayscale Particle Pack via -tint; background layer strips
+composited from Pixel Platformer tiles + backdrop panes).
+License: https://creativecommons.org/publicdomain/zero/1.0/
+Locked decision 4: no ripped LF2 sprites or portraits.
+
+AUDIO (Task 11) — all CC0 1.0 Universal, no attribution required
+================================================================
+
+SFX — Kenney "Impact Sounds" (https://kenney.nl/assets/impact-sounds)
+  Downloaded: https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip
+  hit-light.mp3 ........ impactGeneric_light_000.ogg (mp3 q4)
+  hit-heavy.mp3 ........ impactPunch_heavy_000.ogg (mp3 q4)
+  block.mp3 ............ impactPlate_medium_000.ogg, 100ms fade-out tail (mp3 q4)
+  land.mp3 ............. impactSoft_heavy_001.ogg (mp3 q4)
+  ko.mp3 ............... impactBell_heavy_002.ogg, fade-out from 350ms (mp3 q4)
+  grab.mp3 ............. impactWood_light_000.ogg, short fade-out tail (mp3 q4)
+  weapon-break.mp3 ..... impactGlass_heavy_003.ogg + echo, fade-out from 300ms (mp3 q4)
+  item-drop.mp3 ........ impactSoft_medium_002.ogg, short fade-out tail (mp3 q4)
+
+SFX — Kenney "Digital Audio" (https://kenney.nl/assets/digital-audio)
+  Downloaded: https://kenney.nl/media/pages/assets/digital-audio/216eac4753-1677590265/kenney_digital-audio.zip
+  weapon-pickup.mp3 .... powerUp2.ogg (mp3 q4)
+  menu-move.mp3 ........ phaserUp3.ogg (mp3 q4)
+  menu-confirm.mp3 ..... powerUp5.ogg (mp3 q4)
+
+SFX — generated with jsfxr (sfxr.me engine, github.com/chr15m/jsfxr; the
+sfxr/jsfxr synth itself carries no license restriction on its output):
+  jump.mp3, dash.mp3, whiff.mp3, cast-fire.mp3, cast-ice.mp3
+  Synthesized locally via jsfxr Params JSON → WAV → mp3 q4. Original wav
+  params recorded in scripts/gen-audio-sfx.md.
+
+MUSIC — OpenGameArt.org, CC0 collection "CC0 Retro Music"
+(https://opengameart.org/content/cc0-retro-music)
+  rooftop-night-loop.mp3 (26.65s loop)
+    Source: "8BitBattleLoop" by Section31/Uncoded — https://opengameart.org/sites/default/files/8BitBattleLoop.ogg
+  grassland-dojo-loop.mp3 (29.5s loop, trimmed from 41.1s with 1s fade-out for seam)
+    Source: Juhani Junkala "Chiptune Adventures: 1. Stage 1" — https://opengameart.org/sites/default/files/Juhani%20Junkala%20%5BChiptune%20Adventures%5D%201.%20Stage%201.ogg
+    Author page: https://opengameart.org/users/juhani-junkala
+

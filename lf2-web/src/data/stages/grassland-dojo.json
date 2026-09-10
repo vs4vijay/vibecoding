@@ -1,0 +1,14 @@
+{
+  "id": "grassland-dojo",
+  "bounds": { "w": 1600, "h": 480, "d": 120 },
+  "walls": { "left": 0, "right": 1600, "restitution": 0.4 },
+  "layers": [
+    { "atlasKey": "bg_dojo_sky",   "parallax": 0.15, "baselineY": 96 },
+    { "atlasKey": "bg_dojo_hills", "parallax": 0.4,  "baselineY": 208 },
+    { "atlasKey": "bg_dojo_floor", "parallax": 1.0,  "baselineY": 420 }
+  ],
+  "drops": {
+    "firstDropTick": 600, "intervalTicks": 900, "intervalJitterTicks": 180,
+    "table": { "milk": 3, "beer": 3, "knife": 2, "baseball-bat": 2, "boulder": 1, "box": 2 }
+  }
+}

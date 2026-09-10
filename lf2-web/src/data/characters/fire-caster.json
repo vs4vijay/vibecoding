@@ -1,0 +1,62 @@
+{
+  "id": "fire-caster",
+  "maxHp": 200, "maxMp": 100, "mpRegenPerTick": 0.07,
+  "walkSpeed": 2.0, "runSpeed": 4.6, "jumpImpulse": -8.3,
+  "grabMoveId": "emberGrasp",
+  "roles": { "dashAttack": "flameSweep", "neutralAttack": "spark1" },
+  "moves": {
+    "spark1": { "frames": [
+      { "sprite": "fc_spark1_windup", "durationTicks": 3, "vx": 0.4, "vy": 0, "vz": 0 },
+      { "sprite": "fc_spark1_active", "durationTicks": 4, "vx": 1.0, "vy": 0, "vz": 0,
+        "cancelInto": ["spark2"],
+        "hitbox": { "x": 24, "y": -34, "z": 0, "w": 28, "h": 20, "d": 40,
+          "damage": 7, "knockback": { "vx": 1.2, "vy": 0 }, "hitstunTicks": 12,
+          "type": "light", "priority": 10 } },
+      { "sprite": "fc_spark1_recover", "durationTicks": 5, "vx": 0, "vy": 0, "vz": 0,
+        "cancelInto": ["spark2"] } ] },
+    "spark2": { "frames": [
+      { "sprite": "fc_spark2_windup", "durationTicks": 3, "vx": 0.4, "vy": 0, "vz": 0 },
+      { "sprite": "fc_spark2_active", "durationTicks": 5, "vx": 1.4, "vy": 0, "vz": 0,
+        "hitbox": { "x": 25, "y": -35, "z": 0, "w": 32, "h": 22, "d": 42,
+          "damage": 11, "knockback": { "vx": 2.2, "vy": -6.0 }, "hitstunTicks": 22,
+          "type": "heavy", "priority": 12 } },
+      { "sprite": "fc_spark2_recover", "durationTicks": 8, "vx": 0, "vy": 0, "vz": 0 } ] },
+    "flameSweep": { "frames": [
+      { "sprite": "fc_sweep_crouch", "durationTicks": 3, "vx": 2.6, "vy": 0, "vz": 0 },
+      { "sprite": "fc_sweep_active", "durationTicks": 8, "vx": 4.6, "vy": 0, "vz": 0,
+        "hitbox": { "x": 26, "y": -36, "z": 0, "w": 38, "h": 24, "d": 46,
+          "damage": 15, "knockback": { "vx": 3.0, "vy": -6.0 }, "hitstunTicks": 28,
+          "status": "burn",
+          "type": "heavy", "priority": 20 } },
+      { "sprite": "fc_sweep_recover", "durationTicks": 8, "vx": 0, "vy": 0, "vz": 0 } ] },
+    "fireball": { "sequence": "D>v", "frames": [
+      { "sprite": "fc_ball_charge", "durationTicks": 7, "vx": 0, "vy": 0, "vz": 0, "mpCost": 30 },
+      { "sprite": "fc_ball_cast", "durationTicks": 4, "vx": 0, "vy": 0, "vz": 0,
+        "spawnProjectile": { "projectileId": "flameBall", "offsetX": 26, "offsetY": -36 } },
+      { "sprite": "fc_ball_recover", "durationTicks": 9, "vx": 0, "vy": 0, "vz": 0 } ] },
+    "meteorLance": { "sequence": "D>A", "frames": [
+      { "sprite": "fc_meteor_charge", "durationTicks": 12, "vx": 0, "vy": 0, "vz": 0, "mpCost": 35 },
+      { "sprite": "fc_meteor_cast", "durationTicks": 5, "vx": 0, "vy": 0, "vz": 0,
+        "spawnProjectile": { "projectileId": "meteorCore", "offsetX": 28, "offsetY": -40 } },
+      { "sprite": "fc_meteor_recover", "durationTicks": 13, "vx": 0, "vy": 0, "vz": 0 } ] },
+    "emberGrasp": { "frames": [
+      { "sprite": "fc_grab_reach", "durationTicks": 3, "vx": 1.0, "vy": 0, "vz": 0 },
+      { "sprite": "fc_grab_hold", "durationTicks": 4, "vx": 0, "vy": 0, "vz": 0,
+        "hitbox": { "x": 16, "y": -36, "z": 0, "w": 22, "h": 30, "d": 38,
+          "damage": 0, "knockback": { "vx": 0, "vy": 0 }, "hitstunTicks": 0,
+          "type": "grab", "priority": 25 } },
+      { "sprite": "fc_grab_scorch", "durationTicks": 11, "vx": 0, "vy": 0, "vz": 0 } ] }
+  },
+  "projectiles": {
+    "flameBall": { "sprite": "fx_flame_ball", "size": { "w": 22, "h": 18, "d": 18 },
+      "velocityVx": 6.0, "gravity": 0, "ttlTicks": 140, "pierce": false,
+      "damage": 14, "knockback": { "vx": 3.0, "vy": -1.0 }, "hitstunTicks": 18,
+      "status": "burn",
+      "type": "projectile", "priority": 15 },
+    "meteorCore": { "sprite": "fx_meteor_core", "size": { "w": 30, "h": 24, "d": 24 },
+      "velocityVx": 7.5, "gravity": 0.15, "ttlTicks": 150, "pierce": true,
+      "damage": 22, "knockback": { "vx": 4.0, "vy": -6.0 }, "hitstunTicks": 30,
+      "status": "burn",
+      "type": "heavy", "priority": 25 }
+  }
+}

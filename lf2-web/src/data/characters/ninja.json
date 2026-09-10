@@ -1,0 +1,66 @@
+{
+  "id": "ninja",
+  "maxHp": 230, "maxMp": 100, "mpRegenPerTick": 0.06,
+  "walkSpeed": 2.8, "runSpeed": 5.8, "jumpImpulse": -9.2,
+  "grabMoveId": "shadowBind",
+  "roles": { "dashAttack": "shadowRush", "neutralAttack": "cut1" },
+  "moves": {
+    "cut1": { "frames": [
+      { "sprite": "nj_cut1_windup", "durationTicks": 2, "vx": 0.8, "vy": 0, "vz": 0 },
+      { "sprite": "nj_cut1_active", "durationTicks": 3, "vx": 1.6, "vy": 0, "vz": 0,
+        "cancelInto": ["cut2"],
+        "hitbox": { "x": 26, "y": -34, "z": 0, "w": 30, "h": 16, "d": 42,
+          "damage": 6, "knockback": { "vx": 1.2, "vy": 0 }, "hitstunTicks": 12,
+          "type": "light", "priority": 10 } },
+      { "sprite": "nj_cut1_recover", "durationTicks": 4, "vx": 0, "vy": 0, "vz": 0,
+        "cancelInto": ["cut2"] } ] },
+    "cut2": { "frames": [
+      { "sprite": "nj_cut2_windup", "durationTicks": 2, "vx": 0.8, "vy": 0, "vz": 0 },
+      { "sprite": "nj_cut2_active", "durationTicks": 4, "vx": 2.0, "vy": 0, "vz": 0,
+        "cancelInto": ["cut3"],
+        "hitbox": { "x": 27, "y": -33, "z": 0, "w": 32, "h": 16, "d": 42,
+          "damage": 8, "knockback": { "vx": 1.6, "vy": 0 }, "hitstunTicks": 14,
+          "type": "light", "priority": 10 } },
+      { "sprite": "nj_cut2_recover", "durationTicks": 5, "vx": 0, "vy": 0, "vz": 0,
+        "cancelInto": ["cut3"] } ] },
+    "cut3": { "frames": [
+      { "sprite": "nj_cut3_windup", "durationTicks": 4, "vx": 0.5, "vy": 0, "vz": 0 },
+      { "sprite": "nj_cut3_active", "durationTicks": 4, "vx": 2.4, "vy": 0, "vz": 0,
+        "hitbox": { "x": 28, "y": -36, "z": 0, "w": 34, "h": 22, "d": 44,
+          "damage": 13, "knockback": { "vx": 3.2, "vy": -6.0 }, "hitstunTicks": 24,
+          "type": "heavy", "priority": 12 } },
+      { "sprite": "nj_cut3_recover", "durationTicks": 8, "vx": 0, "vy": 0, "vz": 0 } ] },
+    "shadowRush": { "frames": [
+      { "sprite": "nj_rush_crouch", "durationTicks": 2, "vx": 4.0, "vy": 0, "vz": 0 },
+      { "sprite": "nj_rush_active", "durationTicks": 7, "vx": 5.8, "vy": 0, "vz": 0,
+        "hitbox": { "x": 26, "y": -36, "z": 0, "w": 34, "h": 20, "d": 44,
+          "damage": 15, "knockback": { "vx": 3.0, "vy": -6.0 }, "hitstunTicks": 28,
+          "type": "heavy", "priority": 20 } },
+      { "sprite": "nj_rush_land", "durationTicks": 5, "vx": 0, "vy": 0, "vz": 0 } ] },
+    "shurikenVolley": { "sequence": "D^A", "frames": [
+      { "sprite": "nj_volley_draw", "durationTicks": 4, "vx": 0, "vy": 0, "vz": 0, "mpCost": 20 },
+      { "sprite": "nj_volley_throw", "durationTicks": 3, "vx": 0, "vy": 0, "vz": 0,
+        "spawnProjectile": { "projectileId": "shuriken", "offsetX": 24, "offsetY": -34 } },
+      { "sprite": "nj_volley_recover", "durationTicks": 6, "vx": 0, "vy": 0, "vz": 0 } ] },
+    "teleportStrike": { "sequence": ">D>A", "frames": [
+      { "sprite": "nj_tp_blur", "durationTicks": 5, "vx": 9.0, "vy": 0, "vz": 0, "mpCost": 25 },
+      { "sprite": "nj_tp_slash", "durationTicks": 5, "vx": 1.0, "vy": 0, "vz": 0,
+        "hitbox": { "x": 30, "y": -36, "z": 0, "w": 36, "h": 24, "d": 46,
+          "damage": 20, "knockback": { "vx": 3.5, "vy": -6.0 }, "hitstunTicks": 30,
+          "type": "heavy", "priority": 22 } },
+      { "sprite": "nj_tp_reappear", "durationTicks": 8, "vx": 0, "vy": 0, "vz": 0 } ] },
+    "shadowBind": { "frames": [
+      { "sprite": "nj_grab_reach", "durationTicks": 3, "vx": 1.4, "vy": 0, "vz": 0 },
+      { "sprite": "nj_grab_hold", "durationTicks": 3, "vx": 0, "vy": 0, "vz": 0,
+        "hitbox": { "x": 18, "y": -36, "z": 0, "w": 22, "h": 30, "d": 40,
+          "damage": 0, "knockback": { "vx": 0, "vy": 0 }, "hitstunTicks": 0,
+          "type": "grab", "priority": 25 } },
+      { "sprite": "nj_grab_toss", "durationTicks": 10, "vx": 0, "vy": 0, "vz": 0 } ] }
+  },
+  "projectiles": {
+    "shuriken": { "sprite": "fx_shuriken", "size": { "w": 16, "h": 12, "d": 12 },
+      "velocityVx": 9.5, "gravity": 0, "ttlTicks": 110, "pierce": false,
+      "damage": 9, "knockback": { "vx": 1.5, "vy": 0 }, "hitstunTicks": 12,
+      "type": "light", "priority": 15 }
+  }
+}
