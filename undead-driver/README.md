@@ -1,4 +1,4 @@
-# Undead Highway
+# Undead Driver
 
 Endless zombie-driving arcade game for the browser. Auto-throttle down a
 divided desert highway at dusk; zombies lurk on the shoulders, telegraph, and
@@ -8,7 +8,7 @@ keep the weight balanced or the car flips.
 ## Play online
 
 The latest build is deployed to GitHub Pages:
-<https://vs4vijay.github.io/vibecoding/zombie-highway/>
+<https://vs4vijay.github.io/vibecoding/undead-driver/>
 
 ## Quickstart
 
