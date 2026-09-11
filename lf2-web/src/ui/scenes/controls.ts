@@ -13,7 +13,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 /** Shared behavior: Defend or Esc pops the scene, unless an overlay is open. */
-function popOnBack(ctxRef: { ctx?: SceneCtx }, register: (fn: () => void) => void): void {
+function popOnBack(ctxRef: { ctx?: SceneCtx }, register: (fn: () => void) => void): () => void {
   const back = (): void => {
     const ctx = ctxRef.ctx;
     if (ctx === undefined || ctx.sm.overlayOpen) return;
@@ -30,6 +30,7 @@ function popOnBack(ctxRef: { ctx?: SceneCtx }, register: (fn: () => void) => voi
     keys();
     globalThis.document.removeEventListener("keydown", onEsc);
   });
+  return back;
 }
 
 export function createControlsScene(): Scene {
@@ -63,13 +64,14 @@ export function createControlsScene(): Scene {
     root,
     enter(c) {
       if (c !== undefined) ctxRef.ctx = c;   // re-enter without ctx keeps the old one
+      const back = popOnBack(ctxRef, (fn) => { dispose = fn; });
       if (root.children.length === 0) {
         root.appendChild(el("div", { cls: "panel-title", text: "CONTROLS" }));
         root.appendChild(table);
         root.appendChild(remapBtn);
+        root.appendChild(el("div", { cls: "card action", text: "BACK", onClick: back }));
         root.appendChild(el("div", { cls: "hint", text: "Defend / Esc = back" }));
       }
-      popOnBack(ctxRef, (fn) => { dispose = fn; });
     },
     exit() {
       dispose?.();
@@ -94,13 +96,16 @@ export function createAboutScene(): Scene {
     root,
     enter(c) {
       if (c !== undefined) ctxRef.ctx = c;   // re-enter without ctx keeps the old one
+      const back = popOnBack(ctxRef, (fn) => { dispose = fn; });
       if (root.children.length === 0) {
         root.appendChild(el("div", { cls: "panel-title", text: "ABOUT" }));
         root.appendChild(body);
+        root.appendChild(el("div", { cls: "card action", text: "BACK", onClick: back }));
         root.appendChild(el("div", { cls: "hint", text: "Defend / Esc = back" }));
       }
-      popOnBack(ctxRef, (fn) => { dispose = fn; });
     },
+
+
     exit() {
       dispose?.();
       dispose = null;

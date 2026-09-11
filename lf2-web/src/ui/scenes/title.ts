@@ -18,8 +18,16 @@ export function createTitleScene(humanSlots: number[] = [0]): Scene {
   const logo = el("div", { cls: "logo", text: "LF2 WEB" });
   const prompt = el("div", { cls: "press-attack blink", text: "PRESS ATTACK" });
   const menu = el("div", { cls: "menu-row title-menu" });
-  const items = ITEMS.map((label) => {
-    const item = el("div", { cls: "card title-item", text: label });
+  const items = ITEMS.map((label, i) => {
+    const item = el("div", {
+      cls: "card title-item",
+      text: label,
+      onClick: () => {
+        cursor = i;
+        paint();
+        choose();
+      },
+    });
     menu.appendChild(item);
     return item;
   });
