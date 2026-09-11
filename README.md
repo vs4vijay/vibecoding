@@ -340,7 +340,7 @@ single combined workflow (`.github/workflows/games-pages-deploy.yml`).
 | **Tank Racer** | [vs4vijay.github.io/vibecoding/tank-racer](https://vs4vijay.github.io/vibecoding/tank-racer/) | [`tank-racer/`](./tank-racer) | TypeScript, Vite, three.js |
 | **Lugaru Combat** | [vs4vijay.github.io/vibecoding/lugaru-combat](https://vs4vijay.github.io/vibecoding/lugaru-combat/) | [`lugaru-combat/`](./lugaru-combat) | TypeScript, Vite, three.js, Rapier |
 | **Dave Dangerous** | [vs4vijay.github.io/vibecoding/dave-dangerous](https://vs4vijay.github.io/vibecoding/dave-dangerous/) | [`dave-dangerous/`](./dave-dangerous) | TypeScript, Vite 5 |
-| **LF2 Web** | [vs4vijay.github.io/vibecoding/lf2-web](https://vs4vijay.github.io/vibecoding/lf2-web/) | [`lf2-web/`](./lf2-web) | TypeScript, Vite 5, Canvas2D, WebAudio |
+| **Bantam Brawler** | [vs4vijay.github.io/vibecoding/bantam-brawler](https://vs4vijay.github.io/vibecoding/bantam-brawler/) | [`bantam-brawler/`](./bantam-brawler) | TypeScript, Vite 5, Canvas2D, WebAudio |
 | **Dustline** | local server — `cd dustline && bun run dev` ([quickstart](./dustline#readme)) | [`dustline/`](./dustline) | TypeScript, Vite, three.js · Bun + Hono + WebSocket |
 
 In development: [`subway-surfers/`](./subway-surfers).
