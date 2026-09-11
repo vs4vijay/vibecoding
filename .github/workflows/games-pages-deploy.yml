@@ -11,6 +11,7 @@
   #   /undead-driver/     <- undead-driver/dist  (vite base "./", subpath-safe)
   #   /lugaru-combat/     <- lugaru-combat/dist  (vite base "./", subpath-safe)
   #   /dave-dangerous/    <- dave-dangerous/dist  (vite base "./", subpath-safe)
+  #   /lf2-web/           <- lf2-web/dist         (vite base "./", subpath-safe)
 
 name: Deploy Games to Pages
 
@@ -22,6 +23,7 @@ on:
       - "undead-driver/**"
       - "lugaru-combat/**"
       - "dave-dangerous/**"
+      - "lf2-web/**"
       - "games-hub/**"
       - ".github/workflows/games-pages-deploy.yml"
   workflow_dispatch:
@@ -78,6 +80,14 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
+      - name: Build lf2-web
+        working-directory: lf2-web
+        # vite.config.ts sets base "./" so the build works under any subpath
+        # (/vibecoding/lf2-web/) with no BASE_PATH env needed.
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Stage site (preserve per-game URL prefixes)
@@ -88,6 +98,7 @@ jobs:
           cp -r undead-driver/dist site/undead-driver
           cp -r lugaru-combat/dist site/lugaru-combat
           cp -r dave-dangerous/dist site/dave-dangerous
+          cp -r lf2-web/dist site/lf2-web
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
