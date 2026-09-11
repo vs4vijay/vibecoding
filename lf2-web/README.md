@@ -4,6 +4,11 @@ A browser remake of Little Fighter 2's VS mode: 6 original archetypes, 2 stages,
 up to 4 local humans plus CPU bots (max 8 fighters). Deterministic 60 Hz
 simulation, Canvas2D rendering, WebAudio, zero gameplay dependencies.
 
+## Play online
+
+The latest build is deployed to GitHub Pages:
+<https://vs4vijay.github.io/vibecoding/lf2-web/>
+
 ## Run
 
     bun install
