@@ -9,7 +9,7 @@ a golden hash — that determinism is the project's spine; don't break it.
 
 ```sh
 bun install                          # bun ONLY — never npm/npx/yarn/pnpm
-bun run dev                          # vite dev server (:5173)
+bun run dev                          # vite dev server (:2000, strict)
 bun run build                        # tsc --noEmit + determinism gate + sprite-refs gate + vite build
 bun test                             # Bun's built-in runner — full suite (208 tests)
 bun test tests/golden/replay.test.ts # 1200-tick replay must hash to tests/golden/match-001.sha256

@@ -12,7 +12,7 @@ The latest build is deployed to GitHub Pages:
 ## Run
 
     bun install
-    bun run dev          # http://localhost:5173
+    bun run dev          # http://localhost:2000
 
 Production: `bun run build` then `bun run preview`.
 

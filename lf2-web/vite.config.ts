@@ -48,4 +48,8 @@ export default defineConfig({
   base: "./",
   plugins: [assetsData()],
   resolve: { alias: { "@sim": "/src/sim", "@render": "/src/render", "@content": "/src/content" } },
+  // Canonical port: LF2 (Marti Wong & Starsky Wong, 2000). strictPort fails
+  // fast instead of silently serving on a random port the docs don't name.
+  server: { port: 2000, strictPort: true },
+  preview: { port: 2000, strictPort: true },
 });

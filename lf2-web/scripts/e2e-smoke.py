@@ -2,13 +2,13 @@
 # scripts/e2e-smoke.py — black-box browser gate for the LF2 web shell.
 # Drives P1 keyboard-only through title → mode → select → stage-select →
 # battle, asserts the sim is rendering (non-black canvas), opens pause, and
-# returns to title. Usage: python3 scripts/e2e-smoke.py [--url http://localhost:4173/]
+# returns to title. Usage: python3 scripts/e2e-smoke.py [--url http://localhost:2000/]
 import argparse
 from playwright.sync_api import sync_playwright
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--url", default="http://localhost:4173/")
+    ap.add_argument("--url", default="http://localhost:2000/")
     args = ap.parse_args()
     errors: list[str] = []
     with sync_playwright() as p:
