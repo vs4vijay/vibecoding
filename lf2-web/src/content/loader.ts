@@ -36,7 +36,7 @@ export interface ContentCache {
   errors: FieldError[];
 }
 
-const DATA_BASE = "/assets-data/";
+const DATA_BASE = "./assets-data/";
 
 export const CHARACTER_FILES = [
   "brawler", "swordsman", "fire-caster", "ice-caster", "ninja", "support-mage",

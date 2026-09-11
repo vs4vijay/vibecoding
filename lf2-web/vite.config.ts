@@ -7,8 +7,9 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 
 /**
  * /assets-data/ serves src/data verbatim (spec §3.7 fetch base). The loader's
- * DATA_BASE is fixed at "/assets-data/", so dev and preview both mount it here;
- * `vite build` copies the files into dist/assets-data at closeBundle.
+ * DATA_BASE is relative ("./assets-data/"), so it resolves against the document
+ * URL — dev/preview mount it here and `vite build` copies the files into
+ * dist/assets-data at closeBundle.
  */
 function assetsData(): Plugin {
   const copyDir = (src: string, dest: string): void => {
