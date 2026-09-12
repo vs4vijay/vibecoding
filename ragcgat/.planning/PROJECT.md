@@ -10,20 +10,18 @@ Import WhatsApp exports and instantly search/query your conversation history.
 
 ## Requirements
 
-### Validated
+### Validated (v1.0 — shipped 2026-09-12)
 
-(None yet — ship to validate)
+- [x] Import WhatsApp chat export .txt files (drag-drop + file picker; .zip with _chat.txt also supported)
+- [x] Parse WhatsApp export format into structured messages (sender, timestamp, content, media placeholders)
+- [x] Organize conversations by group/contact name with upsert semantics (create new / merge into existing)
+- [x] Display conversations in chat-style UI (message bubbles, timestamps, sender labels, capped windowing)
+- [x] Full-text keyword search across all messages and within a conversation (exact counts, highlighted results, scroll-to-message deep links)
+- [x] Media placeholders in chat view for attached media (images, videos, audio, documents, stickers, GIFs)
+- [x] Local-first storage using IndexedDB (Dexie, schema v1→v3)
+- [x] Data model designed for future export/sharing capability (deterministic dedup hashes, stable ids, denormalized stats)
 
-### Active
-
-- [ ] Import WhatsApp chat export .txt files (drag-drop + file picker)
-- [ ] Parse WhatsApp export format into structured messages (sender, timestamp, content, media placeholders)
-- [ ] Organize conversations by group/contact name with upsert semantics (create new / update existing)
-- [ ] Display conversations in chat-style UI (message bubbles, timestamps, sender labels)
-- [ ] Full-text keyword search across all messages
-- [ ] Media placeholders in chat view for attached media (images, videos, audio)
-- [ ] Local-first storage using IndexedDB or equivalent
-- [ ] Data model designed for future export/sharing capability
+Bonus (not originally scoped): dark mode with OS detection + persisted toggle; svelte-check in the standard gate set.
 
 ### Out of Scope
 
@@ -47,12 +45,14 @@ Personal project to archive and make searchable the user's WhatsApp conversation
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Web-first, PWA deferred | Faster iteration on core functionality | — Pending |
-| Local-first storage (IndexedDB) | No backend, single-user, fully client-side | — Pending |
-| Chat-style UI (bubbles) | Familiar to WhatsApp users | — Pending |
-| Preview-before-import | User control over what gets merged | — Pending |
-| Configurable RAG (future) | Local model by default, API key as upgrade | — Pending |
+| Web-first, PWA deferred | Faster iteration on core functionality | ✅ Validated — v1.0 shipped web-only |
+| Local-first storage (IndexedDB) | No backend, single-user, fully client-side | ✅ Validated — Dexie v1→v3, 270 tests green |
+| Chat-style UI (bubbles) | Familiar to WhatsApp users | ✅ Validated — Phase 4 UAT manual pass |
+| Preview-before-import | User control over what gets merged | ✅ Validated — new/skipped diff on every import |
+| Custom parser over npm packages | 14+ format families need first-class tolerance | ✅ Validated — 24-fixture benchmark green |
+| Dexie multiEntry over Orama (v1 search) | Query layer pre-built; native persistence; v2 RAG picks its own vector store | ✅ Validated — 05-UAT 8/8 |
+| Capped-window over full virtualization | 120 rows ≤ 200 budget covers 100K msgs via keyset pagination | ✅ Validated — budget never trips |
+| Configurable RAG (future) | Local model by default, API key as upgrade | Pending — v2 |
 
----
+*Last updated: 2026-09-13 — v1.0 milestone close (audit: v1.0-MILESTONE-AUDIT.md)*
 
-*Last updated: 2025-07-28 after initialization*

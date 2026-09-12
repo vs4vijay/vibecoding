@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-current_phase: 05
+milestone_name: MVP — Import, Browse, Search
+current_phase: —
 
-current_phase_name: Full-Text Search
-status: verified
-stopped_at: Phase 05 VERIFIED COMPLETE — 05-01 engine + 05-02 UI executed, 270 tests green, all gates pass, 8/8 browser UAT checks pass on :4647; v1 roadmap complete (Phases 1-5)
-last_updated: "2026-09-12T00:00:00Z"
-last_activity: 2026-09-12
-last_activity_desc: Phase 05 05-01 executed 2026-09-12 — searchMessages (exact count, newest-first), getWindowAt (bounded target window), seedWindow, highlight/snippet lib, searchAll/searchChat; 265 tests + gates green
+current_phase_name: (milestone complete — next milestone not started)
+status: milestone-complete
+stopped_at: v1.0 shipped 2026-09-12 — 13/13 requirements, audit tech_debt-status (0 blockers, 10 acknowledged findings), milestone archived + tagged; next: /gsd-new-milestone for v1.x/v2.0
+last_updated: "2026-09-13T00:00:00Z"
+last_activity: 2026-09-13
+last_activity_desc: v1.0 milestone close — audit (integration checker PASS-WITH-NOTES, 4/4 flows), archives written (milestones/v1.0-*.md), MILESTONES.md created, PROJECT evolved, ROADMAP reset
 progress:
   total_phases: 1
   completed_phases: 1
@@ -28,14 +28,28 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 05 (Full-Text Search) — **VERIFIED COMPLETE** (2/2 plans + UAT)
-Plan: 2 of 2 executed
-Status: Phase 05 verified 2026-09-12 — search UI, navigation, deep links, fallback, theme all pass; next: milestone wrap-up or v2 planning
-Last activity: 2026-09-12 — 05-02 execution + browser UAT complete; all gates green
+Milestone: v1.0 (MVP — Import, Browse, Search) — **SHIPPED 2026-09-12**
+Plans: 11/11 executed across Phases 1-5; audit 13/13 requirements, integration 4/4 flows
+Status: milestone closed 2026-09-13 — archived to .planning/milestones/, tagged v1.0
+Last activity: 2026-09-13 — milestone audit + close (integration checker PASS-WITH-NOTES; 10 findings acknowledged as deferred)
 
+## Deferred Items
 
+Items acknowledged and deferred at milestone close on 2026-09-13 (see .planning/v1.0-MILESTONE-AUDIT.md for evidence):
 
-Progress: [██████████] 100%
+| Category | Item | Status |
+|----------|------|--------|
+| storage (N1) | importChatText dead-in-prod, never sets v3 stats | open — delete in cleanup pass |
+| storage (N4) | v2-migration `day` column write-only | open — keep as migration-history artifact |
+| import (N6) | dedupHash global scope vs name-scoped merge | open — decision needed for v2 |
+| import (N5) | worker preview-result {bytes, lines} payload unread | open — cleanup |
+| import (N7) | first-import done-banner unreachable on happy path | open — UX polish candidate |
+| browsing (N2) | sidebar ordering duplicated (listChatsNewest test-only) | open — cleanup |
+| browsing (N3) | dead exports: observeLatest, anchorDelta, isSameDay | open — cleanup |
+| browsing (N8) | chat selection bounded to 100 newest (deep links) | open — v2 polish |
+| browsing (N9) | one-sided bubbles (no 'me' concept) | open — v2 feature decision |
+| parser (N10) | roadmap export-map file naming drift (capability complete) | open — doc note only |
+Progress: v1.0 complete — 5 phases, 11 plans, 13/13 requirements
 
 ## Performance Metrics
 
