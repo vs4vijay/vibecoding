@@ -2,16 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 04
-current_phase_name: Chat Browsing
-status: verifying
-stopped_at: Phase 04 execution complete, ready for verification
-last_updated: "2026-09-09T00:00:00Z"
-last_activity: 2026-09-09
-last_activity_desc: Phase 04 execution complete (04-01 tracer + 04-02 virtualization, 245-test suite green)
+current_phase: 05
+
+current_phase_name: Full-Text Search
+status: planning
+stopped_at: Phase 04 verified — all UAT gates (automated + deferred manual browser pass) green; ready for Phase 05 planning
+last_updated: "2026-09-12T00:00:00Z"
+last_activity: 2026-09-12
+last_activity_desc: Phase 04 UAT verified — deferred manual browser pass executed on localhost:1337; found and fixed 4 real issues (ChatView missing browser import, undeclared activeObserver, trimToBudget keyset loop, min-h-screen layout); svelte-check gate added; 245/245 tests green
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
   completed_plans: 3
 ---
@@ -23,14 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-28)
 
 **Core value:** Import WhatsApp exports and instantly search/query your conversation history
-**Current focus:** Phase 04 verification (UAT), then Phase 05 — Full-Text Search
+**Current focus:** Phase 05 planning — Full-Text Search
 
 ## Current Position
 
-Phase: 04 (Chat Browsing) — COMPLETE (2/2 plans)
+Phase: 04 (Chat Browsing) — **VERIFIED COMPLETE** (2/2 plans, UAT incl. deferred manual pass)
 Plan: 2 of 2
-Status: Phase 04 complete, ready for verification
-Last activity: 2026-09-09 — Phase 04 Waves 1+2 executed (tracer slice + virtualization/polish)
+Status: Phase 04 verified 2026-09-12; next: Phase 05 (Full-Text Search) planning
+Last activity: 2026-09-12 — UAT manual browser pass executed; 4 fixes committed
+  (8a25324 browser import + activeObserver; d9b402f trimToBudget frontier;
+   8eb5ff1 h-screen shell; ce5e3a3 svelte-check gate; 92aa3cf dev port 1337)
 
 Progress: [██████████] 100%
 
