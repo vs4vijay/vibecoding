@@ -17,10 +17,14 @@
     /* --- scenes ------------------------------------------------------- */
     .scene {
       position: absolute; inset: 0; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 14px;
+      align-items: center; gap: 14px;
       background: rgba(0, 0, 0, 0.55);
+      /* Margin-auto centering (not justify-content:center) keeps the top of
+         overflowing content reachable on short mobile viewports. */
+      justify-content: flex-start; overflow-y: auto;
     }
-    .scene.battle { background: transparent; pointer-events: none; }
+    .scene > :first-child { margin-top: auto; }
+    .scene > :last-child { margin-bottom: auto; }
     .title .logo { font-size: 72px; letter-spacing: 12px; color: #FFD24A;
       text-shadow: 4px 4px 0 #803C00; margin-bottom: 8px; }
     .title .press-attack { font-size: 22px; letter-spacing: 6px; margin-bottom: 24px; }
@@ -65,7 +69,30 @@
     .controls-binds { opacity: 0.85; word-break: break-word; }
     .remap .card.action { min-width: 120px; font-size: 14px; }
     .remap .hint { max-width: 70ch; text-align: center; }
-
+    /* --- touch gamepad (mounted only on touch devices) ------------------------ */
+    .touchpad {
+      position: fixed; left: 12px; right: 12px; bottom: 14px;
+      display: flex; justify-content: space-between; align-items: flex-end;
+      pointer-events: none; z-index: 30;
+    }
+    .tcluster { display: flex; gap: 10px; align-items: flex-end; }
+    .dstick { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(2, 56px); gap: 6px; }
+    .d-left { grid-column: 1; grid-row: 2; }
+    .d-right { grid-column: 3; grid-row: 2; }
+    .d-up { grid-column: 2; grid-row: 1; }
+    .d-down { grid-column: 2; grid-row: 2; }
+    .tbtn {
+      pointer-events: auto; user-select: none; -webkit-user-select: none;
+      touch-action: none; display: flex; align-items: center; justify-content: center;
+      width: 56px; height: 56px; border-radius: 12px;
+      border: 2px solid #666; background: rgba(17, 17, 17, .55);
+      color: #fff; font-size: 20px;
+    }
+    .tbtn.a, .tbtn.j, .tbtn.d { border-radius: 50%; border-color: #FFD24A; color: #FFD24A; }
+    .pausebtn {
+      position: fixed; top: 10px; right: 10px; width: 44px; height: 44px;
+      border-radius: 10px; font-size: 15px; z-index: 30;
+    }
   </style>
 </head>
 <body>

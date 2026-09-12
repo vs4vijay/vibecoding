@@ -19,8 +19,10 @@ import type { Assets } from "../../render/types";
 import { loadAtlas } from "../../render/atlas";
 import { buildPauseOverlay, buildRemapOverlay } from "../overlays";
 import type { Scene, SceneCtx } from "../scene-manager";
-import { buildSlotConfigs, type MatchSetup } from "../flow";
+import { createTouchSource, hasTouch, type TouchSource } from "../../input/touch";
+import { mountTouchPad } from "../touchpad";
 import type { MatchOutcome } from "./results";
+import { buildSlotConfigs, type MatchSetup } from "../flow";
 
 const TICK_MS = 1000 / 60;
 const MAX_CATCH_UP_MS = 250;
@@ -50,6 +52,8 @@ export function createBattleScene(
   let renderer: Renderer | null = null;
   let pollInputs: (() => InputFrame[]) | null = null;
   let detachEsc: (() => void) | null = null;
+  let touch: TouchSource | null = null;
+  let destroyTouchPad: (() => void) | null = null;
   let paused = false;
   let outcome: MatchOutcome | null = null;
   const kills = new Array<number>(MAX_FIGHTERS).fill(0);
@@ -67,20 +71,25 @@ export function createBattleScene(
     const keymaps = resolveKeymaps(humans);
     padProviders.length = 0;
     const routed: RoutedSource[] = [];
-    for (const slot of humans) {
+    for (const [i, slot] of humans.entries()) {
       const keyboard = createKeyboardSource(globalThis.document, keymaps[slot] ?? keymaps[0]!);
       const padIndex = setup.padsBySlot[slot];
-      if (padIndex === undefined) {
+      // Touch pad drives the first human slot; everywhere else it is absent.
+      const touchSource = i === 0 ? touch : null;
+      if (padIndex === undefined && touchSource === null) {
         routed.push({ slot, source: keyboard });
         continue;
       }
-      const provider: SnapshotProvider = () => systemSnapshot(padIndex);
-      padProviders.push(provider);
-      routed.push({ slot, source: createCompositeSource({ keyboard, pads: [provider] }) });
+      const pads: SnapshotProvider[] = [];
+      if (padIndex !== undefined) {
+        const provider: SnapshotProvider = () => systemSnapshot(padIndex);
+        padProviders.push(provider);
+        pads.push(provider);
+      }
+      routed.push({ slot, source: createCompositeSource({ keyboard, pads, ...(touchSource !== null ? { touch: touchSource } : {}) }) });
     }
     pollInputs = createRouter(routed).poll;
   }
-
   // --- pause ----------------------------------------------------------------
 
   function togglePause(): void {
@@ -145,6 +154,13 @@ export function createBattleScene(
     }
     paused = false;
     outcome = null;
+    destroyTouchPad?.();
+    destroyTouchPad = null;
+    touch = null;
+    if (hasTouch()) {
+      touch = createTouchSource();
+      destroyTouchPad = mountTouchPad(root, touch, togglePause);
+    }
     wireSources();
     attachEsc();
     renderer = createRenderer();
@@ -248,6 +264,9 @@ export function createBattleScene(
     loop = null;
     detachEsc?.();
     detachEsc = null;
+    destroyTouchPad?.();
+    destroyTouchPad = null;
+    touch = null;
     pollInputs = null;
     world = null;
     paused = false;

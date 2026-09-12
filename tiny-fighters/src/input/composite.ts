@@ -9,6 +9,8 @@ export interface CompositeSourceOptions {
   keyboard: Source;
   /** Physical pad indices (system snapshot) or test providers. */
   pads?: Array<number | SnapshotProvider>;
+  /** On-screen gamepad (P1 touch devices); inert when untouched. */
+  touch?: Source;
 }
 
 /**
@@ -23,6 +25,7 @@ export function createCompositeSource(opts: CompositeSourceOptions): Source {
   return {
     poll(): InputFrame {
       const frames: InputFrame[] = [opts.keyboard.poll(), ...padSources.map((s) => s.poll())];
+      if (opts.touch !== undefined) frames.push(opts.touch.poll());
       // Direction: sum across devices then clamp — two devices pulling opposite
       // ways cancel, exactly like opposing keys on one keyboard.
       const rawX = frames.reduce((sum, f) => sum + f.dir.x, 0);
