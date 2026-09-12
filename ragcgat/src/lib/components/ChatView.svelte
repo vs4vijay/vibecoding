@@ -1,5 +1,6 @@
 <script lang="ts">
 import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
 import {
 	PAGE_SIZE,
 	type WindowState,
@@ -8,6 +9,7 @@ import {
 	emptyWindow,
 	groupForRender,
 	prependPage,
+	seedWindow,
 } from '$lib/chat/windows';
 import type { ChatRecord } from '$lib/db/db';
 import { db } from '$lib/db/db';
@@ -15,17 +17,23 @@ import { MessageRepository } from '$lib/db/repositories';
 import { tick } from 'svelte';
 import DateSeparator from './DateSeparator.svelte';
 import MessageBubble from './MessageBubble.svelte';
+import SearchBar from './SearchBar.svelte';
 
 const {
 	chat,
 	selectedId = null,
+	highlightId = null,
+	onselectMessage,
 }: {
 	chat: ChatRecord | undefined;
 	selectedId?: number | null;
+	highlightId?: number | null;
+	onselectMessage?: (chatId: number, msgId: number) => void;
 } = $props();
 
 let win = $state<WindowState | null>(null);
 let loadingOlder = $state(false);
+let highlightIdActive = $state<number | null>(null);
 // biome-ignore lint/style/useConst: Svelte bind:this requires a let binding
 let scrollEl = $state<HTMLElement | null>(null);
 // biome-ignore lint/style/useConst: Svelte bind:this requires a let binding
@@ -44,13 +52,33 @@ const messages = new MessageRepository(db);
 // Dexie contact stays behind the browser guard in $effect (prerender has no IndexedDB).
 $effect(() => {
 	const chatId = chat?.id;
+	const target = highlightId;
 	if (!browser || typeof chatId !== 'number') {
 		win = null;
+		highlightIdActive = null;
 		return;
 	}
 	let cancelled = false;
 	win = null;
+	highlightIdActive = null;
 	void (async () => {
+		if (typeof target === 'number' && Number.isSafeInteger(target) && target > 0) {
+			const found = await messages.getWindowAt(chatId, target, PAGE_SIZE * 2);
+			if (cancelled) return;
+			if (found) {
+				const next = seedWindow(chatId, found.messages);
+				assertRenderBudget(next);
+				win = next;
+				highlightIdActive = found.targetId;
+				await tick();
+				// Scroll the target row to the top of the pane; the h-screen
+				// shell keeps the chat pane the only scroll container.
+				scrollEl?.querySelector(`[data-msg-id="${found.targetId}"]`)?.scrollIntoView({ block: 'start' });
+				void setupSentinel();
+				return;
+			}
+			console.warn(`ChatView: message ${target} not in chat ${chatId}; opening newest`);
+		}
 		const newestFirst = await messages.getLatestWindow(chatId, PAGE_SIZE);
 		if (cancelled) return;
 		const next = prependPage(emptyWindow(chatId), [...newestFirst].reverse());
@@ -115,6 +143,17 @@ const sections = $derived(win ? groupForRender(win.pages) : []);
 			<h2 class="truncate font-semibold">{chat.name}</h2>
 			<span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{chat.messageCount} messages</span>
 		</header>
+		<div class="border-b border-gray-200 px-4 py-2 dark:border-gray-700">
+			<SearchBar
+				mode="chat"
+				chatId={chat.id}
+				onselect={(message) => {
+					if (typeof chat.id !== 'number' || typeof message.id !== 'number') return;
+					if (onselectMessage) onselectMessage(chat.id, message.id);
+					else void goto(`?chat=${chat.id}&at=${message.id}`, { noScroll: true, keepFocus: true });
+				}}
+			/>
+		</div>
 		<div bind:this={scrollEl} class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
 			{#if win === null}
 				<p class="text-center text-sm text-gray-500 dark:text-gray-400" role="status">Loading…</p>
@@ -138,7 +177,11 @@ const sections = $derived(win ? groupForRender(win.pages) : []);
 				{#each sections as section (section.label)}
 					<DateSeparator label={section.label} />
 					{#each section.messages as group (group.message.id)}
-						<MessageBubble message={group.message} showSender={group.showSender} />
+						<MessageBubble
+							message={group.message}
+							showSender={group.showSender}
+							highlight={group.message.id === highlightIdActive}
+						/>
 					{/each}
 				{/each}
 			{/if}

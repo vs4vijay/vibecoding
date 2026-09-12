@@ -5,8 +5,8 @@ milestone_name: milestone
 current_phase: 05
 
 current_phase_name: Full-Text Search
-status: in-progress
-stopped_at: Phase 05 05-01 executed — search engine + highlight lib complete (searchMessages, getWindowAt, seedWindow, splitByTerms, makeSnippet, searchAll/searchChat); 265 tests green; gates pass; 05-02 UI+navigation is next
+status: verified
+stopped_at: Phase 05 VERIFIED COMPLETE — 05-01 engine + 05-02 UI executed, 270 tests green, all gates pass, 8/8 browser UAT checks pass on :4647; v1 roadmap complete (Phases 1-5)
 last_updated: "2026-09-12T00:00:00Z"
 last_activity: 2026-09-12
 last_activity_desc: Phase 05 05-01 executed 2026-09-12 — searchMessages (exact count, newest-first), getWindowAt (bounded target window), seedWindow, highlight/snippet lib, searchAll/searchChat; 265 tests + gates green
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 05 (Full-Text Search) — **05-01 EXECUTED** (1/2 plans: 05-01 search engine + highlight lib complete)
-Plan: 1 of 2 executed
-Status: 05-01 complete (commit 5204685); 05-02 UI+navigation next
-Last activity: 2026-09-12 — 05-01 execution complete; all gates green
+Phase: 05 (Full-Text Search) — **VERIFIED COMPLETE** (2/2 plans + UAT)
+Plan: 2 of 2 executed
+Status: Phase 05 verified 2026-09-12 — search UI, navigation, deep links, fallback, theme all pass; next: milestone wrap-up or v2 planning
+Last activity: 2026-09-12 — 05-02 execution + browser UAT complete; all gates green
 
 
 

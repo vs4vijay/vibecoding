@@ -3,12 +3,13 @@ import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { observeChats } from '$lib/chat/queries';
-import { parseChatParam, serializeChatParam } from '$lib/chat/selection';
+import { parseChatParam, parseMessageParam, serializeChatParam, serializeMessageParam } from '$lib/chat/selection';
 import ChatSidebar from '$lib/components/ChatSidebar.svelte';
 import ChatView from '$lib/components/ChatView.svelte';
 import DropZone from '$lib/components/DropZone.svelte';
 import PreviewCard from '$lib/components/PreviewCard.svelte';
 import ProgressBar from '$lib/components/ProgressBar.svelte';
+import SearchBar from '$lib/components/SearchBar.svelte';
 import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 import type { ChatRecord } from '$lib/db/db';
 import { db } from '$lib/db/db';
@@ -27,6 +28,7 @@ let tab = $state<'browse' | 'import' | null>(null);
 let chats = $state<ChatRecord[]>([]);
 const activeTab = $derived(tab ?? (chats.length > 0 ? 'browse' : 'import'));
 const selectedId = $derived(parseChatParam(page.url.searchParams.get('chat')));
+const selectedMsgId = $derived(parseMessageParam(page.url.searchParams.get('at')));
 const selectedChat = $derived(chats.find((c) => c.id === selectedId));
 
 // One liveQuery here for tab default + selected-chat resolution; the
@@ -39,8 +41,21 @@ $effect(() => {
 });
 
 function openChat(id: number) {
-	if (id === selectedId) return;
+	if (id === selectedId) {
+		if (page.url.searchParams.has('at')) {
+			void goto(`?chat=${serializeChatParam(id)}`, { noScroll: true, keepFocus: true });
+		}
+		return;
+	}
 	void goto(`?chat=${serializeChatParam(id)}`, { noScroll: true, keepFocus: true });
+}
+
+function openChatAt(chatId: number, msgId: number) {
+	tab = 'browse';
+	void goto(`?chat=${serializeChatParam(chatId)}&at=${serializeMessageParam(msgId)}`, {
+		noScroll: true,
+		keepFocus: true,
+	});
 }
 
 function switchTab(next: 'browse' | 'import') {
@@ -216,6 +231,9 @@ function onChatName(name: string) {
 <div class="flex h-screen flex-col bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100">
 	<header class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
 		<h1 class="text-lg font-bold">RagChat</h1>
+		<div class="min-w-0 flex-1 px-4">
+			<SearchBar mode="global" onselect={(message) => openChatAt(message.chatId, message.id as number)} />
+		</div>
 		<nav class="flex items-center gap-2" aria-label="Main">
 			<button
 				type="button"
@@ -250,7 +268,7 @@ function onChatName(name: string) {
 				<ChatSidebar selectedId={selectedId} onselect={openChat} />
 			</aside>
 			<section class="min-w-0 flex-1">
-				<ChatView chat={selectedChat} {selectedId} />
+				<ChatView chat={selectedChat} {selectedId} highlightId={selectedMsgId} onselectMessage={openChatAt} />
 			</section>
 		</div>
 	{:else}

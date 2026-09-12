@@ -4,7 +4,11 @@ import { eventKind } from '$lib/chat/placeholders';
 import type { MessageRecord } from '$lib/db/db';
 import MediaPlaceholder from './MediaPlaceholder.svelte';
 
-const { message, showSender = true }: { message: MessageRecord; showSender?: boolean } = $props();
+const {
+	message,
+	showSender = true,
+	highlight = false,
+}: { message: MessageRecord; showSender?: boolean; highlight?: boolean } = $props();
 
 const event = $derived(eventKind(message.type));
 const color = $derived(event ? '' : senderColor(message.sender));
@@ -12,14 +16,19 @@ const color = $derived(event ? '' : senderColor(message.sender));
 
 {#if event}
 	<!-- system / call / deleted: centered event row, never a bubble -->
-	<div class="my-2 text-center text-xs text-gray-500 dark:text-gray-400" data-msg>
+	<div
+		class="my-2 text-center text-xs text-gray-500 dark:text-gray-400 {highlight ? 'rounded ring-2 ring-green-500 search-flash' : ''}"
+		data-msg
+		data-msg-id={message.id}
+		data-highlight={highlight ? '' : undefined}
+	>
 		{message.text}
 		· {formatClock(message.timestamp)}
 	</div>
 {:else}
-	<div class="mb-2 flex flex-col items-start" data-msg>
+	<div class="mb-2 flex flex-col items-start {highlight ? 'search-flash' : ''}" data-msg data-msg-id={message.id}>
 		{#if showSender}<span class="mb-0.5 text-xs font-semibold {color}">{message.sender}</span>{/if}
-		<div class="max-w-[75%] rounded-lg bg-gray-100 px-3 py-2 dark:bg-gray-700">
+		<div class="max-w-[75%] rounded-lg bg-gray-100 px-3 py-2 dark:bg-gray-700 {highlight ? 'ring-2 ring-green-500' : ''}">
 			{#if message.type === 'media'}
 				<MediaPlaceholder mediaType={message.mediaType} />
 			{/if}
