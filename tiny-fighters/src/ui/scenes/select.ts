@@ -29,7 +29,7 @@ export function createSelectScene(): Scene {
   });
 
   const cells = CHAR_IDS.map((id) => {
-    const cell = el("div", { cls: "char-cell", text: id });
+    const cell = el("div", { cls: "char-cell", text: id, onClick: () => joinPointer(id) });
     grid.appendChild(cell);
     return cell;
   });
@@ -37,6 +37,21 @@ export function createSelectScene(): Scene {
     const chip = el("span", { cls: "chip", text: `P${slot + 1}` });
     chipsRow.appendChild(chip);
     return chip;
+  });
+  function joinPointer(charId: string): void {
+    const s = slots[0];
+    if (s === undefined) return;
+    s.joined = true;
+    s.charId = charId;
+    paint();
+  }
+
+  const confirmBtn = el("div", {
+    cls: "card action",
+    text: "CONFIRM",
+    onClick: () => {
+      if (slots[0]?.joined === true) confirm();
+    },
   });
 
   function paint(): void {
@@ -58,6 +73,7 @@ export function createSelectScene(): Scene {
       chipEl.style.color = TEAM_COLORS[slot.team];
       chipEl.textContent = `P${i + 1} · ${slot.charId} · ${slot.team}`;
     }
+    confirmBtn.style.display = slots[0]?.joined === true ? "" : "none";
   }
 
   function handle(slot: number, action: string): void {
@@ -139,6 +155,7 @@ export function createSelectScene(): Scene {
         root.appendChild(grid);
         root.appendChild(chipsRow);
         root.appendChild(hint);
+        root.appendChild(confirmBtn);
       }
       paint();
       ensureWatcher();

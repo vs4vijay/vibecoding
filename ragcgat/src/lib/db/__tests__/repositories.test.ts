@@ -144,16 +144,61 @@ describe('repositories', () => {
 		const db = openDb('search');
 		const { chatId } = await importChatText(db, 'Search Group', buildExport(60, { word: 'PiNeApPlE' }));
 		const repo = new MessageRepository(db);
-		const hits = await repo.searchTerms('pineapple');
-		expect(hits).toHaveLength(6);
-		expect(new Set(hits.map((m) => m.id)).size).toBe(6);
+		const { total, results } = await repo.searchMessages('pineapple');
+		expect(total).toBe(6);
+		expect(results).toHaveLength(6);
+		expect(new Set(results.map((m) => m.id)).size).toBe(6);
 
-		const scoped = await repo.searchTermsInChat(chatId, 'PINEAPPLE');
+		const { total: scopedTotal, results: scoped } = await repo.searchMessages('PINEAPPLE', { chatId });
+		expect(scopedTotal).toBe(6);
 		expect(scoped).toHaveLength(6);
 		expect(scoped.every((m) => m.chatId === chatId)).toBe(true);
 
-		expect(await repo.searchTerms('')).toEqual([]);
-		expect(await repo.searchTerms('!!!')).toEqual([]);
+		expect(await repo.searchMessages('')).toEqual({ total: 0, results: [] });
+		expect(await repo.searchMessages('!!!')).toEqual({ total: 0, results: [] });
+	}, 30000);
+
+	it('orders search results newest-first and caps at limit', async () => {
+		const db = openDb('searchorder');
+		const chats = new ChatRepository(db);
+		const repo = new MessageRepository(db);
+		const chatId = await chats.saveChat({ name: 'Search Order' });
+		await repo.bulkSave(syntheticRecords(chatId, 60, { tag: 'order' }));
+		const { total, results } = await repo.searchMessages('order', { limit: 10 });
+		expect(total).toBe(60);
+		expect(results).toHaveLength(10);
+		for (let i = 0; i < results.length - 1; i++) {
+			expect(results[i].timestamp).toBeGreaterThanOrEqual(results[i + 1].timestamp);
+		}
+	});
+
+	it('getWindowAt returns target with surrounding messages', async () => {
+		const db = openDb('windowat');
+		const chats = new ChatRepository(db);
+		const repo = new MessageRepository(db);
+		const chatId = await chats.saveChat({ name: 'Window At' });
+		await repo.bulkSave(syntheticRecords(chatId, 30, { tag: 'win' }));
+		const all = await collectAll(chatId, repo, 30);
+		const target = all[15];
+		const found = await repo.getWindowAt(chatId, target.id as number, 11);
+		expect(found).not.toBeNull();
+		if (!found) throw new Error('expected window');
+		expect(found.targetId).toBe(target.id);
+		expect(found.messages.length).toBeLessThanOrEqual(11);
+		expect(found.messages.some((m) => m.id === target.id)).toBe(true);
+	});
+
+	it('getWindowAt returns null for missing message and foreign chat', async () => {
+		const db = openDb('windowatnull');
+		const chats = new ChatRepository(db);
+		const repo = new MessageRepository(db);
+		const chatId = await chats.saveChat({ name: 'Null Window' });
+		await repo.bulkSave(syntheticRecords(chatId, 5, { tag: 'nullwin' }));
+		expect(await repo.getWindowAt(chatId, 999999, 11)).toBeNull();
+		const all = await collectAll(chatId, repo, 5);
+		const target = all[0];
+		const otherChatId = await chats.saveChat({ name: 'Other' });
+		expect(await repo.getWindowAt(otherChatId, target.id as number, 11)).toBeNull();
 	}, 30000);
 
 	it('preserves data across close plus reopen', async () => {

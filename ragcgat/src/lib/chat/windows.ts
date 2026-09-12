@@ -44,6 +44,23 @@ export function prependPage(state: WindowState, page: MessageRecord[]): WindowSt
 		loading: false,
 	});
 }
+/**
+ * Seed a window with a pre-fetched chronological message array (from
+ * getWindowAt). pages[0][0] stays the oldest held message so cursorOf
+ * feeds loadOlder unchanged.
+ *
+ * After three prepends on a 2-page seed, trimToBudget keeps the oldest
+ * three pages and the target page may leave the window — matches the
+ * scroll-follows-window contract.
+ */
+export function seedWindow(chatId: number, messages: MessageRecord[]): WindowState {
+	return {
+		chatId,
+		pages: [messages],
+		hasMore: messages.length >= PAGE_SIZE,
+		loading: false,
+	};
+}
 
 export function renderedCount(state: WindowState): number {
 	return state.pages.reduce((n, p) => n + p.length, 0);

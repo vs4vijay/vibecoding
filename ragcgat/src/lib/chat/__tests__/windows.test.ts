@@ -11,6 +11,7 @@ import {
 	isSameDay,
 	prependPage,
 	renderedCount,
+	seedWindow,
 	trimToBudget,
 } from '../windows';
 
@@ -245,5 +246,39 @@ describe('simulated-100K budget', () => {
 		}
 		expect(state.pages.length).toBeLessThanOrEqual(MAX_RENDERED_PAGES);
 		assertRenderBudget(state); // ≤ 120 rendered regardless of 100K total
+	});
+});
+
+describe('seedWindow', () => {
+	it('creates a window with one page and correct hasMore', () => {
+		const messages = fullPage(1, 0);
+		const state = seedWindow(42, messages);
+		expect(state.chatId).toBe(42);
+		expect(state.pages).toHaveLength(1);
+		expect(state.pages[0]).toBe(messages);
+		expect(state.hasMore).toBe(true); // PAGE_SIZE messages = hasMore true
+		expect(state.loading).toBe(false);
+	});
+
+	it('sets hasMore false when fewer than PAGE_SIZE', () => {
+		const messages = Array.from({ length: 5 }, (_, i) => msg(i, i * 1000));
+		const state = seedWindow(1, messages);
+		expect(state.hasMore).toBe(false);
+	});
+
+	it('cursorOf reads the oldest message from seeded window', () => {
+		const messages = fullPage(100, 1000);
+		const state = seedWindow(1, messages);
+		expect(cursorOf(state)).toEqual({ timestamp: 1000, id: 100 });
+	});
+
+	it('prependPage works after seedWindow', () => {
+		const messages = fullPage(100, 1000);
+		const state = seedWindow(1, messages);
+		const older = Array.from({ length: 5 }, (_, i) => msg(i, i * 1000));
+		const next = prependPage(state, older);
+		expect(next.pages).toHaveLength(2);
+		expect(next.pages[0]).toBe(older);
+		expect(next.pages[1]).toBe(messages);
 	});
 });

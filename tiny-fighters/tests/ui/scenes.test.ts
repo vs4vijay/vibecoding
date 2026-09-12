@@ -251,6 +251,24 @@ describe("select scene", () => {
     doc.dispatch("keydown", fakeKey("KeyF"));   // P2 joins brawler too — no error
     scene.exit();
   });
+  test("pointer tap joins P1 as the tapped portrait and confirms", () => {
+    const scene = createSelectScene();
+    const ctx = fakeCtx();
+    ctx.gotoArg = setupWith("ffa");
+    scene.enter(ctx);
+    const root = scene.root as unknown as FakeElement;
+    const cells = root.querySelectorAll(".char-cell");
+    expect(cells).toHaveLength(6);
+    cells[1]!.dispatch("click");
+    const confirmBtn = root.querySelectorAll(".card").find((c: FakeElement) => c.textContent === "CONFIRM");
+    expect(confirmBtn).toBeDefined();
+    confirmBtn!.dispatch("click");
+    expect(ctx.nav).toHaveLength(1);
+    expect(ctx.nav[0]![0]).toBe("stage-select");
+    const handed = ctx.nav[0]![1] as MatchSetup;
+    expect(handed.selectSlots[0]).toEqual({ joined: true, charId: "swordsman", team: "independent" });
+    scene.exit();
+  });
 });
 
 describe("select gamepad join", () => {
