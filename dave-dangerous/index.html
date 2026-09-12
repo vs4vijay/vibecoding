@@ -3,71 +3,49 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dangerous Dave — Web Remake</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23000'/%3E%3Crect x='4' y='2' width='8' height='5' fill='%23aa00aa'/%3E%3Crect x='4' y='7' width='8' height='7' fill='%2300aa00'/%3E%3C/svg%3E" />
+    <meta name="theme-color" content="#05080c" />
+    <title>Dangerous Dave — Catacomb Depths</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2305080c'/%3E%3Crect x='4' y='2' width='8' height='5' fill='%23c93b2e'/%3E%3Crect x='4' y='7' width='8' height='7' fill='%233e6b4f'/%3E%3C/svg%3E" />
+    <!-- Fonts: Cinzel (display — carved-stone titles) + Outfit (UI sans). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Outfit:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
-      :root { color-scheme: dark; }
+      :root {
+        color-scheme: dark;
+        /* Page-shell palette mirrors src/render3d/palette.ts (UI tokens). */
+        --page-deep: #05080c;
+        --page-text: #e8ecf2;
+        --page-font-display: "Cinzel", Georgia, "Times New Roman", serif;
+        --page-font-ui: "Outfit", "Sora", system-ui, sans-serif;
+      }
       * { box-sizing: border-box; }
-      html, body { margin: 0; background: #0b0b12; color: #e8e8f0; min-height: 100%; font-family: monospace; }
-      body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px 12px 32px; }
-      .dd-head { text-align: center; }
-      .dd-head h1 { margin: 0; font-size: 20px; letter-spacing: 2px; color: #ffd75e; }
-      .dd-head p { margin: 4px 0 0; font-size: 12px; color: #9a9ab0; }
-      .dd-toolbar { display: flex; gap: 8px; }
-      .dd-toolbar button { font: inherit; font-size: 12px; padding: 6px 12px; background: #1c1c28; color: #e8e8f0; border: 1px solid #44445e; border-radius: 4px; cursor: pointer; }
-      .dd-toolbar button:hover { background: #2a2a3c; }
-      #app { position: relative; line-height: 0; }
-      #app canvas { image-rendering: pixelated; border: 2px solid #33334a; background: #000; max-width: 96vw; height: auto; }
-      .dd-card { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.72); line-height: 1.5; text-align: center; }
-      .dd-card[hidden] { display: none; }
-      .dd-card .dd-box { border: 2px solid #ffd75e; background: #101018; padding: 20px 28px; border-radius: 6px; }
-      .dd-card h2 { margin: 0 0 8px; font-size: 18px; letter-spacing: 2px; color: #ffd75e; }
-      .dd-card p { margin: 0 0 12px; font-size: 12px; color: #c9c9da; }
-      .dd-card button { font: inherit; font-size: 13px; padding: 8px 16px; margin: 0 4px; background: #ffd75e; color: #111; border: 0; border-radius: 4px; cursor: pointer; }
-      .dd-card button.secondary { background: #2a2a3c; color: #e8e8f0; border: 1px solid #55556e; }
-      .dd-help { font-size: 12px; color: #9a9ab0; text-align: center; }
-      .dd-help kbd { background: #1c1c28; border: 1px solid #44445e; border-radius: 3px; padding: 1px 5px; font-family: inherit; }
+      html, body {
+        margin: 0;
+        background: var(--page-deep);
+        color: var(--page-text);
+        min-height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        font-family: var(--page-font-ui);
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+      body {
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* Game canvas fills the viewport; the DOM overlay mounts above it. */
+      #app { position: fixed; inset: 0; }
+      #app canvas { display: block; width: 100%; height: 100%; }
     </style>
   </head>
   <body>
-    <header class="dd-head">
-      <h1>DANGEROUS DAVE</h1>
-      <p>Web remake — grab the trophy, dodge spiders, find the door</p>
-    </header>
-    <div class="dd-toolbar">
-      <button id="btn-pause" type="button">Pause (P)</button>
-      <button id="btn-sound" type="button">Sound on (M)</button>
-      <button id="btn-restart" type="button">Restart (R)</button>
-    </div>
-    <div id="app">
-      <div id="dd-pause" class="dd-card" hidden>
-        <div class="dd-box">
-          <h2>PAUSED</h2>
-          <p>Press P to resume</p>
-          <button id="btn-resume" type="button">Resume</button>
-          <button id="btn-restart2" type="button" class="secondary">Restart</button>
-        </div>
-      </div>
-      <div id="dd-over" class="dd-card" hidden>
-        <div class="dd-box">
-          <h2>GAME OVER</h2>
-          <p id="dd-over-score">Score 0</p>
-          <button id="btn-again" type="button">Play again</button>
-        </div>
-      </div>
-      <div id="dd-clear" class="dd-card" hidden>
-        <div class="dd-box">
-          <h2>LEVEL CLEAR!</h2>
-          <p>Warping to the next room…</p>
-          <button id="btn-next" type="button">Continue</button>
-        </div>
-      </div>
-    </div>
-    <footer class="dd-help">
-      <kbd>A</kbd>/<kbd>D</kbd> or arrows move · <kbd>W</kbd>/<kbd>Space</kbd> jump ·
-      <kbd>Ctrl</kbd> jetpack · <kbd>Shift</kbd> fire ·
-      <kbd>P</kbd> pause · <kbd>M</kbd> sound · <kbd>R</kbd> restart
-    </footer>
+    <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
