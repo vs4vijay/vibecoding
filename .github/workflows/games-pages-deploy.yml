@@ -12,6 +12,7 @@
   #   /lugaru-combat/     <- lugaru-combat/dist  (vite base "./", subpath-safe)
   #   /dave-dangerous/    <- dave-dangerous/dist  (vite base "./", subpath-safe)
   #   /tiny-fighters/    <- tiny-fighters/dist  (vite base "./", subpath-safe)
+  #   /claude-of-duty/    <- Claude-of-Duty/dist (vite base "./", subpath-safe)
 
 name: Deploy Games to Pages
 
@@ -24,6 +25,7 @@ on:
       - "lugaru-combat/**"
       - "dave-dangerous/**"
       - "tiny-fighters/**"
+      - "Claude-of-Duty/**"
       - "games-hub/**"
       - ".github/workflows/games-pages-deploy.yml"
   workflow_dispatch:
@@ -88,6 +90,13 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
+      - name: Build claude-of-duty
+        working-directory: Claude-of-Duty
+        # vite.config.js sets base "./" so the build works under any subpath
+        # (/vibecoding/claude-of-duty/) with no BASE_PATH env needed.
+        run: |
+          bun install --frozen-lockfile
+          bun run build
       - name: Stage site (preserve per-game URL prefixes)
         run: |
           mkdir -p site
@@ -97,6 +106,7 @@ jobs:
           cp -r lugaru-combat/dist site/lugaru-combat
           cp -r dave-dangerous/dist site/dave-dangerous
           cp -r tiny-fighters/dist site/tiny-fighters
+          cp -r Claude-of-Duty/dist site/claude-of-duty
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
