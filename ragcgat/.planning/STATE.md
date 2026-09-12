@@ -6,10 +6,10 @@ current_phase: 05
 
 current_phase_name: Full-Text Search
 status: in-progress
-stopped_at: Phase 05 planned — 2 plans written (05-01 search engine + highlight lib, 05-02 search UI + result navigation), independent plan check passed, docs committed; execution is next
+stopped_at: Phase 05 05-01 executed — search engine + highlight lib complete (searchMessages, getWindowAt, seedWindow, splitByTerms, makeSnippet, searchAll/searchChat); 265 tests green; gates pass; 05-02 UI+navigation is next
 last_updated: "2026-09-12T00:00:00Z"
 last_activity: 2026-09-12
-last_activity_desc: Phase 05 planning complete — search index strategy confirmed as Dexie multiEntry (user decision 2026-09-12, ROADMAP Research Flags resolved); 05-01/05-02 PLANS written and checked
+last_activity_desc: Phase 05 05-01 executed 2026-09-12 — searchMessages (exact count, newest-first), getWindowAt (bounded target window), seedWindow, highlight/snippet lib, searchAll/searchChat; 265 tests + gates green
 progress:
   total_phases: 1
   completed_phases: 1
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 05 (Full-Text Search) — **PLANNED** (2/2 plans: 05-01 engine, 05-02 UI+navigation)
-Plan: 0 of 2 executed
-Status: Phase 05 planning complete 2026-09-12 — Dexie multiEntry index confirmed; execute 05-01 then 05-02
-Last activity: 2026-09-12 — Phase 05 plans written and plan-checked
-  (05-01-PLAN.md search engine, 05-02-PLAN.md UI + navigation; ROADMAP flag resolved)
+Phase: 05 (Full-Text Search) — **05-01 EXECUTED** (1/2 plans: 05-01 search engine + highlight lib complete)
+Plan: 1 of 2 executed
+Status: 05-01 complete (commit 5204685); 05-02 UI+navigation next
+Last activity: 2026-09-12 — 05-01 execution complete; all gates green
+
 
 
 Progress: [██████████] 100%
@@ -41,7 +41,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 1
 - Average duration: N/A
 - Total execution time: 0 hours
 
@@ -53,7 +53,7 @@ Progress: [██████████] 100%
 | 2. Storage Layer | 0 | 0 | - |
 | 3. Import Feature | 0 | 0 | - |
 | 4. Chat Browsing | 0 | 0 | - |
-| 5. Full-Text Search | 0 | 0 | - |
+| 5. Full-Text Search | 2 | 1 | - |
 
 **Recent Trend:**
 

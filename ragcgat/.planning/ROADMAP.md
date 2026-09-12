@@ -167,4 +167,4 @@ Plans:
 | 2. Storage Layer | 2/2 | Complete | 2026-09-06 |
 | 3. Import Feature | 2/2 | Complete | 2026-09-06 |
 | 4. Chat Browsing | 2/2 | Complete | 2026-09-09 |
-| 5. Full-Text Search | 0/0 | Not started | - |
+| 5. Full-Text Search | 1/2 | In progress (05-01 executed) | 2026-09-12 |
