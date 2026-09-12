@@ -1,4 +1,5 @@
 <script lang="ts">
+import { browser } from '$app/environment';
 import {
 	PAGE_SIZE,
 	type WindowState,
@@ -29,6 +30,9 @@ let loadingOlder = $state(false);
 let scrollEl = $state<HTMLElement | null>(null);
 // biome-ignore lint/style/useConst: Svelte bind:this requires a let binding
 let sentinelEl = $state<HTMLElement | null>(null);
+
+// Shared scroll-up sentinel observer, disconnected on chat change / cleanup.
+let activeObserver: IntersectionObserver | null = null;
 
 const messages = new MessageRepository(db);
 
