@@ -11,7 +11,8 @@
   #   /undead-driver/     <- undead-driver/dist  (vite base "./", subpath-safe)
   #   /lugaru-combat/     <- lugaru-combat/dist  (vite base "./", subpath-safe)
   #   /dave-dangerous/    <- dave-dangerous/dist  (vite base "./", subpath-safe)
-  #   /lf2-web/           <- lf2-web/dist         (vite base "./", subpath-safe)
+  #   /tiny-fighters/    <- tiny-fighters/dist  (vite base "./", subpath-safe)
+  #   /claude-of-duty/    <- Claude-of-Duty/dist (vite base "./", subpath-safe)
 
 name: Deploy Games to Pages
 
@@ -23,7 +24,8 @@ on:
       - "undead-driver/**"
       - "lugaru-combat/**"
       - "dave-dangerous/**"
-      - "lf2-web/**"
+      - "tiny-fighters/**"
+      - "Claude-of-Duty/**"
       - "games-hub/**"
       - ".github/workflows/games-pages-deploy.yml"
   workflow_dispatch:
@@ -80,16 +82,21 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
-      - name: Build lf2-web
-        working-directory: lf2-web
+      - name: Build tiny-fighters
+        working-directory: tiny-fighters
         # vite.config.ts sets base "./" so the build works under any subpath
-        # (/vibecoding/lf2-web/) with no BASE_PATH env needed.
+        # (/vibecoding/tiny-fighters/) with no BASE_PATH env needed.
         run: |
           bun install --frozen-lockfile
           bun run build
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+      - name: Build claude-of-duty
+        working-directory: Claude-of-Duty
+        # vite.config.js sets base "./" so the build works under any subpath
+        # (/vibecoding/claude-of-duty/) with no BASE_PATH env needed.
+        run: |
+          bun install --frozen-lockfile
+          bun run build
       - name: Stage site (preserve per-game URL prefixes)
         run: |
           mkdir -p site
@@ -98,7 +105,8 @@ jobs:
           cp -r undead-driver/dist site/undead-driver
           cp -r lugaru-combat/dist site/lugaru-combat
           cp -r dave-dangerous/dist site/dave-dangerous
-          cp -r lf2-web/dist site/lf2-web
+          cp -r tiny-fighters/dist site/tiny-fighters
+          cp -r Claude-of-Duty/dist site/claude-of-duty
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

@@ -1,9 +1,9 @@
 # 04-UAT: Chat Browsing — User Acceptance Testing
 
 - **Phase:** 04-chat-browsing
-- **Date:** 2026-09-09
-- **Method:** automated suite + static build gate; manual browser pass deferred (Worker threading, drag-drop pixels, scroll anchoring, dark-mode flash, 100K-message budget are browser-only and covered by the deferred manual pass below)
-- **Result:** 245/245 tests PASS + typecheck + Biome + build PASS — no issues found, no fix plans needed
+- **Date:** 2026-09-12 (automated suite 2026-09-09; deferred manual browser pass executed 2026-09-12)
+- **Method:** automated suite + static build gate + live-browser manual pass at localhost:1337 (dev origin, real IndexedDB, synthetic WhatsApp exports)
+- **Result:** 245/245 tests PASS + typecheck + Biome + build + `svelte-check` PASS. Manual pass found **3 runtime bugs** (all fixed, re-verified in browser) and **1 layout defect** (fixed)
 
 ## Test Results
 
@@ -43,27 +43,56 @@
 | `bun run test` | 245/245 pass (23 files) |
 | `bun run typecheck` | exit 0 |
 | `bunx biome check` | clean, exit 0 |
+| `bun run check` (svelte-check) | 0 errors (added as regression gate for the .svelte ReferenceError class) |
 | `bun run build` | exit 0, build/ written |
 | `grep -r "{@html}" src/lib/components src/routes` | zero render usage |
 
-## Deferred Manual Pass (browser-only, operator)
+## Deferred Manual Pass — EXECUTED 2026-09-12 (browser, real IndexedDB)
 
-The following require a live browser and cannot run headlessly. When convenient:
+All seven browser-only items verified live on the dev origin (localhost:1337) with synthetic
+WhatsApp exports (Android format, 165- and 600-message chats, media/event/deleted/call lines):
 
-1. `bun run dev` → import a real chat export → sidebar appears sorted by recency
-2. Click a chat → bubbles render with colored sender labels and timestamps
-3. Media messages show placeholders (image/video/audio/document/sticker/gif icons)
-4. Scroll up in a chat with 50+ messages → older messages load without a teleport jump
-5. Toggle dark mode → persists on reload; check OS-default on fresh load (no white flash)
-6. Deep link: open `?chat=<id>` directly → loads correct chat
-7. Empty states: delete all chats from IndexedDB → import-free library state appears
+| # | Item | Result | Evidence |
+|---|------|--------|----------|
+| 1 | Sidebar sorted by recency, not import order | PASS | 21-Jul chat listed above 13-Jul chat |
+| 2 | Bubbles with colored sender labels + timestamps | PASS | 39 bubbles, 39 sender labels (4 senders), 39 clocks, 2 day dividers in the first window of the 600-message chat |
+| 3 | Media placeholders, never real media | PASS | 🎞️ GIF placeholder rendered; `rawMediaTags` 0 (`<img>/<video>/<audio>` absent) |
+| 4 | 50+ chat: scroll-up loads older, bounded DOM, no teleport | PASS | anchored prepend (scrollTop delta = `prevTop + Δheight` exact); rows capped at 120 (3×40 ≤ 200 budget) across all 600 messages; keyset exhausted → "Load older" disappears; page never scrolls as a whole (pane scrolls internally, pinned to newest on open) |
+| 5 | Dark mode: OS default + persisted toggle, no flash | PASS | fresh origin → `dark` class before toggle, storage key `ragchat:theme` absent; toggle → reload → persists (both directions) |
+| 6 | `?chat=<id>` deep links | PASS | `?chat=1` loads Road Trip (40 rows); `?chat=999999` → "Conversation not found."; `?chat=abc` → "Select a conversation…" |
+| 7 | Empty states after wiping all chats | PASS | aside "No conversations yet…"; view "Select a conversation…" |
 
-No automation gap — all logic paths above already pass via unit/integration tests.
+**Bugs found and fixed during the manual pass (all verified fixed in-browser):**
+
+1. **ChatView never rendered messages** — `$effect` gated on `browser` but the import was missing →
+   `ReferenceError` on mount, window stuck at "Loading…" with zero IndexedDB contact (SSR skips
+   effects; `tsc` ignores `.svelte`; no test instantiates ChatView — all gates passed). Fixed:
+   `import { browser } from '$app/environment'`. Commit `8a25324`.
+2. **Scroll-up sentinel never engaged** — `setupSentinel()` and the effect cleanup referenced
+   undeclared `activeObserver` → unhandled rejection after paint, IntersectionObserver never
+   connected (latent; button path masked it). Fixed: declared `let activeObserver`. Commit `8a25324`.
+3. **Load-older looped on one keyset** — `trimToBudget` kept the NEWEST pages, dropping the
+   just-prepended page, so the frontier froze at 120 rows and every click re-fetched the same
+   keyset (verified: 6 clicks, identical scrollHeight/scrollTop/rows). Fixed: keep the OLDEST
+   page block — cursor advances monotonically older. Commit `d9b402f`.
+4. **Whole page scrolled instead of the chat pane** — app shell `min-h-screen` let the flex chain
+   grow with content; the windowed list never overflowed, so pane-level anchors never engaged
+   (page scrollHeight == 7919px vs 935px viewport). Fixed: `h-screen`. Commit `8eb5ff1`.
+
+**Regression gate added:** `bun run check` (svelte-check over `.svelte` files) with the kit
+`tsconfig` extends chain — catches the undeclared-name class that `tsc`/tests/build all miss.
+It also surfaced 2 pre-existing type errors (DropZone `FileList` spread, `Uint8Array<ArrayBuffer>`
+in the unzip path); both fixed. Commit `ce5e3a3`.
+
+No automation gap remains unverified: every T-item above is now exercised by a live browser pass.
 
 ## Diagnosis / Fix Plans
 
-None — zero failures. No gaps to diagnose, no fix plans to prepare.
+Four findings, four fixes — see "Deferred Manual Pass" table. All re-verified in the browser
+after each fix (window renders, frontier exhausts, anchor math exact, page height bounded).
 
 ## Routing
 
-Phase 04 UAT complete with all automated tests passing. Phase 4 (Chat Browsing) is COMPLETE. Ready for Phase 05 (Full-Text Search) planning.
+Phase 04 UAT complete: automated gates + deferred manual browser pass executed. Phase 4
+(Chat Browsing) is VERIFIED and COMPLETE. Ready for Phase 05 (Full-Text Search) planning.
+

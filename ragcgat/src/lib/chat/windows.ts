@@ -44,6 +44,23 @@ export function prependPage(state: WindowState, page: MessageRecord[]): WindowSt
 		loading: false,
 	});
 }
+/**
+ * Seed a window with a pre-fetched chronological message array (from
+ * getWindowAt). pages[0][0] stays the oldest held message so cursorOf
+ * feeds loadOlder unchanged.
+ *
+ * After three prepends on a 2-page seed, trimToBudget keeps the oldest
+ * three pages and the target page may leave the window — matches the
+ * scroll-follows-window contract.
+ */
+export function seedWindow(chatId: number, messages: MessageRecord[]): WindowState {
+	return {
+		chatId,
+		pages: [messages],
+		hasMore: messages.length >= PAGE_SIZE,
+		loading: false,
+	};
+}
 
 export function renderedCount(state: WindowState): number {
 	return state.pages.reduce((n, p) => n + p.length, 0);
@@ -116,11 +133,15 @@ export function groupForRender(pages: MessageRecord[][]): DaySection[] {
 }
 
 /**
- * Trim window to at most MAX_RENDERED_PAGES NEWEST pages.
- * The dropped oldest page is still in IndexedDB; cursor recompute from
- * pages[0][0] makes it re-fetchable on scroll-up.
+ * Trim window to at most MAX_RENDERED_PAGES OLDEST pages.
+ * prependPage always pushes the freshly-loaded older page to the front, so
+ * dropping the NEWEST page keeps the keyset cursor (pages[0][0]) advancing
+ * monotonically older — never re-reading rows already held (the previous
+ * slice(-N) trim dropped the just-loaded page and looped on one keyset). The
+ * render stream stays contiguous; the newest page remains in IndexedDB and is
+ * re-reachable by reopening the chat.
  */
 export function trimToBudget(state: WindowState): WindowState {
 	if (state.pages.length <= MAX_RENDERED_PAGES) return state;
-	return { ...state, pages: state.pages.slice(-MAX_RENDERED_PAGES) };
+	return { ...state, pages: state.pages.slice(0, MAX_RENDERED_PAGES) };
 }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0b12">
-<meta name="description" content="Vibecoding Arcade: browser games built with AI — procedural everything, zero assets, no installs. Play Undead Driver, Tank Racer, Lugaru Combat, Dave Dangerous and LF2 Web right in your browser.">
+<meta name="description" content="Vibecoding Arcade: browser games built with AI — procedural everything, zero assets, no installs. Play Undead Driver, Tank Racer, Lugaru Combat, Dave Dangerous, Tiny Fighters and Claude of Duty right in your browser.">
 <title>Vibecoding Arcade — browser games built with AI</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a1030'/%3E%3Cpath d='M11 8 L25 16 L11 24 Z' fill='%23ff7733'/%3E%3C/svg%3E">
 <style>
@@ -149,14 +149,14 @@
     --ink:#1a0a0c;
     --marquee-bg:#2a0a0e;
   }
-  .cab--lf2-web{
-    --accent:#4fd1c5;
-    --accent-soft:rgba(79,209,197,.14);
-    --accent-line:rgba(79,209,197,.42);
-    --genre:#4fd1c5;
-    --label:#9ae6df;
-    --ink:#071614;
-    --marquee-bg:#0b1d1a;
+  .cab--tiny{
+    --accent:#ff6b35;
+    --accent-soft:rgba(255,107,53,.14);
+    --accent-line:rgba(255,107,53,.42);
+    --genre:#ff6b35;
+    --label:#ffb088;
+    --ink:#1a0c04;
+    --marquee-bg:#1a0a04;
   }
   .cab--dustline{
     --accent:#d4a24e;
@@ -166,6 +166,15 @@
     --label:#b8c4a8;
     --ink:#161207;
     --marquee-bg:#15110a;
+  }
+  .cab--cod{
+    --accent:#8a9a5b;
+    --accent-soft:rgba(138,154,91,.14);
+    --accent-line:rgba(138,154,91,.4);
+    --genre:#a3b374;
+    --label:#c9d1a8;
+    --ink:#131508;
+    --marquee-bg:#141607;
   }
 
   .cab__marquee{
@@ -372,7 +381,7 @@
 <header class="hero">
 
 
-  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 5 cabinets online · 1 runs locally</p>
+  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 6 cabinets online · 1 runs locally</p>
   <h1 class="hero__title">Vibecoding <span class="hero__hollow">Arcade</span></h1>
   <p class="hero__sub">Browser games built with AI — procedural everything, zero assets, no installs. <strong>Click a cabinet and play.</strong></p>
 </header>
@@ -558,38 +567,39 @@
     </li>
 
     <li>
-      <article class="cab cab--lf2-web" aria-labelledby="cab-lf2web-title">
+      <article class="cab cab--tiny" aria-labelledby="cab-tiny-title">
         <div class="cab__marquee">
-          <svg class="motif" viewBox="0 0 120 100" width="148" height="123" role="img" aria-label="Stick fighter emblem for LF2 Web" focusable="false">
+          <svg class="motif" viewBox="0 0 120 100" width="148" height="123" role="img" aria-label="Boxing glove emblem for Tiny Fighters" focusable="false">
             <defs>
-              <radialGradient id="glowLF" cx="50%" cy="50%" r="62%">
-                <stop offset="0%" stop-color="#4fd1c5" stop-opacity=".28"/>
-                <stop offset="100%" stop-color="#4fd1c5" stop-opacity="0"/>
+              <radialGradient id="glowBB" cx="50%" cy="50%" r="62%">
+                <stop offset="0%" stop-color="#ff6b35" stop-opacity=".32"/>
+                <stop offset="100%" stop-color="#ff6b35" stop-opacity="0"/>
               </radialGradient>
             </defs>
-            <rect width="120" height="100" fill="url(#glowLF)"/>
+            <rect width="120" height="100" fill="url(#glowBB)"/>
             <ellipse cx="60" cy="88" rx="30" ry="4.5" fill="#000" opacity=".3"/>
-            <g stroke="#4fd1c5" stroke-width="4.5" stroke-linecap="round" fill="none">
-              <line x1="60" y1="36" x2="60" y2="62"/>
-              <line x1="60" y1="44" x2="80" y2="38"/>
-              <line x1="60" y1="44" x2="45" y2="52"/>
-              <line x1="60" y1="62" x2="47" y2="84"/>
-              <line x1="60" y1="62" x2="73" y2="84"/>
-            </g>
-            <circle cx="60" cy="24" r="9" fill="#4fd1c5"/>
-            <circle cx="92" cy="36" r="9" fill="#4fd1c5" opacity=".35"/>
-            <circle cx="92" cy="36" r="5" fill="#9ae6df"/>
+            <!-- Mitt body -->
+            <ellipse cx="62" cy="42" rx="24" ry="22" fill="#ff6b35"/>
+            <!-- Thumb -->
+            <ellipse cx="37" cy="54" rx="8" ry="13" fill="#ff6b35" transform="rotate(18 37 54)"/>
+            <!-- Knuckle shading -->
+            <ellipse cx="62" cy="30" rx="15" ry="8" fill="#ff8a5c" opacity=".65"/>
+            <!-- Sheen -->
+            <ellipse cx="52" cy="28" rx="4.5" ry="2.5" fill="#fff" opacity=".5"/>
+            <!-- Cuff -->
+            <rect x="47" y="64" width="28" height="20" rx="4" fill="#c74e1f"/>
+            <rect x="47" y="70" width="28" height="5" fill="#0b0b12" opacity=".35"/>
           </svg>
         </div>
         <div class="cab__body">
           <p class="cab__genre">Brawl · Combo · Blast</p>
-          <h2 class="cab__title" id="cab-lf2web-title">LF2 Web</h2>
+          <h2 class="cab__title" id="cab-tiny-title">Tiny Fighters</h2>
           <p class="cab__desc">Little Fighter 2 style VS mode — 8-fighter local brawls, deterministic 60 Hz sim.</p>
           <div class="cab__panel">
             <span class="cab__panel-label">Controls</span>
             <p class="cab__keys"><kbd>,</kbd> attack · <kbd>.</kbd> jump · <kbd>/</kbd> defend · arrows move</p>
           </div>
-          <a class="play" href="https://vs4vijay.github.io/vibecoding/lf2-web/" aria-label="Play LF2 Web">
+          <a class="play" href="https://vs4vijay.github.io/vibecoding/tiny-fighters/" aria-label="Play Tiny Fighters">
             <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
             Play
           </a>
@@ -597,6 +607,38 @@
       </article>
     </li>
 
+    <li>
+      <article class="cab cab--cod" aria-labelledby="cab-cod-title">
+        <div class="cab__marquee">
+          <svg class="motif" viewBox="0 0 120 100" width="148" height="123" role="img" aria-label="Combat helmet emblem for Claude of Duty" focusable="false">
+            <defs>
+              <radialGradient id="glowC" cx="50%" cy="50%" r="62%">
+                <stop offset="0%" stop-color="#8a9a5b" stop-opacity=".24"/>
+                <stop offset="100%" stop-color="#8a9a5b" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="120" height="100" fill="url(#glowC)"/>
+            <path fill="#8a9a5b" d="M60 16 C38 16 26 33 26 53 L26 62 C26 66 29 69 33 69 L87 69 C91 69 94 66 94 62 L94 53 C94 33 82 16 60 16 Z"/>
+            <path fill="#6f7d45" d="M20 62 L100 62 C104 62 106 65 105 68 C104 71 101 72 98 72 L22 72 C19 72 16 71 15 68 C14 65 16 62 20 62 Z"/>
+            <path fill="none" stroke="#6f7d45" stroke-width="3" d="M42 72 C42 82 50 87 60 87 C70 87 78 82 78 72"/>
+            <rect x="26" y="38" width="68" height="10" rx="5" fill="#131508" opacity=".55"/>
+          </svg>
+        </div>
+        <div class="cab__body">
+          <p class="cab__genre">Aim · ADS · Clear</p>
+          <h2 class="cab__title" id="cab-cod-title">Claude of Duty</h2>
+          <p class="cab__desc">Call-of-Duty-style browser FPS — bot team deathmatch on a market-street map with an HDR render pipeline, PBR materials and ballistics. Every texture, mesh and sound is procedural: zero art assets.</p>
+          <div class="cab__panel">
+            <span class="cab__panel-label">Controls</span>
+            <p class="cab__keys"><kbd>WASD</kbd> move · <kbd>Mouse</kbd> aim &amp; fire · <kbd>R</kbd> reload · <kbd>Shift</kbd> sprint</p>
+          </div>
+          <a class="play" href="https://vs4vijay.github.io/vibecoding/claude-of-duty/" aria-label="Play Claude of Duty">
+            <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
+            Play
+          </a>
+        </div>
+      </article>
+    </li>
     <li>
       <article class="cab cab--dustline" aria-labelledby="cab-dustline-title">
         <div class="cab__marquee">

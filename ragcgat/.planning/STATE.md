@@ -2,16 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 04
-current_phase_name: Chat Browsing
-status: verifying
-stopped_at: Phase 04 execution complete, ready for verification
-last_updated: "2026-09-09T00:00:00Z"
-last_activity: 2026-09-09
-last_activity_desc: Phase 04 execution complete (04-01 tracer + 04-02 virtualization, 245-test suite green)
+current_phase: 05
+
+current_phase_name: Full-Text Search
+status: in-progress
+stopped_at: Phase 05 05-01 executed — search engine + highlight lib complete (searchMessages, getWindowAt, seedWindow, splitByTerms, makeSnippet, searchAll/searchChat); 265 tests green; gates pass; 05-02 UI+navigation is next
+last_updated: "2026-09-12T00:00:00Z"
+last_activity: 2026-09-12
+last_activity_desc: Phase 05 05-01 executed 2026-09-12 — searchMessages (exact count, newest-first), getWindowAt (bounded target window), seedWindow, highlight/snippet lib, searchAll/searchChat; 265 tests + gates green
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
   completed_plans: 3
 ---
@@ -23,14 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-28)
 
 **Core value:** Import WhatsApp exports and instantly search/query your conversation history
-**Current focus:** Phase 04 verification (UAT), then Phase 05 — Full-Text Search
+**Current focus:** Phase 05 planning — Full-Text Search
 
 ## Current Position
 
-Phase: 04 (Chat Browsing) — COMPLETE (2/2 plans)
-Plan: 2 of 2
-Status: Phase 04 complete, ready for verification
-Last activity: 2026-09-09 — Phase 04 Waves 1+2 executed (tracer slice + virtualization/polish)
+Phase: 05 (Full-Text Search) — **05-01 EXECUTED** (1/2 plans: 05-01 search engine + highlight lib complete)
+Plan: 1 of 2 executed
+Status: 05-01 complete (commit 5204685); 05-02 UI+navigation next
+Last activity: 2026-09-12 — 05-01 execution complete; all gates green
+
+
 
 Progress: [██████████] 100%
 
@@ -38,7 +41,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 1
 - Average duration: N/A
 - Total execution time: 0 hours
 
@@ -50,7 +53,7 @@ Progress: [██████████] 100%
 | 2. Storage Layer | 0 | 0 | - |
 | 3. Import Feature | 0 | 0 | - |
 | 4. Chat Browsing | 0 | 0 | - |
-| 5. Full-Text Search | 0 | 0 | - |
+| 5. Full-Text Search | 2 | 1 | - |
 
 **Recent Trend:**
 
@@ -67,6 +70,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
 - Roadmap: 5 phases, sequential execution from parser → storage → import → browsing → search
+- Phase 5 search index: Dexie multiEntry confirmed over Orama (2026-09-12) — index/tokenizer/search methods already built and tested since schema v1; zero new deps; native persistence avoids in-memory index blowout; v2 RAG needs its own vector storage regardless (ROADMAP Research Flags resolved)
 
 ### Pending Todos
 
@@ -74,7 +78,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 5 (Search) needs a decision on Orama vs Dexie multiEntry index strategy before implementation
+- None
 
 ## Deferred Items
 

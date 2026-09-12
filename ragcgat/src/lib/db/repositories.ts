@@ -159,22 +159,115 @@ export class MessageRepository {
 		return [...siblings, ...older];
 	}
 
-	async searchTerms(query: string, limit = 50): Promise<MessageRecord[]> {
+	/**
+	 * Exact-count, newest-first search across or within one chat.
+	 *
+	 * Filter-then-distinct: chatId filter runs BEFORE distinct() — the
+	 * documented safe order for multiEntry anyOf in Dexie.
+	 * primaryKeys() returns ids only (zero record materialization for count);
+	 * ids are sorted descending then capped at candidateCap so the newest
+	 * matches are always fetched (anyOf+distinct primaryKeys are grouped
+	 * per-term ascending-within-term, not globally by id).
+	 */
+	async searchMessages(
+		query: string,
+		opts?: { chatId?: number; limit?: number; candidateCap?: number },
+	): Promise<{ total: number; results: MessageRecord[] }> {
 		const tokens = tokenize(query);
-		if (tokens.length === 0) return [];
-		return this.db.messages.where('terms').anyOf(tokens).distinct().limit(limit).toArray();
+		if (tokens.length === 0) return { total: 0, results: [] };
+
+		// Filter before distinct (Dexie documented order for multiEntry anyOf).
+		let col = this.db.messages.where('terms').anyOf(tokens);
+		if (typeof opts?.chatId === 'number') {
+			col = col.filter((m) => m.chatId === opts.chatId);
+		}
+		col = col.distinct();
+
+		const ids = await col.primaryKeys();
+		const total = ids.length;
+		if (total === 0) return { total: 0, results: [] };
+
+		const candidateCap = opts?.candidateCap ?? 200;
+		const candidates = ids.sort((a, b) => (b as number) - (a as number)).slice(0, candidateCap);
+
+		const records = await this.db.messages.bulkGet(candidates);
+		const limit = opts?.limit ?? 50;
+		return {
+			total,
+			results: records
+				.filter((r): r is MessageRecord => r !== undefined)
+				.sort((a, b) => b.timestamp - a.timestamp || (b.id as number) - (a.id as number))
+				.slice(0, limit),
+		};
 	}
 
-	async searchTermsInChat(chatId: number, query: string, limit = 50): Promise<MessageRecord[]> {
-		const tokens = tokenize(query);
-		if (tokens.length === 0) return [];
-		return this.db.messages
-			.where('terms')
-			.anyOf(tokens)
-			.filter((m) => m.chatId === chatId)
-			.distinct()
-			.limit(limit)
+	/**
+	 * Bounded window of messages around a target message for scroll-to-result
+	 * navigation. Returns null when the target is missing or belongs to a
+	 * different chat — callers fall back to a normal newest-open.
+	 *
+	 * Every read (same-ts siblings, older/newer rows) has an explicit .limit()
+	 * — satisfies the repo-layer guardrail "every read path is limit-bounded".
+	 */
+	async getWindowAt(
+		chatId: number,
+		msgId: number,
+		limit: number,
+	): Promise<{ messages: MessageRecord[]; targetId: number } | null> {
+		const target = await this.db.messages.get(msgId);
+		if (!target || target.chatId !== chatId) return null;
+
+		const half = Math.floor((limit - 1) / 2);
+
+		// Older: same-ts siblings with id < target.id, then rows below.
+		const olderSiblings = await this.db.messages
+			.where('[chatId+timestamp]')
+			.equals([chatId, target.timestamp])
+			.limit(1000)
 			.toArray();
+		const olderSameTs = olderSiblings
+			.filter((m) => (m.id as number) < (target.id as number))
+			.sort((a, b) => (b.id as number) - (a.id as number))
+			.slice(0, half);
+
+		const olderRemainder = half - olderSameTs.length;
+		let olderOlder: MessageRecord[] = [];
+		if (olderRemainder > 0) {
+			olderOlder = await this.db.messages
+				.where('[chatId+timestamp]')
+				.between([chatId, Number.NEGATIVE_INFINITY], [chatId, target.timestamp], true, false)
+				.reverse()
+				.limit(olderRemainder)
+				.toArray();
+		}
+		const olderChronological = [...olderOlder.reverse(), ...olderSameTs.reverse()];
+
+		// Newer: same-ts siblings with id > target.id, then rows above.
+		const newerSiblings = await this.db.messages
+			.where('[chatId+timestamp]')
+			.equals([chatId, target.timestamp])
+			.limit(1000)
+			.toArray();
+		const newerSameTs = newerSiblings
+			.filter((m) => (m.id as number) > (target.id as number))
+			.sort((a, b) => (a.id as number) - (b.id as number))
+			.slice(0, half);
+
+		const newerRemainder = limit - half - 1 - newerSameTs.length;
+		let newerOlder: MessageRecord[] = [];
+		if (newerRemainder > 0) {
+			newerOlder = await this.db.messages
+				.where('[chatId+timestamp]')
+				.between([chatId, target.timestamp], [chatId, Number.POSITIVE_INFINITY], false, true)
+				.limit(newerRemainder)
+				.toArray();
+		}
+		const newerChronological = [...newerSameTs, ...newerOlder];
+
+		return {
+			messages: [...olderChronological, target, ...newerChronological],
+			targetId: target.id as number,
+		};
 	}
 }
 

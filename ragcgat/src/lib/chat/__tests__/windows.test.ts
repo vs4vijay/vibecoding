@@ -11,6 +11,7 @@ import {
 	isSameDay,
 	prependPage,
 	renderedCount,
+	seedWindow,
 	trimToBudget,
 } from '../windows';
 
@@ -73,16 +74,17 @@ describe('prependPage', () => {
 		expect(state.pages[1][0].id).toBe(10);
 	});
 
-	it('keeps at most MAX_RENDERED_PAGES newest pages', () => {
+	it('keeps at most MAX_RENDERED_PAGES oldest pages', () => {
 		// Load newest page first, then progressively older pages (production order).
 		let state = emptyWindow(1);
 		for (let i = 5; i > 0; i--) {
 			state = prependPage(state, fullPage((i - 1) * PAGE_SIZE, (i - 1) * 40_000));
 		}
 		expect(state.pages.length).toBe(MAX_RENDERED_PAGES);
-		// The OLDEST three pages were trimmed away; the newest two survive.
-		expect(state.pages[0][0].id).toBe(PAGE_SIZE * 2);
-		expect(state.pages[state.pages.length - 1][0].id).toBe(PAGE_SIZE * 4);
+		// The NEWEST two pages were trimmed away; the oldest three survive —
+		// the frontier the user is scrolling into.
+		expect(state.pages[0][0].id).toBe(0);
+		expect(state.pages[state.pages.length - 1][0].id).toBe(PAGE_SIZE * 2);
 	});
 
 	it('sets hasMore false on an empty page and keeps held pages', () => {
@@ -214,22 +216,24 @@ describe('trimToBudget', () => {
 		expect(trimToBudget(state)).toBe(state); // same reference when no trim needed
 	});
 
-	it('keeps the newest pages when over budget', () => {
+	it('keeps the oldest pages when over budget', () => {
 		const trimmed = trimToBudget(fivePageState());
 		expect(trimmed.pages.length).toBe(MAX_RENDERED_PAGES);
-		// Newest 3 pages survive: ids 80..199, timestamps 80000..199000.
-		expect(trimmed.pages[0][0].id).toBe(PAGE_SIZE * 2);
-		expect(trimmed.pages[0][0].timestamp).toBe(80_000);
-		expect(trimmed.pages[trimmed.pages.length - 1][0].id).toBe(PAGE_SIZE * 4);
+		// Oldest 3 pages survive: ids 0..119, timestamps 0..119000.
+		expect(trimmed.pages[0][0].id).toBe(0);
+		expect(trimmed.pages[0][0].timestamp).toBe(0);
+		expect(trimmed.pages[trimmed.pages.length - 1][0].id).toBe(PAGE_SIZE * 2);
+		expect(trimmed.pages[trimmed.pages.length - 1][0].timestamp).toBe(80_000);
 	});
 
-	it('cursor recomputes from the oldest held message after trim', () => {
+	it('cursor is unchanged after trim — the next read is strictly older, never a held re-read', () => {
 		const state = fivePageState();
 		expect(cursorOf(state)).toEqual({ timestamp: 0, id: 0 });
-		// Oldest page (id 0, ts 0) dropped; the cursor now targets the new oldest
-		// held message (id 80, ts 80000) — a valid re-fetch point, so trimmed
-		// history stays reachable via a later getOlderPage read.
-		expect(cursorOf(trimToBudget(state))).toEqual({ timestamp: 80_000, id: PAGE_SIZE * 2 });
+		// The trimmed window must offer the same keyset cursor as before the
+		// trim: prependPage loads OLDER rows, so dropping the newest page must
+		// not move the frontier. (The previous slice(-N) trim dropped the
+		// just-loaded page and made every subsequent load re-read one keyset.)
+		expect(cursorOf(trimToBudget(state))).toEqual({ timestamp: 0, id: 0 });
 	});
 });
 
@@ -242,5 +246,39 @@ describe('simulated-100K budget', () => {
 		}
 		expect(state.pages.length).toBeLessThanOrEqual(MAX_RENDERED_PAGES);
 		assertRenderBudget(state); // ≤ 120 rendered regardless of 100K total
+	});
+});
+
+describe('seedWindow', () => {
+	it('creates a window with one page and correct hasMore', () => {
+		const messages = fullPage(1, 0);
+		const state = seedWindow(42, messages);
+		expect(state.chatId).toBe(42);
+		expect(state.pages).toHaveLength(1);
+		expect(state.pages[0]).toBe(messages);
+		expect(state.hasMore).toBe(true); // PAGE_SIZE messages = hasMore true
+		expect(state.loading).toBe(false);
+	});
+
+	it('sets hasMore false when fewer than PAGE_SIZE', () => {
+		const messages = Array.from({ length: 5 }, (_, i) => msg(i, i * 1000));
+		const state = seedWindow(1, messages);
+		expect(state.hasMore).toBe(false);
+	});
+
+	it('cursorOf reads the oldest message from seeded window', () => {
+		const messages = fullPage(100, 1000);
+		const state = seedWindow(1, messages);
+		expect(cursorOf(state)).toEqual({ timestamp: 1000, id: 100 });
+	});
+
+	it('prependPage works after seedWindow', () => {
+		const messages = fullPage(100, 1000);
+		const state = seedWindow(1, messages);
+		const older = Array.from({ length: 5 }, (_, i) => msg(i, i * 1000));
+		const next = prependPage(state, older);
+		expect(next.pages).toHaveLength(2);
+		expect(next.pages[0]).toBe(older);
+		expect(next.pages[1]).toBe(messages);
 	});
 });
