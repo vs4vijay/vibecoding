@@ -158,7 +158,7 @@ async function handleFiles(files: File[]) {
 			await new Promise((r) => requestAnimationFrame(r));
 			try {
 				const entry = extractTxtFromZip(raw);
-				entryBytes = entry.bytes;
+				entryBytes = entry.bytes as Uint8Array<ArrayBuffer>;
 				entryName = entry.name;
 			} catch (err) {
 				fail(err instanceof Error ? err.message : 'corrupt-zip');
@@ -213,7 +213,7 @@ function onChatName(name: string) {
 }
 </script>
 
-<div class="flex min-h-screen flex-col bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+<div class="flex h-screen flex-col bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100">
 	<header class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
 		<h1 class="text-lg font-bold">RagChat</h1>
 		<nav class="flex items-center gap-2" aria-label="Main">
