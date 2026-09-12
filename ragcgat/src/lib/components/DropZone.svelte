@@ -14,13 +14,13 @@ let fileInput = $state<HTMLInputElement | null>(null);
 function onDrop(e: DragEvent) {
 	e.preventDefault();
 	dragging = false;
-	const files = [...(e.dataTransfer?.files ?? [])];
+	const files = Array.from(e.dataTransfer?.files ?? []);
 	if (files.length) onfiles(files);
 }
 
 function onInputChange(e: Event) {
 	const input = e.currentTarget as HTMLInputElement;
-	const files = [...(input.files ?? [])];
+	const files = Array.from(input.files ?? []);
 	input.value = '';
 	if (files.length) onfiles(files);
 }
