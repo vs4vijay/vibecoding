@@ -11,7 +11,7 @@
   #   /undead-driver/     <- undead-driver/dist  (vite base "./", subpath-safe)
   #   /lugaru-combat/     <- lugaru-combat/dist  (vite base "./", subpath-safe)
   #   /dave-dangerous/    <- dave-dangerous/dist  (vite base "./", subpath-safe)
-  #   /bantam-brawler/    <- bantam-brawler/dist  (vite base "./", subpath-safe)
+  #   /tiny-fighters/    <- tiny-fighters/dist  (vite base "./", subpath-safe)
 
 name: Deploy Games to Pages
 
@@ -23,7 +23,7 @@ on:
       - "undead-driver/**"
       - "lugaru-combat/**"
       - "dave-dangerous/**"
-      - "bantam-brawler/**"
+      - "tiny-fighters/**"
       - "games-hub/**"
       - ".github/workflows/games-pages-deploy.yml"
   workflow_dispatch:
@@ -80,10 +80,10 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
-      - name: Build bantam-brawler
-        working-directory: bantam-brawler
+      - name: Build tiny-fighters
+        working-directory: tiny-fighters
         # vite.config.ts sets base "./" so the build works under any subpath
-        # (/vibecoding/bantam-brawler/) with no BASE_PATH env needed.
+        # (/vibecoding/tiny-fighters/) with no BASE_PATH env needed.
         run: |
           bun install --frozen-lockfile
           bun run build
@@ -96,7 +96,7 @@ jobs:
           cp -r undead-driver/dist site/undead-driver
           cp -r lugaru-combat/dist site/lugaru-combat
           cp -r dave-dangerous/dist site/dave-dangerous
-          cp -r bantam-brawler/dist site/bantam-brawler
+          cp -r tiny-fighters/dist site/tiny-fighters
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

@@ -14,7 +14,7 @@ without breaking the others.
 | Tank Racer | <https://vs4vijay.github.io/vibecoding/tank-racer/> | [`tank-racer/`](../tank-racer) | TS strict · Vite 8 · three.js | bun test (pure logic) |
 | Lugaru Combat | <https://vs4vijay.github.io/vibecoding/lugaru-combat/> | [`lugaru-combat/`](../lugaru-combat) | TypeScript, Vite, three.js, Rapier | vitest |
 | Dave Dangerous | <https://vs4vijay.github.io/vibecoding/dave-dangerous/> | [`dave-dangerous/`](../dave-dangerous) | TS strict · Vite 5 | vitest |
-| Bantam Brawler | <https://vs4vijay.github.io/vibecoding/bantam-brawler/> | [`bantam-brawler/`](../bantam-brawler) | TS strict · Vite 5 · Canvas2D · WebAudio | bun test (208) |
+| Tiny Fighters | <https://vs4vijay.github.io/vibecoding/tiny-fighters/> | [`tiny-fighters/`](../tiny-fighters) | TS strict · Vite 5 · Canvas2D · WebAudio | bun test (208) |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
 status): [`subway-surfers/`](../subway-surfers).
