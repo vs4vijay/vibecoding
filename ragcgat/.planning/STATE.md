@@ -5,11 +5,11 @@ milestone_name: milestone
 current_phase: 05
 
 current_phase_name: Full-Text Search
-status: planning
-stopped_at: Phase 04 verified — all UAT gates (automated + deferred manual browser pass) green; ready for Phase 05 planning
+status: in-progress
+stopped_at: Phase 05 planned — 2 plans written (05-01 search engine + highlight lib, 05-02 search UI + result navigation), independent plan check passed, docs committed; execution is next
 last_updated: "2026-09-12T00:00:00Z"
 last_activity: 2026-09-12
-last_activity_desc: Phase 04 UAT verified — deferred manual browser pass executed on localhost:1337; found and fixed 4 real issues (ChatView missing browser import, undeclared activeObserver, trimToBudget keyset loop, min-h-screen layout); svelte-check gate added; 245/245 tests green
+last_activity_desc: Phase 05 planning complete — search index strategy confirmed as Dexie multiEntry (user decision 2026-09-12, ROADMAP Research Flags resolved); 05-01/05-02 PLANS written and checked
 progress:
   total_phases: 1
   completed_phases: 1
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 04 (Chat Browsing) — **VERIFIED COMPLETE** (2/2 plans, UAT incl. deferred manual pass)
-Plan: 2 of 2
-Status: Phase 04 verified 2026-09-12; next: Phase 05 (Full-Text Search) planning
-Last activity: 2026-09-12 — UAT manual browser pass executed; 4 fixes committed
-  (8a25324 browser import + activeObserver; d9b402f trimToBudget frontier;
-   8eb5ff1 h-screen shell; ce5e3a3 svelte-check gate; 92aa3cf dev port 1337)
+Phase: 05 (Full-Text Search) — **PLANNED** (2/2 plans: 05-01 engine, 05-02 UI+navigation)
+Plan: 0 of 2 executed
+Status: Phase 05 planning complete 2026-09-12 — Dexie multiEntry index confirmed; execute 05-01 then 05-02
+Last activity: 2026-09-12 — Phase 05 plans written and plan-checked
+  (05-01-PLAN.md search engine, 05-02-PLAN.md UI + navigation; ROADMAP flag resolved)
+
 
 Progress: [██████████] 100%
 
@@ -70,6 +70,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
 - Roadmap: 5 phases, sequential execution from parser → storage → import → browsing → search
+- Phase 5 search index: Dexie multiEntry confirmed over Orama (2026-09-12) — index/tokenizer/search methods already built and tested since schema v1; zero new deps; native persistence avoids in-memory index blowout; v2 RAG needs its own vector storage regardless (ROADMAP Research Flags resolved)
 
 ### Pending Todos
 
@@ -77,7 +78,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 5 (Search) needs a decision on Orama vs Dexie multiEntry index strategy before implementation
+- None
 
 ## Deferred Items
 

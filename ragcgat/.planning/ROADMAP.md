@@ -147,7 +147,7 @@ Plans:
   4. User clicks a search result and the app navigates to that conversation, scrolled to that specific message
   5. Search results display result count (e.g., "142 results for 'birthday'")
 
-**Plans**: TBD
+**Plans**: 2 (05-01 search engine + highlight lib, 05-02 search UI + result navigation)
 **UI hint**: yes
 **Notes**: Search index strategy needs a decision — Orama (forward-compatible with future RAG) vs Dexie multiEntry index (no extra dependency). Research recommends Orama for strategic alignment with v2 vector search.
 
@@ -157,7 +157,7 @@ Plans:
 
 | Phase | Flag | Resolution |
 |-------|------|------------|
-| Phase 5 | Orama persistent index vs Dexie multiEntry index — both viable, affects v2 migration path | Research recommends Orama for forward compatibility with vector search in v2; confirm during Phase 5 planning |
+| Phase 5 | Orama persistent index vs Dexie multiEntry index — both viable, affects v2 migration path | RESOLVED 2026-09-12: Dexie multiEntry confirmed — index/tokenizer/query methods already built and tested since schema v1, zero new deps, native IndexedDB persistence (avoids the documented in-memory Orama blowout); v2 RAG needs its own embedding/vector storage regardless |
 
 ## Progress
 
