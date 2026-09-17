@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Asphalt Outlaws</title>
+    <meta
+      name="description"
+      content="Pseudo-3D motorcycle racing with fists — punch, kick and outrink your rivals to the finish line."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1026'/%3E%3Ccircle cx='9' cy='22' r='6' fill='none' stroke='%23ff5b2e' stroke-width='2.5'/%3E%3Ccircle cx='24' cy='22' r='6' fill='none' stroke='%23ff5b2e' stroke-width='2.5'/%3E%3Cpath d='M9 22 L15 12 L22 12 L24 22 M15 12 L13 8 L17 8' stroke='%23ffc93c' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        --ink: #f5ead6;
+        --panel: #16101f;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0710;
+        font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+        color: var(--ink);
+      }
+      #game-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        display: block;
+        background: #0b0710;
+      }
+      /* DOM screens (title/select/results) live on their own root so they can
+         never hide or be hidden by the canvas HUD. */
+      #overlay-root {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+      #overlay-root.active {
+        pointer-events: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game-canvas" width="1280" height="720"></canvas>
+    <div id="overlay-root"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

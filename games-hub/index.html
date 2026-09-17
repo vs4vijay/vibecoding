@@ -158,6 +158,15 @@
     --ink:#1a0c04;
     --marquee-bg:#1a0a04;
   }
+  .cab--asphalt{
+    --accent:#ff5b2e;
+    --accent-soft:rgba(255,91,46,.14);
+    --accent-line:rgba(255,91,46,.42);
+    --genre:#ff5b2e;
+    --label:#ffc9a8;
+    --ink:#1a0d06;
+    --marquee-bg:#160b14;
+  }
   .cab--dustline{
     --accent:#d4a24e;
     --accent-soft:rgba(212,162,78,.13);
@@ -381,7 +390,7 @@
 <header class="hero">
 
 
-  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 6 cabinets online · 1 runs locally</p>
+  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 7 cabinets online · 1 runs locally</p>
   <h1 class="hero__title">Vibecoding <span class="hero__hollow">Arcade</span></h1>
   <p class="hero__sub">Browser games built with AI — procedural everything, zero assets, no installs. <strong>Click a cabinet and play.</strong></p>
 </header>
@@ -600,6 +609,52 @@
             <p class="cab__keys"><kbd>,</kbd> attack · <kbd>.</kbd> jump · <kbd>/</kbd> defend · arrows move</p>
           </div>
           <a class="play" href="https://vs4vijay.github.io/vibecoding/tiny-fighters/" aria-label="Play Tiny Fighters">
+            <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
+            Play
+          </a>
+        </div>
+      </article>
+    </li>
+
+    <li>
+      <article class="cab cab--asphalt" aria-labelledby="cab-asphalt-title">
+        <div class="cab__marquee">
+          <svg class="motif" viewBox="0 0 120 100" width="148" height="123" role="img" aria-label="Motorcycle emblem for Asphalt Outlaws" focusable="false">
+            <defs>
+              <radialGradient id="glowAO" cx="50%" cy="50%" r="62%">
+                <stop offset="0%" stop-color="#ff5b2e" stop-opacity=".32"/>
+                <stop offset="100%" stop-color="#ff5b2e" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="120" height="100" fill="url(#glowAO)"/>
+            <ellipse cx="60" cy="88" rx="34" ry="4" fill="#000" opacity=".35"/>
+            <!-- wheels -->
+            <circle cx="26" cy="66" r="17" fill="none" stroke="#1c1424" stroke-width="6"/>
+            <circle cx="94" cy="66" r="17" fill="none" stroke="#1c1424" stroke-width="6"/>
+            <circle cx="26" cy="66" r="6" fill="#3a3244"/>
+            <circle cx="94" cy="66" r="6" fill="#3a3244"/>
+            <!-- body -->
+            <path d="M38 62 L52 38 L76 38 L86 62 L74 62 L68 50 L54 50 L48 62 Z" fill="#ff5b2e"/>
+            <rect x="58" y="26" width="12" height="14" rx="3" fill="#ffc93c"/>
+            <!-- rider -->
+            <circle cx="63" cy="20" r="8" fill="#f5ead6"/>
+            <path d="M52 34 Q63 24 74 34 L70 44 L56 44 Z" fill="#f5ead6" opacity=".9"/>
+            <!-- speed lines -->
+            <g stroke="#ff5b2e" stroke-width="3" stroke-linecap="round" opacity=".5">
+              <line x1="4" y1="40" x2="22" y2="40"/>
+              <line x1="0" y1="54" x2="16" y2="54"/>
+            </g>
+          </svg>
+        </div>
+        <div class="cab__body">
+          <p class="cab__genre">Race · Punch · Survive</p>
+          <h2 class="cab__title" id="cab-asphalt-title">Asphalt Outlaws</h2>
+          <p class="cab__desc">Road Rash–style pseudo-3D brawler racing. Punch rivals off their bikes, weave through oncoming traffic and out-ride the patrol cops across a five-race ladder.</p>
+          <div class="cab__panel">
+            <span class="cab__panel-label">Controls</span>
+            <p class="cab__keys"><kbd>W</kbd> throttle · <kbd>A</kbd>/<kbd>D</kbd> steer · <kbd>J</kbd>/<kbd>K</kbd> punch/kick · <kbd>S</kbd> brake</p>
+          </div>
+          <a class="play" href="https://vs4vijay.github.io/vibecoding/asphalt-outlaws/" aria-label="Play Asphalt Outlaws">
             <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
             Play
           </a>

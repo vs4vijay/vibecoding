@@ -16,6 +16,7 @@ without breaking the others.
 | Dave Dangerous | <https://vs4vijay.github.io/vibecoding/dave-dangerous/> | [`dave-dangerous/`](../dave-dangerous) | TS strict · Vite 5 | vitest |
 | Tiny Fighters | <https://vs4vijay.github.io/vibecoding/tiny-fighters/> | [`tiny-fighters/`](../tiny-fighters) | TS strict · Vite 5 · Canvas2D · WebAudio | bun test (208) |
 | Claude of Duty | <https://vs4vijay.github.io/vibecoding/claude-of-duty/> | [`Claude-of-Duty/`](../Claude-of-Duty) | JavaScript, Vite, three.js | capture harness (`tools/`) |
+| Asphalt Outlaws | <https://vs4vijay.github.io/vibecoding/asphalt-outlaws/> | [`asphalt-outlaws/`](../asphalt-outlaws) | TS strict · Vite 5 · Canvas2D · WebAudio | bun test |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
 status): [`subway-surfers/`](../subway-surfers).
