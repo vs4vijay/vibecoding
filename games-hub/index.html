@@ -167,6 +167,15 @@
     --ink:#1a0d06;
     --marquee-bg:#160b14;
   }
+  .cab--vulture{
+    --accent:#c8a156;
+    --accent-soft:rgba(200,161,86,.14);
+    --accent-line:rgba(200,161,86,.42);
+    --genre:#c8a156;
+    --label:#e8d5ae;
+    --ink:#17100a;
+    --marquee-bg:#141009;
+  }
   .cab--dustline{
     --accent:#d4a24e;
     --accent-soft:rgba(212,162,78,.13);
@@ -688,6 +697,38 @@
             <p class="cab__keys"><kbd>WASD</kbd> move · <kbd>Mouse</kbd> aim &amp; fire · <kbd>R</kbd> reload · <kbd>Shift</kbd> sprint</p>
           </div>
           <a class="play" href="https://vs4vijay.github.io/vibecoding/claude-of-duty/" aria-label="Play Claude of Duty">
+            <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
+            Play
+          </a>
+        </div>
+      </article>
+    </li>
+    <li>
+      <article class="cab cab--vulture" aria-labelledby="cab-vulture-title">
+        <div class="cab__marquee">
+          <svg class="motif" viewBox="0 0 120 100" width="148" height="123" role="img" aria-label="Vulture emblem for Vulture Pass" focusable="false">
+            <defs>
+              <radialGradient id="glowVP" cx="50%" cy="50%" r="62%">
+                <stop offset="0%" stop-color="#c8a156" stop-opacity=".24"/>
+                <stop offset="100%" stop-color="#c8a156" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="120" height="100" fill="url(#glowVP)"/>
+            <circle cx="60" cy="42" r="15" fill="#e8d5ae" opacity=".16"/>
+            <path fill="#c8a156" d="M60 34 C48 34 42 44 40 54 L28 46 C36 62 44 70 60 72 C76 70 84 62 92 46 L80 54 C78 44 72 34 60 34 Z"/>
+            <path fill="#8a6f3f" d="M60 44 L64 54 L60 60 L56 54 Z"/>
+            <path fill="none" stroke="#8a6f3f" stroke-width="3" stroke-dasharray="7 5" d="M18 84 L102 78"/>
+          </svg>
+        </div>
+        <div class="cab__body">
+          <p class="cab__genre">Trade · Ambush · Avenge</p>
+          <h2 class="cab__title" id="cab-vulture-title">Vulture Pass</h2>
+          <p class="cab__desc">Top-down car-combat trading romp across a sepia desert basin — buy low, sell high, and haul your fortune through bandit ambushes with side-mounted guns: aim left to fire the left gun, right for the right. Topple the Buzzard and the Basin is yours. Every sprite and sound is procedural: zero art assets.</p>
+          <div class="cab__panel">
+            <span class="cab__panel-label">Controls</span>
+            <p class="cab__keys"><kbd>WASD</kbd> drive · <kbd>Mouse</kbd> aim · <kbd>L-Click</kbd> fire side mount · <kbd>E</kbd> enter town spots</p>
+          </div>
+          <a class="play" href="https://vs4vijay.github.io/vibecoding/vulture-pass/" aria-label="Play Vulture Pass">
             <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
             Play
           </a>

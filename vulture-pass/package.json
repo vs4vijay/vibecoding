@@ -1,0 +1,21 @@
+{
+  "name": "vulture-pass",
+  "version": "0.1.0",
+  "description": "Original web homage to top-down car-combat trading games — one-region vertical slice",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node qa/units/mounts.test.mjs && node qa/units/driving.test.mjs && node qa/units/loop.test.mjs && node qa/units/waves.test.mjs",
+    "qa": "node qa/smoke.mjs",
+    "playthrough": "node qa/playthrough.mjs"
+  },
+  "dependencies": {
+    "three": "^0.171.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0",
+    "vite": "^6.4.3"
+  }
+}

@@ -14,6 +14,7 @@
   #   /tiny-fighters/    <- tiny-fighters/dist  (vite base "./", subpath-safe)
   #   /claude-of-duty/    <- Claude-of-Duty/dist (vite base "./", subpath-safe)
   #   /asphalt-outlaws/   <- asphalt-outlaws/dist (vite base "./", subpath-safe)
+  #   /vulture-pass/      <- vulture-pass/dist   (vite base "./", subpath-safe)
 
 name: Deploy Games to Pages
 
@@ -28,6 +29,7 @@ on:
       - "tiny-fighters/**"
       - "Claude-of-Duty/**"
       - "asphalt-outlaws/**"
+      - "vulture-pass/**"
       - "games-hub/**"
       - ".github/workflows/games-pages-deploy.yml"
   workflow_dispatch:
@@ -107,6 +109,14 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun run build
+
+      - name: Build vulture-pass
+        working-directory: vulture-pass
+        # vite.config.js sets base "./" so the build works under any subpath
+        # (/vibecoding/vulture-pass/) with no BASE_PATH env needed.
+        run: |
+          bun install --frozen-lockfile
+          bun run build
       - name: Stage site (preserve per-game URL prefixes)
         run: |
           mkdir -p site
@@ -118,6 +128,7 @@ jobs:
           cp -r tiny-fighters/dist site/tiny-fighters
           cp -r Claude-of-Duty/dist site/claude-of-duty
           cp -r asphalt-outlaws/dist site/asphalt-outlaws
+          cp -r vulture-pass/dist site/vulture-pass
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

@@ -343,6 +343,7 @@ single combined workflow (`.github/workflows/games-pages-deploy.yml`).
 | **Tiny Fighters** | [vs4vijay.github.io/vibecoding/tiny-fighters](https://vs4vijay.github.io/vibecoding/tiny-fighters/) | [`tiny-fighters/`](./tiny-fighters) | TypeScript, Vite 5, Canvas2D, WebAudio |
 | **Claude of Duty** | [vs4vijay.github.io/vibecoding/claude-of-duty](https://vs4vijay.github.io/vibecoding/claude-of-duty/) | [`Claude-of-Duty/`](./Claude-of-Duty) | JavaScript, Vite, three.js |
 | **Asphalt Outlaws** | [vs4vijay.github.io/vibecoding/asphalt-outlaws](https://vs4vijay.github.io/vibecoding/asphalt-outlaws/) | [`asphalt-outlaws/`](./asphalt-outlaws) | TypeScript, Vite 5, Canvas2D, WebAudio |
+| **Vulture Pass** | [vs4vijay.github.io/vibecoding/vulture-pass](https://vs4vijay.github.io/vibecoding/vulture-pass/) | [`vulture-pass/`](./vulture-pass) | JavaScript, Vite, three.js, WebAudio |
 | **Dustline** | local server — `cd dustline && bun run dev` ([quickstart](./dustline#readme)) | [`dustline/`](./dustline) | TypeScript, Vite, three.js · Bun + Hono + WebSocket |
 
 In development: [`subway-surfers/`](./subway-surfers).

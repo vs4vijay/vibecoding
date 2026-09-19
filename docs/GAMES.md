@@ -17,6 +17,7 @@ without breaking the others.
 | Tiny Fighters | <https://vs4vijay.github.io/vibecoding/tiny-fighters/> | [`tiny-fighters/`](../tiny-fighters) | TS strict · Vite 5 · Canvas2D · WebAudio | bun test (208) |
 | Claude of Duty | <https://vs4vijay.github.io/vibecoding/claude-of-duty/> | [`Claude-of-Duty/`](../Claude-of-Duty) | JavaScript, Vite, three.js | capture harness (`tools/`) |
 | Asphalt Outlaws | <https://vs4vijay.github.io/vibecoding/asphalt-outlaws/> | [`asphalt-outlaws/`](../asphalt-outlaws) | TS strict · Vite 5 · Canvas2D · WebAudio | bun test |
+| Vulture Pass | <https://vs4vijay.github.io/vibecoding/vulture-pass/> | [`vulture-pass/`](../vulture-pass) | JavaScript, Vite, three.js, WebAudio | node units + headless-browser suites |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
 status): [`subway-surfers/`](../subway-surfers).
