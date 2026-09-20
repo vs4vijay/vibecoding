@@ -49,7 +49,18 @@ export const CONFIG = {
     unlockLevel: { walker: 1, runner: 2, brute: 3 },
   },
   spawn: { shoulderOffset: 1.2, zMinAhead: 70, zMaxAhead: 110 },
-  world: { duskColor: 0x3d1f10 },
+  world: {
+    duskColor: 0x3d1f10,
+    hemisphereIntensity: 0.95,
+    sunIntensity: 1.35,
+    rearFillIntensity: 0.45,
+    roadAlbedo: 0x2b2b31,
+    sandAlbedo: 0x5a4028,
+    railAlbedo: 0x6a6a6a,
+    fogColor: 0x3a2012,
+    fogNear: 60,
+    fogFar: 160,
+  },
   camera: {
     fovBase: 62,
     fovBoost: 74,
@@ -58,4 +69,6 @@ export const CONFIG = {
     offset: { x: 0.55, y: 4.2, z: 9 },
     lookAt: { x: 0.8, y: 1.2, z: -14 },
   },
+  hud: { warnAt: 0.5, critAt: 0.75, popupCount: 6, popupLifeS: 1 },
+  readability: { obstacleWarnDist: 45 },
 };

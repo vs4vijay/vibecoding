@@ -30,3 +30,7 @@ export function knobsForLevel(level: number): Knobs {
     types: all.filter((t) => level >= D.unlockLevel[t]),
   };
 }
+export function unlocksForLevel(level: number): ZombieType[] {
+  // Level 1 is the starting loadout (walker), not an unlock event — only levels ≥ 2 can unlock.
+  return (Object.keys(D.unlockLevel) as ZombieType[]).filter((t) => D.unlockLevel[t] === level && D.unlockLevel[t] > 1);
+}

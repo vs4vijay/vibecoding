@@ -1,9 +1,10 @@
 import * as THREE from "three";
 import type { CarState } from "../game/car";
 
-const BODY_COLOR = 0xb3341f;
+const BODY_COLOR = 0xc94b2e;
 const CABIN_COLOR = 0x20140e;
 const HEADLIGHT_COLOR = 0xffe9a8;
+const TAILLIGHT_COLOR = 0xff2a1a;
 const WHEEL_RADIUS = 0.34;
 
 export type CarMesh = {
@@ -16,8 +17,8 @@ export type CarMesh = {
 
 /**
  * Pooled car rig built once: hull box + cabin + 4 cylinder wheels + two
- * emissive headlight boxes with a SpotLight per side + blob shadow disc.
- * update() mutates transforms only.
+ * emissive headlight boxes with a SpotLight per side + two red tail-light
+ * boxes on the rear + blob shadow disc. update() mutates transforms only.
  */
 export function createCarMesh(scene: THREE.Scene): CarMesh {
   const root = new THREE.Group();
@@ -47,6 +48,16 @@ export function createCarMesh(scene: THREE.Scene): CarMesh {
     spot.position.set(sx, 0.62, 2.2);
     spot.target.position.set(sx * 2, -0.4, 30);
     body.add(spot, spot.target);
+  }
+
+  // Tail lights: emissive red boxes on the rear face — the side the chase
+  // camera sees — mirroring the headlamp offsets. MeshBasicMaterial ignores
+  // scene lighting, so they read as lit at any sun angle.
+  const tailMat = new THREE.MeshBasicMaterial({ color: TAILLIGHT_COLOR });
+  for (const sx of [-0.62, 0.62]) {
+    const tail = new THREE.Mesh(lampGeo, tailMat);
+    tail.position.set(sx, 0.62, -2.24);
+    body.add(tail);
   }
 
   // Wheels: cylinders tipped so their axis runs along x.

@@ -67,6 +67,45 @@ canvas {
   }
 }
 
+/* ---------- side danger glow (heavier flank in the critical band) ---------- */
+
+/* Full-height gradient strips hugging the screen edges. pointer-events is
+   disabled explicitly (on top of #hud's own) so steering drags and
+   tap-to-fire pass straight through; toggling the `active` class is the
+   only per-frame work — the opacity transition does the ramp. No z-index:
+   they stay under the coach (5), menu card (10) and toasts (20). */
+.danger-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: clamp(16px, 3.5vw, 30px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease-out;
+}
+
+.danger-edge.left {
+  left: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(220, 30, 30, 0.8),
+    rgba(220, 30, 30, 0)
+  );
+}
+
+.danger-edge.right {
+  right: 0;
+  background: linear-gradient(
+    270deg,
+    rgba(220, 30, 30, 0.8),
+    rgba(220, 30, 30, 0)
+  );
+}
+
+.danger-edge.active {
+  opacity: 1;
+}
+
 /* ---------- top-left: distance ---------- */
 
 .hud-topleft {
@@ -116,19 +155,62 @@ canvas {
 
 .tilt-gauge {
   margin-top: 6px;
-  width: 84px;
-  height: 44px;
+  box-sizing: border-box;
+  width: 120px;
+  height: 64px;
   border: 2px solid rgba(232, 220, 200, 0.35);
   border-radius: 8px;
   display: grid;
-  place-items: center;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.35);
-  transition: border-color 0.15s linear;
+  transition: border-color 0.15s linear, box-shadow 0.15s linear;
+}
+
+/* Flanks hold the per-side weight pips (one cell per capacity unit,
+   brute = 2). column-reverse fills the first unit at the bottom like a
+   level gauge; fixed cell sizes keep the centered silhouette in place. */
+.tilt-flank {
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: center;
+  gap: 2px;
+}
+
+/* Weight pip cell: hollow until occupied by an attached zombie's units. */
+.wpip {
+  flex: 0 1 12px;
+  min-height: 6px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.5);
+}
+
+.wpip.full {
+  background: linear-gradient(#ffe9a8, #d9a441);
+  box-shadow: 0 0 4px rgba(255, 209, 102, 0.55);
+}
+
+/* Critical band tints occupied cells red — free via the gauge's class. */
+.tilt-gauge.critical .wpip.full {
+  background: linear-gradient(#ff6a5a, #c81e1e);
+  box-shadow: 0 0 5px rgba(220, 40, 40, 0.7);
 }
 
 .tilt-gauge.dimmed {
   opacity: 0.35;
+}
+
+.tilt-gauge.warn {
+  border-color: rgba(255, 209, 102, 0.9);
+  box-shadow:
+    0 0 12px rgba(255, 180, 40, 0.35),
+    inset 0 0 10px rgba(255, 180, 40, 0.18);
 }
 
 .tilt-gauge.critical {
@@ -144,8 +226,8 @@ canvas {
 }
 
 .tilt-car {
-  width: 52px;
-  height: 22px;
+  width: 60px;
+  height: 26px;
   background: linear-gradient(#7a8494, #3d4652);
   clip-path: polygon(
     12% 100%, 20% 42%, 36% 12%, 64% 12%, 80% 42%, 88% 100%
@@ -311,6 +393,54 @@ canvas {
   }
 }
 
+/* ---------- kill-score popups ---------- */
+
+/* Preallocated pool in #hud (CONFIG.hud.popupCount), round-robin reused.
+   Spawn writes --px/--py custom props; every popup-rise keyframe restates
+   that base transform (the streak-pop pattern), so animating never
+   discards the anchor. translate(-50%, -100%) hangs the popup above the
+   victim's projected head. pointer-events: none keeps taps flowing to the
+   fire halves (click-through invariant). Animation lifetime comes from
+   --popup-life, set once on #hud from CONFIG.hud.popupLifeS. */
+.score-popup {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(var(--px, 0px), var(--py, 0px)) translate(-50%, -100%);
+  font-family: "ZhMono", monospace;
+  font-size: clamp(16px, 3.6vw, 26px);
+  font-weight: 800;
+  color: #ffd166;
+  text-shadow: 0 0 12px rgba(255, 120, 40, 0.8), 0 2px 0 #000;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.score-popup.live {
+  animation: popup-rise var(--popup-life, 1s) ease-out forwards;
+}
+
+@keyframes popup-rise {
+  0% {
+    opacity: 0;
+    transform: translate(var(--px, 0px), var(--py, 0px))
+      translate(-50%, -100%) translateY(12px) scale(0.9);
+  }
+  14% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--px, 0px), var(--py, 0px))
+      translate(-50%, -100%) translateY(-46px) scale(1.05);
+  }
+}
+
 /* ---------- center toasts ---------- */
 
 .toasts {
@@ -332,8 +462,23 @@ canvas {
   letter-spacing: 6px;
   color: #ffd166;
   text-shadow: 0 0 18px rgba(255, 150, 40, 0.8), 0 2px 0 #000;
+  /* Centers the .toast-sub line within the shrink-wrapped toast block
+     (no visual effect on the text-only toast). */
+  text-align: center;
   animation: toast-in 0.4s cubic-bezier(0.2, 1.6, 0.4, 1),
     toast-out 0.35s ease-in 0.85s forwards;
+}
+
+/* Second line of the level-up banner (e.g. "RUNNERS UNLOCKED"): smaller
+   and softer than the main line, still warm-lit for legibility. */
+.toast-sub {
+  margin-top: 6px;
+  font-family: "ZhMono", monospace;
+  font-weight: 700;
+  font-size: clamp(14px, 3.2vw, 20px);
+  letter-spacing: 4px;
+  color: #ffe9a8;
+  text-shadow: 0 0 10px rgba(255, 150, 40, 0.6), 0 1px 0 #000;
 }
 
 .toast::before,
@@ -485,7 +630,7 @@ canvas {
 .new-best {
   font-family: "ZhMono", monospace;
   font-weight: 800;
-  font-size: 22px;
+  font-size: 24px;
   letter-spacing: 4px;
   color: #1a0a05;
   background: linear-gradient(#ffe9a8, #ffd166);
@@ -507,7 +652,8 @@ canvas {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(130px, 180px));
+  /* Widened with the 34px stat values so a 6-char value never wraps. */
+  grid-template-columns: repeat(2, minmax(140px, 200px));
   gap: 12px 26px;
   padding: 18px 26px;
   border: 1px solid rgba(232, 220, 200, 0.22);
@@ -524,24 +670,24 @@ canvas {
 
 .stat-label {
   font-family: "ZhMono", monospace;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 3px;
-  color: rgba(232, 220, 200, 0.6);
+  color: rgba(232, 220, 200, 0.78);
 }
 
 .stat-value {
   font-family: "ZhMono", monospace;
-  font-size: 27px;
+  font-size: 34px;
   font-weight: 800;
-  color: #e8dcc8;
-  text-shadow: 0 1px 0 #000;
+  color: #f7f0df;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.85), 0 1px 0 #000;
 }
 
 .retry-hint {
   font-family: "ZhMono", monospace;
   font-size: 13px;
   letter-spacing: 2px;
-  color: rgba(232, 220, 200, 0.55);
+  color: rgba(232, 220, 200, 0.7);
 }
 
 /* ---------- coach overlay ---------- */

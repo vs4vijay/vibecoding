@@ -122,12 +122,18 @@ export class World {
 
   constructor(scene: THREE.Scene) {
     // --- Shared materials, built once and reused by the pool ---
-    const asphaltMat = new THREE.MeshLambertMaterial({ color: 0x1c1c20 });
+    const asphaltMat = new THREE.MeshLambertMaterial({
+      color: CONFIG.world.roadAlbedo,
+    });
     const dashMat = new THREE.MeshBasicMaterial({ color: 0xc9b47a });
-    const railMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
+    const railMat = new THREE.MeshLambertMaterial({
+      color: CONFIG.world.railAlbedo,
+    });
     const poleMat = new THREE.MeshLambertMaterial({ color: 0x181820 });
     const headMat = new THREE.MeshBasicMaterial({ color: 0xffb347 });
-    const sandMat = new THREE.MeshLambertMaterial({ color: 0x4a3421 });
+    const sandMat = new THREE.MeshLambertMaterial({
+      color: CONFIG.world.sandAlbedo,
+    });
 
     // --- Per-material merged segment geometry (built once) ---
     // Every segment is identical, so each material's pieces are baked into a

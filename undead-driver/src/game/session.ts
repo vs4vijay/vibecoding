@@ -43,7 +43,13 @@ export type GameEvents = {
   ];
   scrape: [side: "left" | "right"];
   shot: [side: "left" | "right"];
-  kill: [type: string, viaScrape: boolean];
+  kill: [
+    type: string,
+    viaScrape: boolean,
+    points: number,
+    worldX: number,
+    worldZ: number,
+  ];
   /** A leaper landed and latched onto the hull. */
   attach: [side: "left" | "right"];
 };
@@ -506,11 +512,11 @@ export class Session {
     wx: number,
     wz: number,
   ): void {
-    this.scoring.registerKill(
+    const points = this.scoring.registerKill(
       type as "walker" | "runner" | "brute",
       viaScrape,
     );
-    this.emitter.emit("kill", type, viaScrape);
+    this.emitter.emit("kill", type, viaScrape, points, wx, wz);
     this.render?.shake?.(0.1);
     this.view?.fx.burst(wx, 0.9, wz, FX_RED, 10);
   }

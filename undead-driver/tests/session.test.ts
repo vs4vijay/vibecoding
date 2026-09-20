@@ -3,6 +3,7 @@ import { Emitter } from "../src/core/emitter";
 import type { GameEvents } from "../src/game/session";
 import { CONFIG } from "../src/config";
 import { Session } from "../src/game/session";
+import type { Zombie } from "../src/game/zombies";
 /** Minimal headless input double satisfying the Session input contract. */
 function fakeInput() {
   const fireCbs: Array<(side: "left" | "right") => void> = [];
@@ -189,6 +190,45 @@ describe("Session", () => {
     }
     expect(session.gun.right.mag).toBe(CONFIG.gun.magSize);
     expect(session.gun.right.reloadT).toBeLessThanOrEqual(0);
+  });
+
+  it("kill event carries [type, viaScrape, points, worldX, worldZ]", () => {
+    const { session, emitter, input } = makeSession(42);
+    const kills = vi.fn();
+    emitter.on("kill", kills);
+    session.startRun();
+
+    // Force a walker into leap range straight ahead: it telegraphs, leaps,
+    // and latches onto the hull. Gun fire then kills it (viaScrape = false).
+    session.zombies.spawnLurker("walker", 0.6, session.carZValue + 4);
+    let target: Zombie | null = null;
+    expect(
+      runUntil(session, () => {
+        target = null;
+        for (const z of session.zombies.all()) {
+          if (z.state === "clinging") target = z;
+        }
+        return target !== null;
+      }),
+    ).toBe(true);
+    const victim = target!;
+
+    // Fire the screen-side gun that maps to the victim's world flank
+    // (screen-left pull fires the world-right gun; the chase cam mirrors x).
+    input.fire(victim.side === "right" ? "left" : "right");
+    session.update(1 / 60);
+
+    expect(kills).toHaveBeenCalledTimes(1);
+    // Fresh-kill payload: streak 1 -> multiplier x1, so points are the
+    // walker's base value; wx/wz are the death coords held by the victim.
+    expect(kills.mock.calls[0]).toEqual([
+      "walker",
+      false,
+      CONFIG.zombies.walker.points,
+      victim.x,
+      victim.z,
+    ]);
+    expect(session.scoring.kills).toBe(1);
   });
 
   it("screen-right steer moves the car toward world -x (camera mirrors x)", () => {

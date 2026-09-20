@@ -6,15 +6,15 @@ const DEATH_TUMBLE_S = 1;
 /** Sink depth reached at the end of the death tumble. */
 const DEAD_SINK_M = 1.6;
 const BRUTE_SCALE = 1.5;
-const HEAD_COLOR = 0x93a06a;
-const SKIN_COLOR = 0x5f7350;
+const HEAD_COLOR = 0xc7cda6;
+const SKIN_COLOR = 0xa8b58a;
 const HEAD_MAT = new THREE.MeshLambertMaterial({ color: HEAD_COLOR });
 const SKIN_MAT = new THREE.MeshLambertMaterial({ color: SKIN_COLOR });
 
 const TORSO_COLOR: Record<ZombieType, number> = {
-  walker: 0x6b7d4f,
-  runner: 0x7d8b4a,
-  brute: 0x8b3a2e,
+  walker: 0x86a05a,
+  runner: 0xc9d16a,
+  brute: 0x9b4232,
 };
 
 /** Per-type torso tints applied via instanceColor (white base material). */
@@ -29,6 +29,28 @@ const TORSO_MAT = new THREE.MeshLambertMaterial({ color: 0xffffff });
 /** Shared scratch transform for composing instance matrices. */
 const SCRATCH = new THREE.Object3D();
 
+// Telegraph ground flash: one flat additive disc per zombie slot under a
+// telegraphing zombie. Same fade trick as the obstacle warning rings — with
+// AdditiveBlending the per-instance color IS the fade (black adds nothing),
+// so the pulse just lerps black→red across the telegraph window; no
+// per-instance opacity. Radius covers the zombie's footprint plus margin.
+const FLASH_TELEGRAPH_S = 0.35; // mirrors ZombiePool's internal TELEGRAPH_S
+const FLASH_BASE_R = 0.9;
+/** Ground y, just above the road to avoid z-fighting (rings sit at 0.04). */
+const FLASH_Y = 0.05;
+const FLASH_RED = 0xff2418; // same warning red as the obstacle rings
+const FLASH_RED_COLOR = new THREE.Color(FLASH_RED);
+const FLASH_BLACK_COLOR = new THREE.Color(0x000000);
+/** Shared scratch color for the black→red pulse lerp (no allocation). */
+const FLASH_SCRATCH_COLOR = new THREE.Color();
+/** Scale range across the telegraph window: swells as the leap approaches. */
+const FLASH_SCALE_MIN = 0.8;
+const FLASH_SCALE_MAX = 1.3;
+/** Brightness floor so the flash pops in immediately, then intensifies. */
+const FLASH_BRIGHT_MIN = 0.3;
+/** Parking depth under the road, matching the zombie parts' hidden slot. */
+const FLASH_PARK_Y = -50;
+
 type Slot = {
   torso: THREE.InstancedMesh;
   head: THREE.InstancedMesh;
@@ -37,12 +59,14 @@ type Slot = {
 
 export type ZombieBindings = {
   slots: Slot[];
+  flash: THREE.InstancedMesh;
 };
 
 /**
  * Four InstancedMesh body parts (torso/head/armL/armR), `capacity` instances
- * each: the whole horde costs 4 draw calls instead of 4 per zombie. Slot i
- * owns instance i of every part; poses compose into a scratch Object3D.
+ * each: the whole horde costs 4 draw calls instead of 4 per zombie. Plus one
+ * InstancedMesh of telegraph ground-flash discs (5th draw call). Slot i owns
+ * instance i of every part; poses compose into a scratch Object3D.
  */
 export function createZombieMeshes(
   scene: THREE.Scene,
@@ -68,15 +92,37 @@ export function createZombieMeshes(
       arms: [armLMesh, armRMesh],
     });
   }
-  return { slots };
+
+  // One InstancedMesh of flat telegraph flash discs, disc i bound to slot i.
+  // Additive blending: instance color carries the whole pulse (black is
+  // invisible), depthWrite off so discs never punch holes in the road glow.
+  const flashGeo = new THREE.CircleGeometry(FLASH_BASE_R, 24);
+  flashGeo.rotateX(-Math.PI / 2); // lie flat on the road
+  const flashMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff, // instance color multiplies through
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const flash = new THREE.InstancedMesh(flashGeo, flashMat, capacity);
+  flash.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  flash.frustumCulled = false; // instances span the visible band
+  for (let i = 0; i < capacity; i++) {
+    parkFlash(flash, i);
+    flash.setColorAt(i, FLASH_BLACK_COLOR); // allocates the instanceColor buffer
+  }
+  scene.add(flash);
+
+  return { slots, flash };
 }
 
 /**
  * Per-frame binding: compose every active zombie's part matrices from pool
  * state. Poses: cling — arms up gripping the car flank with a per-slot bob;
- * telegraph — squash to y*0.7; dead — tumble rotation and sink below the
- * road; else upright sprint lean with pumping arms. Slot i owns instance i
- * of each part (stable indices); unused instances park under the road.
+ * telegraph — squash to y*0.7 with a swelling ground flash beneath; dead —
+ * tumble rotation and sink below the road; else upright sprint lean with
+ * pumping arms. Slot i owns instance i of each part (stable indices); unused
+ * instances park under the road.
  */
 export function updateZombieMeshes(
   bindings: ZombieBindings,
@@ -86,29 +132,83 @@ export function updateZombieMeshes(
   nowS: number,
 ): void {
   const parts = bindings.slots[0];
+  const flash = bindings.flash;
   let used = 0;
   for (const z of zombies.allSlots()) {
     if (!z.active) continue;
     bind(parts, z, carX, carZ, nowS, used);
+    bindFlash(flash, z, used);
     used++;
   }
   // Unused instances park under the road.
   for (let i = used; i < bindings.slots.length; i++) {
     hideInstance(parts, i);
+    parkFlash(flash, i);
   }
   for (const m of [parts.torso, parts.head, parts.arms[0], parts.arms[1]]) {
     m.instanceMatrix.needsUpdate = true;
   }
   if (parts.torso.instanceColor) parts.torso.instanceColor.needsUpdate = true;
+  flash.instanceMatrix.needsUpdate = true;
+  if (flash.instanceColor) flash.instanceColor.needsUpdate = true;
 }
 
 /** Hides every zombie; called on run reset. */
 export function resetZombieMeshes(bindings: ZombieBindings): void {
   const parts = bindings.slots[0];
-  for (let i = 0; i < bindings.slots.length; i++) hideInstance(parts, i);
+  const flash = bindings.flash;
+  for (let i = 0; i < bindings.slots.length; i++) {
+    hideInstance(parts, i);
+    parkFlash(flash, i);
+    flash.setColorAt(i, FLASH_BLACK_COLOR);
+  }
   for (const m of [parts.torso, parts.head, parts.arms[0], parts.arms[1]]) {
     m.instanceMatrix.needsUpdate = true;
   }
+  flash.instanceMatrix.needsUpdate = true;
+  if (flash.instanceColor) flash.instanceColor.needsUpdate = true;
+}
+
+/** Park flash instance i under the road so it never shades a pixel. */
+function parkFlash(flash: THREE.InstancedMesh, i: number): void {
+  SCRATCH.position.set(0, FLASH_PARK_Y, 0);
+  SCRATCH.rotation.set(0, 0, 0);
+  SCRATCH.scale.set(1, 1, 1);
+  SCRATCH.updateMatrix();
+  flash.setMatrixAt(i, SCRATCH.matrix);
+}
+
+/**
+ * Pose flash instance i for zombie z: a ground disc that ignites at the start
+ * of the telegraph and swells/brightens toward the leap, then vanishes the
+ * moment the state leaves telegraphing (parked + black = invisible under
+ * additive blending). Telegraphing zombies hold road-space x (only clingers
+ * are car-relative), so no offset is needed.
+ */
+function bindFlash(
+  flash: THREE.InstancedMesh,
+  z: Zombie,
+  index: number,
+): void {
+  if (z.state !== "telegraphing") {
+    parkFlash(flash, index);
+    flash.setColorAt(index, FLASH_BLACK_COLOR);
+    return;
+  }
+  // 0 at telegraph entry → 1 at leap launch (clamped; the pool flips to
+  // "leaping" inside the same step that carries telegraphT past the window).
+  const t = Math.min(z.telegraphT / FLASH_TELEGRAPH_S, 1);
+  const r = FLASH_BASE_R * (FLASH_SCALE_MIN + (FLASH_SCALE_MAX - FLASH_SCALE_MIN) * t);
+  const bright = FLASH_BRIGHT_MIN + (1 - FLASH_BRIGHT_MIN) * t;
+  SCRATCH.position.set(z.x, FLASH_Y, z.z);
+  SCRATCH.rotation.set(0, 0, 0);
+  SCRATCH.scale.set(r, 1, r);
+  SCRATCH.updateMatrix();
+  flash.setMatrixAt(index, SCRATCH.matrix);
+  flash.setColorAt(
+    index,
+    FLASH_SCRATCH_COLOR.lerpColors(FLASH_BLACK_COLOR, FLASH_RED_COLOR, bright),
+  );
 }
 
 /** Park instance i below the road so it never shades a pixel. */

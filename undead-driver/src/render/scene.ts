@@ -13,7 +13,7 @@ export type GameScene = {
  */
 const isPortrait = (aspect: number): boolean => aspect < 1;
 
-/** Renderer, dusk-lit scene with fog + gradient sky dome, and the game camera. */
+/** Renderer, dusk-lit scene with fog + gradient sky dome, a sun plus rear-fill light, and the game camera. */
 export function createGameScene(canvas: HTMLCanvasElement): GameScene {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setClearColor(new THREE.Color(CONFIG.world.duskColor), 1);
@@ -26,7 +26,11 @@ export function createGameScene(canvas: HTMLCanvasElement): GameScene {
   renderer.setSize(window.innerWidth, window.innerHeight, true);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x2a160c, 60, 160);
+  scene.fog = new THREE.Fog(
+    CONFIG.world.fogColor,
+    CONFIG.world.fogNear,
+    CONFIG.world.fogFar,
+  );
 
   // Inverted sky dome with a vertex-color gradient: zenith 0x1a1030 -> horizon 0xff7733.
   // Parented to the camera so the dome always surrounds the player; fog disabled so
@@ -54,10 +58,23 @@ export function createGameScene(canvas: HTMLCanvasElement): GameScene {
       depthWrite: false,
     }),
   );
-  scene.add(new THREE.HemisphereLight(0x33224a, 0x140b06, 0.7));
-  const sun = new THREE.DirectionalLight(0xff8844, 1.2);
+  scene.add(
+    new THREE.HemisphereLight(0x33224a, 0x140b06, CONFIG.world.hemisphereIntensity),
+  );
+  const sun = new THREE.DirectionalLight(0xff8844, CONFIG.world.sunIntensity);
   sun.position.set(-40, 18, -60);
   scene.add(sun);
+
+  // Rear-fill: dim warm light from behind the car (the chase-camera side) so
+  // the camera-facing rear hull isn't a silhouette. No shadows — the renderer
+  // runs no shadow pass.
+  const rearFill = new THREE.DirectionalLight(
+    0x664433,
+    CONFIG.world.rearFillIntensity,
+  );
+  rearFill.position.set(0, 6, -30);
+  rearFill.castShadow = false;
+  scene.add(rearFill);
 
   const camera = new THREE.PerspectiveCamera(
     // Aspect-compensated base: portrait gets a wider lens so the road stays

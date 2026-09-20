@@ -1,6 +1,6 @@
 import "./style.css";
 import { CONFIG } from "./config";
-import { scoreForLevel } from "./game/difficulty";
+import { scoreForLevel, unlocksForLevel } from "./game/difficulty";
 import { Emitter } from "./core/emitter";
 import { InputController } from "./core/input";
 import { AudioEngine, type AudioState } from "./core/audio";
@@ -9,9 +9,22 @@ import { Session, type GameEvents } from "./game/session";
 import { CameraRig } from "./render/cameraRig";
 import { createGameScene } from "./render/scene";
 import { World } from "./render/world";
-import { Hud, type HudState } from "./ui/hud";
+import { Hud, unlockSubtitle, type HudState } from "./ui/hud";
+import { formatPopupText } from "./ui/popups";
+import { worldToScreen, type ScreenPos } from "./ui/worldToScreen";
 import { Coach } from "./ui/coach";
 import { Menus, coachPending, markCoachSeen } from "./ui/menus";
+
+/** Dev-only verification hook (openspec D11); absent in prod builds. */
+declare global {
+  interface Window {
+    __zh?: {
+      rendererInfo(): number;
+      debugAddWeight(side: "left" | "right", w: number): void;
+      carZ(): number;
+    };
+  }
+}
 
 export function boot(): void {
   if (typeof document === "undefined") return;
@@ -46,6 +59,19 @@ export function boot(): void {
   });
   rig.resetDeathCam();
 
+  // Dev-only verification hook (openspec D11): the headless verification pass
+  // reads the draw-call budget, forces hull weight for the tilt-danger shots
+  // (the true-to-sim path — Session.addWeight persists through the per-step
+  // absolute weight sync) and samples car z. import.meta.env.DEV dead-code
+  // eliminates this from prod builds; no gameplay API surface added.
+  if (import.meta.env.DEV) {
+    window.__zh = {
+      rendererInfo: () => renderer.info.render.calls,
+      debugAddWeight: (side, w) => session.addWeight(side, w),
+      carZ: () => session.carZValue,
+    };
+  }
+
   // Persistence snapshot for this session.
   let bestScore = load("bestScore", 0);
   let bestDist = load("bestDist", 0);
@@ -78,7 +104,32 @@ export function boot(): void {
   emitter.on("scrape", () => audio.scrape());
   emitter.on("levelUp", (level) => {
     audio.levelUpSting();
-    hud.toast(`LEVEL ${level}`);
+    // undefined when the level unlocks nothing → banner is level-only.
+    hud.toast(`LEVEL ${level}`, unlockSubtitle(unlocksForLevel(level)));
+  });
+  // Kill-score popups: project the victim's ~head height (y ≈ 1.6 m) to CSS
+  // px and hand the HUD a preallocated position. The handler runs
+  // synchronously inside the same fixed step as the kill — registerKill
+  // updates scoring.multiplier before emitting — so reading it here IS the
+  // at-kill value. Camera matrices are one render old (events fire before
+  // renderer.render); imperceptible for a ~1 s popup. Off-screen kills
+  // clamp to the viewport edge, keeping burst feedback bounded.
+  const killScreen: ScreenPos = { x: 0, y: 0, offscreen: false };
+  emitter.on("kill", (_type, _viaScrape, points, worldX, worldZ) => {
+    worldToScreen(
+      worldX,
+      1.6,
+      worldZ,
+      camera,
+      canvas.clientWidth,
+      canvas.clientHeight,
+      killScreen,
+    );
+    hud.popup(
+      killScreen.x,
+      killScreen.y,
+      formatPopupText(points, session.scoring.multiplier),
+    );
   });
   emitter.on("gameOver", () => rig.armDeathCam());
 
@@ -150,6 +201,7 @@ export function boot(): void {
     levelProgress: 0,
     tilt: 0,
     imbalance: 0,
+    weights: { left: 0, right: 0 },
     mag: { left: CONFIG.gun.magSize, right: CONFIG.gun.magSize },
     reload01: { left: 1, right: 1 },
     multiplier: 1,
@@ -223,6 +275,11 @@ export function boot(): void {
     out.levelProgress = Number.isFinite(progress) ? progress : 1;
     out.tilt = -s.car.tilt; // gauge is screen-space; world tilt mirrors on screen
     out.imbalance = imbalance;
+    // World-space capacity units (capacity = CONFIG.car.capacityPerSide per
+    // side). Unlike mag/tilt these are NOT screen-flipped here; any display
+    // that mirrors sides does so at render time.
+    out.weights.left = s.car.leftWeight;
+    out.weights.right = s.car.rightWeight;
     // Ammo rows are screen-space: the on-screen-left gun is gun.right (world).
     out.mag.left = s.gun.right.mag;
     out.mag.right = s.gun.left.mag;

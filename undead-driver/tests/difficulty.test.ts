@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { knobsForLevel, levelForScore, scoreForLevel } from "../src/game/difficulty";
+import { knobsForLevel, levelForScore, scoreForLevel, unlocksForLevel } from "../src/game/difficulty";
 
 describe("difficulty", () => {
   it("score thresholds follow 400*(n-1)^1.35 and grow monotonically", () => {
@@ -26,5 +26,12 @@ describe("difficulty", () => {
     expect(capped.leapAccuracy).toBe(0.95);
     expect(capped.cruiseSpeed).toBe(52);
     expect(capped.obstacleDensity).toBe(1);
+  });
+  it("unlocksForLevel reports only types whose unlockLevel equals the level", () => {
+    expect(unlocksForLevel(1)).toEqual([]);
+    expect(unlocksForLevel(2)).toEqual(["runner"]);
+    expect(unlocksForLevel(3)).toEqual(["brute"]);
+    expect(unlocksForLevel(4)).toEqual([]);
+    expect(unlocksForLevel(10)).toEqual([]);
   });
 });

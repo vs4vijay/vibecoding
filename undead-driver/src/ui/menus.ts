@@ -12,7 +12,8 @@ export const HOW_TO_LINES = [
 
 /**
  * Title menu: logo, PLAY, HOW TO panel, best score and mute toggle.
- * Owns the game-over card too (cause, stats grid, NEW BEST badge, RETRY).
+ * Owns the game-over card too (cause, stats grid, NEW BEST badge, RETRY);
+ * tapping anywhere on the card restarts, alongside RETRY and Space/Enter.
  */
 export class Menus {
   private readonly root: HTMLElement;
@@ -32,9 +33,18 @@ export class Menus {
     this.t.play.addEventListener("click", () => {
       for (const cb of this.playCbs) cb();
     });
-    this.o.retry.addEventListener("click", () => {
-      for (const cb of this.playCbs) cb();
+    this.o.retry.addEventListener("click", (e) => {
+      // RETRY sits inside the over-menu root; stop the bubble so the
+      // tap-anywhere handler below can't fire a second restart.
+      e.stopPropagation();
+      this.restart();
     });
+    // Tap/click anywhere on the game-over card restarts, exactly as if
+    // RETRY was pressed. Safe to attach permanently: the wrap is
+    // display:none outside game-over, so it can only receive clicks while
+    // visible, and the title menu is a separate root (its clicks never
+    // reach this element).
+    this.o.wrap.addEventListener("click", () => this.restart());
 
     this.root.append(this.t.wrap, this.o.wrap);
     this.t.wrap.classList.add("hidden");
@@ -45,6 +55,11 @@ export class Menus {
   onPlay(cb: () => void): () => void {
     this.playCbs.add(cb);
     return () => void this.playCbs.delete(cb);
+  }
+
+  /** Single restart path shared by RETRY and the tap-anywhere card handler. */
+  private restart(): void {
+    for (const cb of this.playCbs) cb();
   }
 
   showTitle(best: number): void {
@@ -141,7 +156,7 @@ function buildOver(): OverRefs {
   newBest.textContent = "NEW BEST!";
   const stats = elDiv("stats-grid");
   const hint = elDiv("retry-hint");
-  hint.textContent = "SPACE / ENTER to retry";
+  hint.textContent = "TAP OR PRESS SPACE TO RETRY";
   const retry = mkBtn("retry-btn", "RETRY");
   wrap.append(cause, newBest, stats, retry, hint);
   return { wrap, cause, newBest, stats, retry };
