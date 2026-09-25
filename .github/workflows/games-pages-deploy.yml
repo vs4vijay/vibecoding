@@ -16,6 +16,7 @@
   #   /asphalt-outlaws/   <- asphalt-outlaws/dist (vite base "./", subpath-safe)
   #   /vulture-pass/      <- vulture-pass/dist   (vite base "./", subpath-safe)
   #   /laser-snail/       <- laser-snail/dist    (vite base "./", subpath-safe)
+  #   /neon-rush/         <- neon-rush/dist      (no bundler by design — build is a pure staging copy)
 
 name: Deploy Games to Pages
 
@@ -32,6 +33,7 @@ on:
       - "asphalt-outlaws/**"
       - "vulture-pass/**"
       - "laser-snail/**"
+      - "neon-rush/**"
       - "games-hub/**"
       - ".github/workflows/games-pages-deploy.yml"
   workflow_dispatch:
@@ -128,6 +130,15 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
+      - name: Build neon-rush
+        working-directory: neon-rush
+        # no bundler by design (neon-rush/ARCHITECTURE.md): ES modules + import
+        # map + vendored three.js — `build` is a pure staging copy (dist = game),
+        # already subpath-safe via relative paths.
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
       - name: Stage site (preserve per-game URL prefixes)
         run: |
           mkdir -p site
@@ -141,6 +152,7 @@ jobs:
           cp -r asphalt-outlaws/dist site/asphalt-outlaws
           cp -r vulture-pass/dist site/vulture-pass
           cp -r laser-snail/dist site/laser-snail
+          cp -r neon-rush/dist site/neon-rush
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

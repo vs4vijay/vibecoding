@@ -1,0 +1,19 @@
+{
+  "name": "neon-rush",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NEON RUSH: Hyperdrome — synthwave endless runner. three.js r170 vendored, ES modules + import map, no bundler by design (see ARCHITECTURE.md).",
+  "scripts": {
+    "dev": "python3 tools/server.py",
+    "build": "rm -rf dist && mkdir -p dist && cp -r index.html src public vendor dist/",
+    "preview": "python3 tools/server.py",
+    "test": "node tools/shot.mjs --set menu,run,death --out /tmp/shots_nr"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.1"
+  }
+}

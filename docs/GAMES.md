@@ -19,6 +19,7 @@ without breaking the others.
 | Asphalt Outlaws | <https://vs4vijay.github.io/vibecoding/asphalt-outlaws/> | [`asphalt-outlaws/`](../asphalt-outlaws) | TS strict · Vite 5 · Canvas2D · WebAudio | bun test |
 | Vulture Pass | <https://vs4vijay.github.io/vibecoding/vulture-pass/> | [`vulture-pass/`](../vulture-pass) | JavaScript, Vite, three.js, WebAudio | node units + headless-browser suites |
 | Laser Snail | <https://vs4vijay.github.io/vibecoding/laser-snail/> | [`laser-snail/`](../laser-snail) | TS strict · Vite 6 · three.js | vitest (272, incl. render-constants guard) |
+| NEON RUSH | <https://vs4vijay.github.io/vibecoding/neon-rush/> | [`neon-rush/`](../neon-rush) | JavaScript ES modules · three.js r170 (vendored, no build step) | Playwright harness (tools/) |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
 status): [`subway-surfers/`](../subway-surfers).

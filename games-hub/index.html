@@ -203,6 +203,15 @@
     --ink:#081118;
     --marquee-bg:#0a1224;
   }
+  .cab--neon-rush{
+    --accent:#00f0ff;
+    --accent-soft:rgba(0,240,255,.13);
+    --accent-line:rgba(0,240,255,.4);
+    --genre:#ff2bd6;
+    --label:#9adcf5;
+    --ink:#021018;
+    --marquee-bg:#0b0518;
+  }
 
   .cab__marquee{
     position:relative;
@@ -408,7 +417,7 @@
 <header class="hero">
 
 
-  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 8 cabinets online · 1 runs locally</p>
+  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 10 cabinets online · 1 runs locally</p>
   <h1 class="hero__title">Vibecoding <span class="hero__hollow">Arcade</span></h1>
   <p class="hero__sub">Browser games built with AI — procedural everything, zero assets, no installs. <strong>Click a cabinet and play.</strong></p>
 </header>
@@ -812,6 +821,56 @@
             <p class="cab__keys"><kbd>←</kbd>/<kbd>→</kbd> or <kbd>A</kbd>/<kbd>D</kbd> steer · <kbd>Z</kbd>/<kbd>Space</kbd> fire · <kbd>Esc</kbd> pause</p>
           </div>
           <a class="play" href="https://vs4vijay.github.io/vibecoding/laser-snail/" aria-label="Play Laser Snail">
+            <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
+            Play
+          </a>
+        </div>
+      </article>
+    </li>
+    <li>
+      <article class="cab cab--neon-rush" aria-labelledby="cab-neon-rush-title">
+        <div class="cab__marquee">
+          <svg class="motif" viewBox="0 0 120 100" width="148" height="123" role="img" aria-label="Synthwave sun over a neon grid emblem for NEON RUSH" focusable="false">
+            <defs>
+              <radialGradient id="glowNR" cx="50%" cy="50%" r="62%">
+                <stop offset="0%" stop-color="#00f0ff" stop-opacity=".22"/>
+                <stop offset="100%" stop-color="#00f0ff" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="120" height="100" fill="url(#glowNR)"/>
+            <circle cx="60" cy="38" r="19" fill="#ff2bd6"/>
+            <g fill="#0b0518">
+              <rect x="39" y="34" width="42" height="2.4"/>
+              <rect x="41" y="40" width="38" height="3"/>
+              <rect x="44" y="47" width="32" height="3.8"/>
+            </g>
+            <g stroke="#00f0ff" fill="none" stroke-linecap="round">
+              <line x1="4" y1="62" x2="116" y2="62" stroke-width="2.2"/>
+              <g stroke-width="1.5" opacity=".7">
+                <line x1="60" y1="62" x2="46" y2="100"/>
+                <line x1="60" y1="62" x2="74" y2="100"/>
+                <line x1="60" y1="62" x2="22" y2="100"/>
+                <line x1="60" y1="62" x2="98" y2="100"/>
+                <line x1="60" y1="62" x2="0" y2="94"/>
+                <line x1="60" y1="62" x2="120" y2="94"/>
+              </g>
+              <g stroke-width="1.5" opacity=".5">
+                <line x1="47" y1="70" x2="73" y2="70"/>
+                <line x1="37" y1="80" x2="83" y2="80"/>
+                <line x1="24" y1="92" x2="96" y2="92"/>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <div class="cab__body">
+          <p class="cab__genre">Run · Shift · Outrun</p>
+          <h2 class="cab__title" id="cab-neon-rush-title">NEON RUSH</h2>
+          <p class="cab__desc">Synthwave endless runner — three lanes at full sprint while the phase bar rewrites the rules mid-run: flight, drift, hopper, stack, orb. Implants that really work, shield charges, and a 250-coin revive keep the run alive.</p>
+          <div class="cab__panel">
+            <span class="cab__panel-label">Controls</span>
+            <p class="cab__keys"><kbd>←</kbd>/<kbd>→</kbd> move · <kbd>↑</kbd>/<kbd>Space</kbd> jump · <kbd>↓</kbd> slide · <kbd>P</kbd> pause</p>
+          </div>
+          <a class="play" href="https://vs4vijay.github.io/vibecoding/neon-rush/" aria-label="Play NEON RUSH">
             <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
             Play
           </a>
