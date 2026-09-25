@@ -1,0 +1,393 @@
+{
+  "id": 8,
+  "name": "Blind Crests",
+  "length": 3776.28,
+  "cruiseSpeed": 50,
+  "controlPoints": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      3,
+      -158.1
+    ],
+    [
+      55,
+      9,
+      -316.2
+    ],
+    [
+      120,
+      20,
+      -474.3
+    ],
+    [
+      90,
+      26,
+      -632.4
+    ],
+    [
+      0,
+      14,
+      -790.5
+    ],
+    [
+      -90,
+      5,
+      -944
+    ],
+    [
+      -145,
+      8,
+      -1097.4
+    ],
+    [
+      -120,
+      18,
+      -1255.5
+    ],
+    [
+      -35,
+      24,
+      -1409
+    ],
+    [
+      60,
+      12,
+      -1562.4
+    ],
+    [
+      130,
+      6,
+      -1715.9
+    ],
+    [
+      110,
+      14,
+      -1874
+    ],
+    [
+      25,
+      22,
+      -2032.1
+    ],
+    [
+      -75,
+      10,
+      -2190.2
+    ],
+    [
+      -140,
+      4,
+      -2343.6
+    ],
+    [
+      -120,
+      12,
+      -2501.7
+    ],
+    [
+      -40,
+      20,
+      -2659.8
+    ],
+    [
+      55,
+      8,
+      -2817.9
+    ],
+    [
+      125,
+      16,
+      -2976
+    ],
+    [
+      100,
+      22,
+      -3134.1
+    ],
+    [
+      20,
+      10,
+      -3292.2
+    ],
+    [
+      -60,
+      4,
+      -3441
+    ]
+  ],
+  "features": [
+    {
+      "type": "packageArc",
+      "at": 140,
+      "lane": -2.5,
+      "toLane": 2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "whiteRing",
+      "at": 300
+    },
+    {
+      "type": "slug",
+      "at": 400,
+      "lane": 0
+    },
+    {
+      "type": "redRing",
+      "at": 620,
+      "lane": 3
+    },
+    {
+      "type": "gap",
+      "at": 700,
+      "width": 46,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 800,
+      "lane": -2.5,
+      "toLane": 2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "asteroid",
+      "at": 910,
+      "lane": -4
+    },
+    {
+      "type": "asteroid",
+      "at": 916,
+      "lane": 0
+    },
+    {
+      "type": "redRing",
+      "at": 1000,
+      "lane": -3
+    },
+    {
+      "type": "gap",
+      "at": 1080,
+      "width": 48,
+      "jumpPod": true
+    },
+    {
+      "type": "yellowRing",
+      "at": 1150
+    },
+    {
+      "type": "slug",
+      "at": 1180,
+      "lane": 2.5
+    },
+    {
+      "type": "whiteRing",
+      "at": 1270
+    },
+    {
+      "type": "packageArc",
+      "at": 1360,
+      "lane": 0,
+      "toLane": 2.5,
+      "count": 5,
+      "span": 80
+    },
+    {
+      "type": "slug",
+      "at": 1470,
+      "lane": 3
+    },
+    {
+      "type": "slug",
+      "at": 1498,
+      "lane": -3
+    },
+    {
+      "type": "redRing",
+      "at": 1580,
+      "lane": 0
+    },
+    {
+      "type": "gap",
+      "at": 1660,
+      "width": 50,
+      "jumpPod": true
+    },
+    {
+      "type": "yellowRing",
+      "at": 1760
+    },
+    {
+      "type": "asteroid",
+      "at": 1840,
+      "lane": 0
+    },
+    {
+      "type": "asteroid",
+      "at": 1846,
+      "lane": 4
+    },
+    {
+      "type": "slug",
+      "at": 1930,
+      "lane": -2
+    },
+    {
+      "type": "package",
+      "at": 2000,
+      "lane": 0
+    },
+    {
+      "type": "package",
+      "at": 2025,
+      "lane": 0
+    },
+    {
+      "type": "redRing",
+      "at": 2080,
+      "lane": -3
+    },
+    {
+      "type": "gap",
+      "at": 2160,
+      "width": 52,
+      "jumpPod": true
+    },
+    {
+      "type": "heart",
+      "at": 2260,
+      "lane": -2
+    },
+    {
+      "type": "packageArc",
+      "at": 2340,
+      "lane": -2.5,
+      "toLane": 2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "gap",
+      "at": 2450,
+      "width": 42,
+      "jumpPod": true
+    },
+    {
+      "type": "asteroid",
+      "at": 2560,
+      "lane": -4
+    },
+    {
+      "type": "asteroid",
+      "at": 2566,
+      "lane": 0
+    },
+    {
+      "type": "slug",
+      "at": 2660,
+      "lane": 0
+    },
+    {
+      "type": "redRing",
+      "at": 2680,
+      "lane": 3.5
+    },
+    {
+      "type": "gap",
+      "at": 2760,
+      "width": 54,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 2860,
+      "lane": 2.5,
+      "toLane": -2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "whiteRing",
+      "at": 2970
+    },
+    {
+      "type": "yellowRing",
+      "at": 3050
+    },
+    {
+      "type": "asteroid",
+      "at": 3130,
+      "lane": 3.5
+    },
+    {
+      "type": "slug",
+      "at": 3158,
+      "lane": 0
+    },
+    {
+      "type": "asteroid",
+      "at": 3240,
+      "lane": -3.5
+    },
+    {
+      "type": "package",
+      "at": 3310,
+      "lane": 0
+    },
+    {
+      "type": "package",
+      "at": 3335,
+      "lane": 0
+    },
+    {
+      "type": "redRing",
+      "at": 3360,
+      "lane": -3
+    },
+    {
+      "type": "gap",
+      "at": 3440,
+      "width": 56,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 3540,
+      "lane": -2.5,
+      "toLane": 0,
+      "count": 5,
+      "span": 80
+    },
+    {
+      "type": "whiteRing",
+      "at": 3600
+    },
+    {
+      "type": "slug",
+      "at": 3630,
+      "lane": 2.5
+    },
+    {
+      "type": "heart",
+      "at": 3680,
+      "lane": 2
+    },
+    {
+      "type": "package",
+      "at": 3740,
+      "lane": 0
+    },
+    {
+      "type": "package",
+      "at": 3765,
+      "lane": 0
+    }
+  ]
+}

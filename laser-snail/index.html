@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#05060f" />
+    <title>Laser Snail</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2305060f'/%3E%3Ccircle cx='14' cy='17' r='8' fill='none' stroke='%234ef3ff' stroke-width='2.4'/%3E%3Ccircle cx='14' cy='17' r='3.2' fill='none' stroke='%234ef3ff' stroke-width='1.6'/%3E%3Cpath d='M4 26 C10 22 20 22 27 25' fill='none' stroke='%234ef3ff' stroke-width='2.6' stroke-linecap='round'/%3E%3Cpath d='M25 24 L24.6 17' stroke='%234ef3ff' stroke-width='1.8' stroke-linecap='round'/%3E%3Ccircle cx='24.5' cy='15.5' r='1.6' fill='%23ff4fd8'/%3E%3Cpath d='M26 14.5 L31 12.5' stroke='%23ff4fd8' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #05060f;
+      }
+      #app {
+        width: 100%;
+        height: 100%;
+      }
+      canvas {
+        display: block;
+      }
+      .webgl-fallback {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        text-align: center;
+        font-family: system-ui, sans-serif;
+        color: #9adcf5;
+        padding: 0 1.5rem;
+      }
+      .webgl-fallback h1 {
+        margin: 0 0 0.75rem;
+        font-size: clamp(1.8rem, 5vw, 3rem);
+        letter-spacing: 0.35em;
+        color: #4ef3ff;
+        text-shadow:
+          0 0 12px rgba(78, 243, 255, 0.8),
+          0 0 42px rgba(78, 243, 255, 0.4);
+      }
+      .webgl-fallback p {
+        margin: 0;
+        max-width: 34rem;
+        line-height: 1.5;
+        color: #8b93b8;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

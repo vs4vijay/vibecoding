@@ -1,0 +1,427 @@
+{
+  "id": 9,
+  "name": "Gauntlet Gate",
+  "length": 3887.31,
+  "cruiseSpeed": 54,
+  "controlPoints": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      2,
+      -161.5
+    ],
+    [
+      -55,
+      7,
+      -327.8
+    ],
+    [
+      -120,
+      13,
+      -494
+    ],
+    [
+      -95,
+      18,
+      -660.2
+    ],
+    [
+      -10,
+      14,
+      -821.8
+    ],
+    [
+      80,
+      8,
+      -983.2
+    ],
+    [
+      145,
+      4,
+      -1144.8
+    ],
+    [
+      120,
+      10,
+      -1306.2
+    ],
+    [
+      35,
+      16,
+      -1467.8
+    ],
+    [
+      -65,
+      20,
+      -1629.2
+    ],
+    [
+      -135,
+      14,
+      -1790.8
+    ],
+    [
+      -115,
+      8,
+      -1952.2
+    ],
+    [
+      -30,
+      12,
+      -2113.8
+    ],
+    [
+      65,
+      17,
+      -2275.2
+    ],
+    [
+      135,
+      11,
+      -2436.8
+    ],
+    [
+      115,
+      6,
+      -2598.2
+    ],
+    [
+      30,
+      10,
+      -2759.8
+    ],
+    [
+      -60,
+      15,
+      -2921.2
+    ],
+    [
+      -130,
+      9,
+      -3082.8
+    ],
+    [
+      -110,
+      5,
+      -3244.2
+    ],
+    [
+      -35,
+      9,
+      -3405.8
+    ],
+    [
+      45,
+      13,
+      -3567.2
+    ]
+  ],
+  "features": [
+    {
+      "type": "packageArc",
+      "at": 140,
+      "lane": -2.5,
+      "toLane": 2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "whiteRing",
+      "at": 280
+    },
+    {
+      "type": "slug",
+      "at": 380,
+      "lane": 0
+    },
+    {
+      "type": "asteroid",
+      "at": 470,
+      "lane": -3.5
+    },
+    {
+      "type": "slug",
+      "at": 498,
+      "lane": 0.2
+    },
+    {
+      "type": "packageArc",
+      "at": 560,
+      "lane": 2.5,
+      "toLane": -2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "redRing",
+      "at": 612,
+      "lane": 3
+    },
+    {
+      "type": "gap",
+      "at": 700,
+      "width": 46,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 790,
+      "lane": -2.5,
+      "toLane": 2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "asteroid",
+      "at": 900,
+      "lane": 0
+    },
+    {
+      "type": "asteroid",
+      "at": 906,
+      "lane": 4
+    },
+    {
+      "type": "redRing",
+      "at": 992,
+      "lane": -3
+    },
+    {
+      "type": "gap",
+      "at": 1080,
+      "width": 48,
+      "jumpPod": true
+    },
+    {
+      "type": "yellowRing",
+      "at": 1150
+    },
+    {
+      "type": "slug",
+      "at": 1180,
+      "lane": 2.5
+    },
+    {
+      "type": "asteroid",
+      "at": 1208,
+      "lane": -4
+    },
+    {
+      "type": "asteroid",
+      "at": 1250,
+      "lane": 3.5
+    },
+    {
+      "type": "whiteRing",
+      "at": 1300
+    },
+    {
+      "type": "packageArc",
+      "at": 1360,
+      "lane": 0,
+      "toLane": 2.5,
+      "count": 5,
+      "span": 80
+    },
+    {
+      "type": "gap",
+      "at": 1460,
+      "width": 50,
+      "jumpPod": true
+    },
+    {
+      "type": "slug",
+      "at": 1560,
+      "lane": -3
+    },
+    {
+      "type": "slug",
+      "at": 1588,
+      "lane": 3
+    },
+    {
+      "type": "package",
+      "at": 1650,
+      "lane": 0
+    },
+    {
+      "type": "package",
+      "at": 1675,
+      "lane": 0
+    },
+    {
+      "type": "heart",
+      "at": 1700,
+      "lane": 2
+    },
+    {
+      "type": "redRing",
+      "at": 1752,
+      "lane": -3
+    },
+    {
+      "type": "gap",
+      "at": 1840,
+      "width": 52,
+      "jumpPod": true
+    },
+    {
+      "type": "yellowRing",
+      "at": 1940
+    },
+    {
+      "type": "asteroid",
+      "at": 2020,
+      "lane": 0
+    },
+    {
+      "type": "asteroid",
+      "at": 2026,
+      "lane": 4
+    },
+    {
+      "type": "package",
+      "at": 2060,
+      "lane": 0
+    },
+    {
+      "type": "slug",
+      "at": 2110,
+      "lane": -2.5
+    },
+    {
+      "type": "asteroid",
+      "at": 2150,
+      "lane": -3
+    },
+    {
+      "type": "gap",
+      "at": 2220,
+      "width": 52,
+      "jumpPod": true
+    },
+    {
+      "type": "asteroid",
+      "at": 2300,
+      "lane": 0
+    },
+    {
+      "type": "asteroid",
+      "at": 2306,
+      "lane": 4
+    },
+    {
+      "type": "slug",
+      "at": 2400,
+      "lane": 0
+    },
+    {
+      "type": "packageArc",
+      "at": 2440,
+      "lane": -2.5,
+      "toLane": 2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "heart",
+      "at": 2560,
+      "lane": -2
+    },
+    {
+      "type": "redRing",
+      "at": 2600,
+      "lane": 3.5
+    },
+    {
+      "type": "gap",
+      "at": 2690,
+      "width": 54,
+      "jumpPod": true
+    },
+    {
+      "type": "slug",
+      "at": 2790,
+      "lane": 0
+    },
+    {
+      "type": "asteroid",
+      "at": 2880,
+      "lane": 3.5
+    },
+    {
+      "type": "slug",
+      "at": 2908,
+      "lane": -0.5
+    },
+    {
+      "type": "gap",
+      "at": 2980,
+      "width": 54,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 3080,
+      "lane": 2.5,
+      "toLane": -2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "redRing",
+      "at": 3140,
+      "lane": -3.5
+    },
+    {
+      "type": "redRing",
+      "at": 3212,
+      "lane": 0
+    },
+    {
+      "type": "gap",
+      "at": 3300,
+      "width": 56,
+      "jumpPod": true
+    },
+    {
+      "type": "asteroid",
+      "at": 3400,
+      "lane": -3.5
+    },
+    {
+      "type": "slug",
+      "at": 3428,
+      "lane": 0.2
+    },
+    {
+      "type": "asteroid",
+      "at": 3470,
+      "lane": 2
+    },
+    {
+      "type": "redRing",
+      "at": 3532,
+      "lane": 2.5
+    },
+    {
+      "type": "gap",
+      "at": 3620,
+      "width": 58,
+      "jumpPod": true
+    },
+    {
+      "type": "whiteRing",
+      "at": 3720
+    },
+    {
+      "type": "package",
+      "at": 3760,
+      "lane": 0
+    }
+  ]
+}

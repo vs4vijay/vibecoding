@@ -1,0 +1,380 @@
+{
+  "id": 7,
+  "name": "Trap Weave",
+  "length": 3506.46,
+  "cruiseSpeed": 47,
+  "controlPoints": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      2,
+      -165
+    ],
+    [
+      -50,
+      6,
+      -330
+    ],
+    [
+      -115,
+      11,
+      -500
+    ],
+    [
+      -90,
+      15,
+      -665
+    ],
+    [
+      -5,
+      12,
+      -825
+    ],
+    [
+      85,
+      8,
+      -985
+    ],
+    [
+      140,
+      5,
+      -1150
+    ],
+    [
+      115,
+      9,
+      -1315
+    ],
+    [
+      30,
+      14,
+      -1475
+    ],
+    [
+      -70,
+      17,
+      -1635
+    ],
+    [
+      -130,
+      12,
+      -1795
+    ],
+    [
+      -110,
+      7,
+      -1955
+    ],
+    [
+      -25,
+      10,
+      -2115
+    ],
+    [
+      70,
+      14,
+      -2275
+    ],
+    [
+      130,
+      10,
+      -2435
+    ],
+    [
+      105,
+      6,
+      -2595
+    ],
+    [
+      20,
+      9,
+      -2755
+    ],
+    [
+      -70,
+      12,
+      -2915
+    ],
+    [
+      -120,
+      8,
+      -3075
+    ],
+    [
+      -60,
+      5,
+      -3230
+    ]
+  ],
+  "features": [
+    {
+      "type": "packageArc",
+      "at": 140,
+      "lane": -2.5,
+      "toLane": 2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "whiteRing",
+      "at": 300
+    },
+    {
+      "type": "slug",
+      "at": 430,
+      "lane": 0
+    },
+    {
+      "type": "packageArc",
+      "at": 520,
+      "lane": 2.5,
+      "toLane": -2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "asteroid",
+      "at": 650,
+      "lane": -3
+    },
+    {
+      "type": "slug",
+      "at": 678,
+      "lane": 3.5
+    },
+    {
+      "type": "package",
+      "at": 730,
+      "lane": 0
+    },
+    {
+      "type": "package",
+      "at": 755,
+      "lane": 0
+    },
+    {
+      "type": "redRing",
+      "at": 780,
+      "lane": 3.5
+    },
+    {
+      "type": "gap",
+      "at": 860,
+      "width": 44,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 960,
+      "lane": -2.5,
+      "toLane": 2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "asteroid",
+      "at": 1080,
+      "lane": 2.5
+    },
+    {
+      "type": "slug",
+      "at": 1108,
+      "lane": 3.8
+    },
+    {
+      "type": "package",
+      "at": 1180,
+      "lane": -1
+    },
+    {
+      "type": "package",
+      "at": 1205,
+      "lane": -1
+    },
+    {
+      "type": "heart",
+      "at": 1250,
+      "lane": -2
+    },
+    {
+      "type": "redRing",
+      "at": 1320,
+      "lane": -3.5
+    },
+    {
+      "type": "gap",
+      "at": 1400,
+      "width": 46,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 1500,
+      "lane": 0,
+      "toLane": 2.5,
+      "count": 5,
+      "span": 80
+    },
+    {
+      "type": "slug",
+      "at": 1600,
+      "lane": 3
+    },
+    {
+      "type": "slug",
+      "at": 1628,
+      "lane": -3
+    },
+    {
+      "type": "whiteRing",
+      "at": 1700
+    },
+    {
+      "type": "asteroid",
+      "at": 1750,
+      "lane": -3.5
+    },
+    {
+      "type": "package",
+      "at": 1810,
+      "lane": 0
+    },
+    {
+      "type": "package",
+      "at": 1835,
+      "lane": 0
+    },
+    {
+      "type": "redRing",
+      "at": 1860,
+      "lane": 2.5
+    },
+    {
+      "type": "gap",
+      "at": 1940,
+      "width": 48,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 2040,
+      "lane": -2.5,
+      "toLane": 0,
+      "count": 5,
+      "span": 80
+    },
+    {
+      "type": "asteroid",
+      "at": 2160,
+      "lane": -2.5
+    },
+    {
+      "type": "slug",
+      "at": 2230,
+      "lane": 0
+    },
+    {
+      "type": "packageArc",
+      "at": 2300,
+      "lane": 2.5,
+      "toLane": 0,
+      "count": 5,
+      "span": 80
+    },
+    {
+      "type": "heart",
+      "at": 2360,
+      "lane": -2
+    },
+    {
+      "type": "redRing",
+      "at": 2400,
+      "lane": -3.5
+    },
+    {
+      "type": "gap",
+      "at": 2480,
+      "width": 50,
+      "jumpPod": true
+    },
+    {
+      "type": "slug",
+      "at": 2580,
+      "lane": 0
+    },
+    {
+      "type": "whiteRing",
+      "at": 2130
+    },
+    {
+      "type": "yellowRing",
+      "at": 2650
+    },
+    {
+      "type": "asteroid",
+      "at": 2680,
+      "lane": -3
+    },
+    {
+      "type": "asteroid",
+      "at": 2860,
+      "lane": 3.5
+    },
+    {
+      "type": "packageArc",
+      "at": 2760,
+      "lane": 0,
+      "toLane": -2.5,
+      "count": 5,
+      "span": 80
+    },
+    {
+      "type": "redRing",
+      "at": 2940,
+      "lane": 0
+    },
+    {
+      "type": "gap",
+      "at": 3020,
+      "width": 52,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 3120,
+      "lane": 2.5,
+      "toLane": -2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "whiteRing",
+      "at": 3240
+    },
+    {
+      "type": "gap",
+      "at": 3280,
+      "width": 48,
+      "jumpPod": true
+    },
+    {
+      "type": "slug",
+      "at": 3390,
+      "lane": -2
+    },
+    {
+      "type": "package",
+      "at": 3430,
+      "lane": 0
+    },
+    {
+      "type": "package",
+      "at": 3455,
+      "lane": 0
+    }
+  ]
+}

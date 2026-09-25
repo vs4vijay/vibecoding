@@ -1,0 +1,463 @@
+{
+  "id": 10,
+  "name": "Postal Apex",
+  "length": 4091.7,
+  "cruiseSpeed": 58,
+  "controlPoints": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      4,
+      -160.7
+    ],
+    [
+      -60,
+      14,
+      -321.3
+    ],
+    [
+      -130,
+      26,
+      -481.9
+    ],
+    [
+      -100,
+      30,
+      -642.6
+    ],
+    [
+      -10,
+      16,
+      -803.2
+    ],
+    [
+      85,
+      6,
+      -963.9
+    ],
+    [
+      155,
+      2,
+      -1124.5
+    ],
+    [
+      130,
+      12,
+      -1285.2
+    ],
+    [
+      40,
+      24,
+      -1445.8
+    ],
+    [
+      -70,
+      30,
+      -1606.5
+    ],
+    [
+      -150,
+      18,
+      -1767.1
+    ],
+    [
+      -125,
+      6,
+      -1927.8
+    ],
+    [
+      -35,
+      2,
+      -2088.4
+    ],
+    [
+      70,
+      12,
+      -2249.1
+    ],
+    [
+      150,
+      24,
+      -2409.8
+    ],
+    [
+      120,
+      30,
+      -2570.4
+    ],
+    [
+      30,
+      18,
+      -2731
+    ],
+    [
+      -70,
+      8,
+      -2891.7
+    ],
+    [
+      -145,
+      4,
+      -3052.3
+    ],
+    [
+      -120,
+      14,
+      -3213
+    ],
+    [
+      -40,
+      26,
+      -3373.6
+    ],
+    [
+      60,
+      20,
+      -3534.3
+    ],
+    [
+      110,
+      10,
+      -3694.9
+    ]
+  ],
+  "features": [
+    {
+      "type": "packageArc",
+      "at": 140,
+      "lane": -2.5,
+      "toLane": 2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "whiteRing",
+      "at": 280
+    },
+    {
+      "type": "slug",
+      "at": 360,
+      "lane": 0
+    },
+    {
+      "type": "redRing",
+      "at": 550,
+      "lane": 3
+    },
+    {
+      "type": "gap",
+      "at": 640,
+      "width": 44,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 730,
+      "lane": -2.5,
+      "toLane": 2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "asteroid",
+      "at": 840,
+      "lane": 0
+    },
+    {
+      "type": "asteroid",
+      "at": 846,
+      "lane": 4
+    },
+    {
+      "type": "slug",
+      "at": 920,
+      "lane": -2.5
+    },
+    {
+      "type": "gap",
+      "at": 1000,
+      "width": 46,
+      "jumpPod": true
+    },
+    {
+      "type": "slug",
+      "at": 1100,
+      "lane": 2.5
+    },
+    {
+      "type": "asteroid",
+      "at": 1128,
+      "lane": -4
+    },
+    {
+      "type": "slug",
+      "at": 1230,
+      "lane": -2
+    },
+    {
+      "type": "whiteRing",
+      "at": 1240
+    },
+    {
+      "type": "redRing",
+      "at": 1270,
+      "lane": 0
+    },
+    {
+      "type": "gap",
+      "at": 1360,
+      "width": 48,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 1460,
+      "lane": 0,
+      "toLane": 2.5,
+      "count": 5,
+      "span": 80
+    },
+    {
+      "type": "asteroid",
+      "at": 1560,
+      "lane": 3.5
+    },
+    {
+      "type": "slug",
+      "at": 1588,
+      "lane": 0
+    },
+    {
+      "type": "gap",
+      "at": 1720,
+      "width": 50,
+      "jumpPod": true
+    },
+    {
+      "type": "slug",
+      "at": 1820,
+      "lane": -3
+    },
+    {
+      "type": "slug",
+      "at": 1848,
+      "lane": 3
+    },
+    {
+      "type": "asteroid",
+      "at": 1880,
+      "lane": -3
+    },
+    {
+      "type": "yellowRing",
+      "at": 1920
+    },
+    {
+      "type": "asteroid",
+      "at": 2000,
+      "lane": 0
+    },
+    {
+      "type": "asteroid",
+      "at": 2006,
+      "lane": 4
+    },
+    {
+      "type": "redRing",
+      "at": 1980,
+      "lane": 2.5
+    },
+    {
+      "type": "gap",
+      "at": 2080,
+      "width": 52,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 2180,
+      "lane": -2.5,
+      "toLane": 2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "asteroid",
+      "at": 2290,
+      "lane": -4
+    },
+    {
+      "type": "asteroid",
+      "at": 2296,
+      "lane": 0
+    },
+    {
+      "type": "asteroid",
+      "at": 2350,
+      "lane": -3
+    },
+    {
+      "type": "slug",
+      "at": 2380,
+      "lane": 0
+    },
+    {
+      "type": "gap",
+      "at": 2440,
+      "width": 54,
+      "jumpPod": true
+    },
+    {
+      "type": "heart",
+      "at": 2540,
+      "lane": -2
+    },
+    {
+      "type": "redRing",
+      "at": 2560,
+      "lane": 0
+    },
+    {
+      "type": "packageArc",
+      "at": 2630,
+      "lane": 2.5,
+      "toLane": -2.5,
+      "count": 6,
+      "span": 100
+    },
+    {
+      "type": "asteroid",
+      "at": 2680,
+      "lane": 3
+    },
+    {
+      "type": "redRing",
+      "at": 2710,
+      "lane": -3
+    },
+    {
+      "type": "gap",
+      "at": 2800,
+      "width": 56,
+      "jumpPod": true
+    },
+    {
+      "type": "slug",
+      "at": 2900,
+      "lane": 2.5
+    },
+    {
+      "type": "asteroid",
+      "at": 2970,
+      "lane": -3.5
+    },
+    {
+      "type": "slug",
+      "at": 2998,
+      "lane": 0.2
+    },
+    {
+      "type": "redRing",
+      "at": 3040,
+      "lane": 3
+    },
+    {
+      "type": "package",
+      "at": 3060,
+      "lane": 0
+    },
+    {
+      "type": "package",
+      "at": 3085,
+      "lane": 0
+    },
+    {
+      "type": "heart",
+      "at": 3095,
+      "lane": -2
+    },
+    {
+      "type": "gap",
+      "at": 3140,
+      "width": 56,
+      "jumpPod": true
+    },
+    {
+      "type": "yellowRing",
+      "at": 3205
+    },
+    {
+      "type": "asteroid",
+      "at": 3240,
+      "lane": 0
+    },
+    {
+      "type": "asteroid",
+      "at": 3246,
+      "lane": -4
+    },
+    {
+      "type": "asteroid",
+      "at": 3290,
+      "lane": 3.5
+    },
+    {
+      "type": "package",
+      "at": 3380,
+      "lane": -2
+    },
+    {
+      "type": "slug",
+      "at": 3330,
+      "lane": 2
+    },
+    {
+      "type": "redRing",
+      "at": 3410,
+      "lane": -3
+    },
+    {
+      "type": "gap",
+      "at": 3500,
+      "width": 58,
+      "jumpPod": true
+    },
+    {
+      "type": "packageArc",
+      "at": 3600,
+      "lane": -2.5,
+      "toLane": 0,
+      "count": 5,
+      "span": 80
+    },
+    {
+      "type": "slug",
+      "at": 3660,
+      "lane": -2
+    },
+    {
+      "type": "whiteRing",
+      "at": 3690
+    },
+    {
+      "type": "redRing",
+      "at": 3770,
+      "lane": 3
+    },
+    {
+      "type": "gap",
+      "at": 3860,
+      "width": 60,
+      "jumpPod": true
+    },
+    {
+      "type": "package",
+      "at": 3950,
+      "lane": 0
+    }
+  ]
+}
