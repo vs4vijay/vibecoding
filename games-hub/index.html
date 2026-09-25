@@ -212,6 +212,15 @@
     --ink:#021018;
     --marquee-bg:#0b0518;
   }
+  .cab--metro-dash{
+    --accent:#ffc94d;
+    --accent-soft:rgba(255,201,77,.13);
+    --accent-line:rgba(255,201,77,.4);
+    --genre:#ff8c42;
+    --label:#ffd9a0;
+    --ink:#0b1526;
+    --marquee-bg:#101b2d;
+  }
   .cab--devils{
     --accent:#ffb24d;
     --accent-soft:rgba(255,178,77,.14);
@@ -914,6 +923,45 @@
             <p class="cab__keys"><kbd>WASD</kbd>/arrows move · <kbd>Space</kbd> jump · <kbd>S</kbd> slide · <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> mode · swipes on touch</p>
           </div>
           <a class="play" href="https://vs4vijay.github.io/vibecoding/devils-highway/" aria-label="Play Devil's Highway">
+            <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
+            Play
+          </a>
+        </div>
+      </article>
+    </li>
+    <li>
+      <article class="cab cab--metro-dash" aria-labelledby="cab-metro-dash-title">
+        <div class="cab__marquee">
+          <svg class="motif" viewBox="0 0 120 100" width="148" height="123" role="img" aria-label="Setting sun over converging subway rails emblem for Metro Dash" focusable="false">
+            <defs>
+              <radialGradient id="glowMD" cx="50%" cy="50%" r="62%">
+                <stop offset="0%" stop-color="#ffc94d" stop-opacity=".22"/>
+                <stop offset="100%" stop-color="#ffc94d" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="120" height="100" fill="url(#glowMD)"/>
+            <circle cx="60" cy="40" r="16" fill="#ff8c42"/>
+            <rect x="0" y="52" width="120" height="48" fill="#101b2d"/>
+            <g stroke="#ffc94d" fill="none" stroke-linecap="round">
+              <line x1="52" y1="55" x2="30" y2="100" stroke-width="2.4"/>
+              <line x1="68" y1="55" x2="90" y2="100" stroke-width="2.4"/>
+              <g stroke-width="1.6" opacity=".65">
+                <line x1="48" y1="63" x2="72" y2="63"/>
+                <line x1="43" y1="74" x2="77" y2="74"/>
+                <line x1="36" y1="88" x2="84" y2="88"/>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <div class="cab__body">
+          <p class="cab__genre">Sprint · Dodge · Outrun the dark</p>
+          <h2 class="cab__title" id="cab-metro-dash-title">METRO DASH</h2>
+          <p class="cab__desc">Endless subway runner with a PBR sheen — dodge oncoming subway cars, vault hazard barriers and roll under signal gantries while the sky drifts from day to sunset to night and the building windows flicker on. Fully procedural, runs offline.</p>
+          <div class="cab__panel">
+            <span class="cab__panel-label">Controls</span>
+            <p class="cab__keys"><kbd>←</kbd>/<kbd>→</kbd> move · <kbd>↑</kbd>/<kbd>Space</kbd> jump · <kbd>↓</kbd> roll · swipes on touch</p>
+          </div>
+          <a class="play" href="https://vs4vijay.github.io/vibecoding/metro-dash/" aria-label="Play METRO DASH">
             <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
             Play
           </a>

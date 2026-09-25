@@ -21,9 +21,11 @@ without breaking the others.
 | Laser Snail | <https://vs4vijay.github.io/vibecoding/laser-snail/> | [`laser-snail/`](../laser-snail) | TS strict · Vite 6 · three.js | vitest (272, incl. render-constants guard) |
 | NEON RUSH | <https://vs4vijay.github.io/vibecoding/neon-rush/> | [`neon-rush/`](../neon-rush) | JavaScript ES modules · three.js r170 (vendored, no build step) | Playwright harness (tools/) |
 | Devil's Highway | <https://vs4vijay.github.io/vibecoding/devils-highway/> | [`devils-highway/`](../devils-highway) | JavaScript ES modules · three.js r172 vendored · no build step | playwright `.qa` probes |
+| Metro Dash | <https://vs4vijay.github.io/vibecoding/metro-dash/> | [`metro-dash/`](../metro-dash) | JavaScript ES modules · three.js r172 (CDN importmap) · no build step · optional Elysia leaderboard API | OpenSpec walkthrough (`openspec/`) |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
-status): [`subway-surfers/`](../subway-surfers).
+status): none — [`dustline/`](../dustline) below is the server-backed
+exception.
 
 [`dustline/`](../dustline) is the registered exception: complete and playable,
 but it needs its own WebSocket game server, so it can't ship as a static Pages
@@ -32,6 +34,12 @@ site — it gets a hub cabinet with a "Run locally" link instead of a Play URL.
 `devils-highway` is the no-build exception: an adopted game (vendored-three
 importmap architecture) deployed by direct copy in the workflow's "Stage site"
 step, exactly like `games-hub/` — no Vite, no `dist/`.
+
+`metro-dash` is the other no-build game: staging-copy build like neon-rush, but
+its three.js comes from the pinned jsdelivr importmap (not vendored) and it
+ships a PWA service worker (network-first same-origin) plus an optional
+Elysia/Postgres leaderboard backend — the deployed static site degrades to
+local-only scores when the API is absent.
 
 Each game folder is self-contained: its own `package.json` + lockfile, its own
 `AGENTS.md` (commands, invariants, gotchas), `README.md` (controls, quickstart,

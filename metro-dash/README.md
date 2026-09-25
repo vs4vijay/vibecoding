@@ -1,17 +1,25 @@
-# 🏃 Subway Surfers Clone
+# 🚇 Metro Dash
 
-A 3D endless runner game inspired by Subway Surfers, built with Three.js, Bun, Elysia, and PostgreSQL.
+A 3D endless runner — sprint down a subway track, dodge trains, vault barriers
+and roll under signal gantries while the sky drifts from day to sunset to
+night. Built with Three.js, Bun, Elysia, and PostgreSQL.
 
 ![Game Screenshot](https://img.shields.io/badge/Three.js-0.172-green) ![Bun](https://img.shields.io/badge/Bun-Latest-brightgreen) ![PWA](https://img.shields.io/badge/PWA-Ready-blue)
+
+**Play online:** <https://vs4vijay.github.io/vibecoding/metro-dash/>
+(static deploy; leaderboards need the optional API backend below)
 
 ## Features
 
 - **3D Endless Runner** - Three.js powered game with lane switching, jumping, and rolling
 - **Procedural World** - Infinite track with randomized obstacles, coins, buildings, and power-ups
-- **3 Lanes** - Dodge trains, jump barriers, roll under overheads
+- **3 Lanes** - Dodge subway cars, jump hazard barriers, roll under signal gantries
+- **Animated Runner** - Procedural run cycle, jump tuck, roll tumble, lane-change lean, landing dust
+- **Living Atmosphere** - Day → sunset → night sky ramp with lit building windows, billboard clouds
+- **PBR Look** - `MeshStandardMaterial` + IBL, textured ballast track bed, curated building facades
 - **Collectibles** - Coins, magnet power-ups, jetpacks
 - **Combo System** - Build multipliers with consecutive actions
-- **Player Profiles** - Persistent stats via PostgreSQL + Drizzle ORM
+- **Player Profiles** - Persistent stats via PostgreSQL + Drizzle ORM (optional; the game falls back to local play)
 - **Achievements** - 16 unlockable achievements (distance, coins, score, combos)
 - **Leaderboard** - Global rankings by high score and total distance
 - **Background Jobs** - Postgres LISTEN/NOTIFY with SKIP LOCKED for async processing
@@ -22,8 +30,8 @@ A 3D endless runner game inspired by Subway Surfers, built with Three.js, Bun, E
 
 | Layer | Technology |
 |-------|-----------|
-| **Game Engine** | Three.js (WebGL) |
-| **Backend** | Bun + Elysia |
+| **Game Engine** | Three.js (WebGL, ES modules + importmap, no bundler) |
+| **Backend** | Bun + Elysia (optional leaderboard API) |
 | **Database** | PostgreSQL 17 |
 | **ORM** | Drizzle ORM |
 | **Validation** | Zod |
@@ -80,7 +88,10 @@ bun run worker       # Runs in background, processes async jobs
 
 ### 8. Open in browser
 
-Navigate to **http://localhost:3001**
+Navigate to **http://localhost:37045**
+(`37045` = METRO DASH in leetspeak: M**3**T**7**R**0** D**4**5**H)
+
+The game also works with no database running — scores are kept locally.
 
 ## Controls
 
@@ -122,14 +133,22 @@ jobs             → Background job queue (LISTEN/NOTIFY)
 ## Project Structure
 
 ```
-subway-surfers/
-├── client/                  # Frontend files
+metro-dash/
+├── client/                  # Frontend files (all paths relative — subpath-safe)
 │   ├── index.html           # Game HTML
+│   ├── manifest.json        # PWA manifest (static, for GitHub Pages)
 │   ├── css/style.css        # UI styles
+│   ├── fonts/               # Bundled Bungee woff2 (OFL)
 │   ├── js/
-│   │   ├── game.js          # Three.js game engine
+│   │   ├── game.js          # Three.js game engine (entry)
+│   │   ├── visual/          # Extracted visual systems
+│   │   │   ├── textures.js  #   procedural CanvasTextures
+│   │   │   ├── props.js     #   buildings, trains, barriers, gantries
+│   │   │   ├── character.js #   rigged player + pose mixer + dust
+│   │   │   ├── atmosphere.js#   day/night ramp, sky, clouds
+│   │   │   └── ui-motion.js #   HUD tweens, flashes, transitions
 │   │   ├── pwa-register.js  # Service Worker registration
-│   │   └── sw.js            # Service Worker (caching)
+│   │   └── sw.js            # Service Worker (network-first, offline cache)
 │   └── icons/               # PWA icons (generated)
 ├── src/
 │   ├── config/

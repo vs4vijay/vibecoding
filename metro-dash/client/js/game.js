@@ -1,4 +1,16 @@
 import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { createAtmosphere } from "./visual/atmosphere.js";
+import { createBuildingMesh, createTrain, createBarrier, createGantry } from "./visual/props.js";
+import { createPlayerRig } from "./visual/character.js";
+import {
+  createBallastTexture,
+  createSleeperTexture,
+  BALLAST_TILE,
+  SLEEPER_TILE,
+} from "./visual/textures.js";
+import { createUiMotion } from "./visual/ui-motion.js";
 
 // ============================================================
 // CONFIG
@@ -19,8 +31,12 @@ const CONFIG = {
   PLAYER_LERP_SPEED: 12,
   COLLISION_RADIUS: 0.8,
   FOV: 65,
+  FOV_MAX: 75,
+  FOV_SMOOTHING: 5,
   CAMERA_HEIGHT: 8,
   CAMERA_DISTANCE: 12,
+  CAM_KICK_DEPTH: 0.9,
+  CAM_KICK_TIME: 0.3,
   FOG_NEAR: 60,
   FOG_FAR: 150,
 };
@@ -59,6 +75,8 @@ let isJumping = false;
 let isRolling = false;
 let rollTimer = 0;
 const ROLL_DURATION = 0.6;
+// Landing camera kick (D8): time remaining in the post-landing dip
+let camKickTimer = 0;
 
 // ============================================================
 // THREE.JS SETUP
@@ -74,11 +92,19 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 1.0;
+
+// Per-frame render stats (fps smoothing: 0.9/0.1 EMA)
+window.__renderStats = { calls: 0, fps: 0, fov: CONFIG.FOV, camY: CONFIG.CAMERA_HEIGHT };
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 scene.fog = new THREE.Fog(0x87ceeb, CONFIG.FOG_NEAR, CONFIG.FOG_FAR);
+
+// Procedural IBL (RoomEnvironment) — ambient/specular env for Standard materials
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+pmrem.dispose();
 
 const camera = new THREE.PerspectiveCamera(
   CONFIG.FOV,
@@ -88,12 +114,14 @@ const camera = new THREE.PerspectiveCamera(
 );
 
 // ============================================================
-// LIGHTING
+// LIGHTING (warm key / cool fill; IBL carries ambient)
 // ============================================================
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.environmentIntensity = 0.7;
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
 scene.add(ambientLight);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+const dirLight = new THREE.DirectionalLight(0xfff2df, 2.2);
 dirLight.position.set(10, 20, 10);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.width = 1024;
@@ -106,111 +134,97 @@ dirLight.shadow.camera.top = 20;
 dirLight.shadow.camera.bottom = -20;
 scene.add(dirLight);
 
-const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x3a7c3f, 0.4);
+const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x8a7f72, 0.5);
 scene.add(hemiLight);
 
 // ============================================================
 // MATERIALS (cached)
 // ============================================================
 const materials = {
-  ground: new THREE.MeshLambertMaterial({ color: 0x6b7280 }),
-  rail: new THREE.MeshLambertMaterial({ color: 0x9ca3af }),
-  building: [
-    new THREE.MeshLambertMaterial({ color: 0x6366f1 }),
-    new THREE.MeshLambertMaterial({ color: 0xec4899 }),
-    new THREE.MeshLambertMaterial({ color: 0x10b981 }),
-    new THREE.MeshLambertMaterial({ color: 0xf59e0b }),
-    new THREE.MeshLambertMaterial({ color: 0xef4444 }),
-    new THREE.MeshLambertMaterial({ color: 0x8b5cf6 }),
-    new THREE.MeshLambertMaterial({ color: 0x3b82f6 }),
-    new THREE.MeshLambertMaterial({ color: 0x14b8a6 }),
-  ],
-  player: new THREE.MeshLambertMaterial({ color: 0x3b82f6 }),
-  playerHead: new THREE.MeshLambertMaterial({ color: 0xfbbf24 }),
-  obstacle: new THREE.MeshLambertMaterial({ color: 0xef4444 }),
-  obstacleBarrier: new THREE.MeshLambertMaterial({ color: 0xf97316 }),
-  coin: new THREE.MeshPhongMaterial({
+  ground: new THREE.MeshStandardMaterial({ map: createBallastTexture(), roughness: 0.95, metalness: 0.0 }),
+  sleeper: new THREE.MeshStandardMaterial({ map: createSleeperTexture(), roughness: 0.9, metalness: 0.0 }),
+  rail: new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.3, metalness: 0.9 }),
+  player: new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.6, metalness: 0.0 }),
+  playerHead: new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.6, metalness: 0.0 }),
+  coin: new THREE.MeshStandardMaterial({
     color: 0xffd700,
     emissive: 0xffa500,
-    emissiveIntensity: 0.3,
-    shininess: 100,
+    emissiveIntensity: 0.15,
+    roughness: 0.2,
+    metalness: 1.0,
   }),
-  magnet: new THREE.MeshPhongMaterial({
+  magnet: new THREE.MeshStandardMaterial({
     color: 0x8b5cf6,
     emissive: 0x7c3aed,
     emissiveIntensity: 0.3,
+    roughness: 0.3,
+    metalness: 0.5,
   }),
-  jetpack: new THREE.MeshPhongMaterial({
+  jetpack: new THREE.MeshStandardMaterial({
     color: 0x06b6d4,
     emissive: 0x0891b2,
     emissiveIntensity: 0.3,
+    roughness: 0.3,
+    metalness: 0.5,
   }),
 };
 
 // ============================================================
-// PLAYER
+// PLAYER (procedural rig with pose mixer, per visual-overhaul D6)
 // ============================================================
-const player = new THREE.Group();
-
-// Body
-const bodyGeo = new THREE.BoxGeometry(0.8, 1.2, 0.5);
-const body = new THREE.Mesh(bodyGeo, materials.player);
-body.position.y = 1.2;
-body.castShadow = true;
-player.add(body);
-
-// Head
-const headGeo = new THREE.SphereGeometry(0.35, 8, 8);
-const head = new THREE.Mesh(headGeo, materials.playerHead);
-head.position.y = 2.1;
-head.castShadow = true;
-player.add(head);
-
-// Backpack
-const packGeo = new THREE.BoxGeometry(0.5, 0.7, 0.3);
-const pack = new THREE.Mesh(packGeo, new THREE.MeshLambertMaterial({ color: 0x1e40af }));
-pack.position.set(0, 1.3, -0.35);
-pack.castShadow = true;
-player.add(pack);
-
-// Sneakers
-const shoeGeo = new THREE.BoxGeometry(0.3, 0.15, 0.45);
-const shoeMat = new THREE.MeshLambertMaterial({ color: 0xff6b35 });
-const leftShoe = new THREE.Mesh(shoeGeo, shoeMat);
-leftShoe.position.set(-0.2, 0.22, 0.05);
-player.add(leftShoe);
-const rightShoe = new THREE.Mesh(shoeGeo, shoeMat);
-rightShoe.position.set(0.2, 0.22, 0.05);
-player.add(rightShoe);
-
-player.position.set(0, 0, 0);
+const rig = createPlayerRig(materials, scene);
+const player = rig.group;
 scene.add(player);
 
 // ============================================================
-// GROUND & TRACK
+// GROUND & TRACK (procedural track bed, per visual-overhaul D4)
 // ============================================================
 const groundGroup = new THREE.Group();
 scene.add(groundGroup);
 
-// Main ground
-const groundGeo = new THREE.PlaneGeometry(
-  CONFIG.LANE_COUNT * CONFIG.LANE_WIDTH + 4,
-  CONFIG.GROUND_LENGTH,
+// Repeats tile an integer number of times along GROUND_LENGTH (80 / 320), so
+// no partial tile shows at the far end.
+const TRACK_WIDTH = CONFIG.LANE_COUNT * CONFIG.LANE_WIDTH + 4;
+const bedZ = CONFIG.GROUND_LENGTH / 2 - 30;
+materials.ground.map.repeat.set(
+  TRACK_WIDTH / BALLAST_TILE.meters,
+  CONFIG.GROUND_LENGTH / BALLAST_TILE.meters,
 );
+
+// Main ground (ballast)
+const groundGeo = new THREE.PlaneGeometry(TRACK_WIDTH, CONFIG.GROUND_LENGTH);
 const ground = new THREE.Mesh(groundGeo, materials.ground);
 ground.rotation.x = -Math.PI / 2;
-ground.position.z = CONFIG.GROUND_LENGTH / 2 - 30;
+ground.position.z = bedZ;
 ground.receiveShadow = true;
 groundGroup.add(ground);
 
-// Lane dividers (rails)
+// Sleeper strip: ties every SLEEPER_TILE.pitch of travel, spanning the rails
+materials.sleeper.map.repeat.set(1, CONFIG.GROUND_LENGTH / SLEEPER_TILE.pitch);
+const sleepers = new THREE.Mesh(
+  new THREE.PlaneGeometry(10, CONFIG.GROUND_LENGTH),
+  materials.sleeper,
+);
+sleepers.rotation.x = -Math.PI / 2;
+sleepers.position.set(0, 0.006, bedZ);
+sleepers.receiveShadow = true;
+groundGroup.add(sleepers);
+
+// Lane dividers (rails): profiled foot/web/head steel merged into one shared
+// geometry — decorative only, gameplay collisions are independent
+const railProfile = mergeGeometries([
+  new THREE.BoxGeometry(0.16, 0.025, CONFIG.GROUND_LENGTH).translate(0, 0.0125, 0),
+  new THREE.BoxGeometry(0.06, 0.115, CONFIG.GROUND_LENGTH).translate(0, 0.0825, 0),
+  new THREE.BoxGeometry(0.08, 0.035, CONFIG.GROUND_LENGTH).translate(0, 0.1575, 0),
+]);
 for (let i = -1; i <= 1; i++) {
-  const railGeo = new THREE.BoxGeometry(0.08, 0.05, CONFIG.GROUND_LENGTH);
-  const rail = new THREE.Mesh(railGeo, materials.rail);
-  rail.position.set(i * CONFIG.LANE_WIDTH / 2 + CONFIG.LANE_WIDTH * 0.5, 0.01, CONFIG.GROUND_LENGTH / 2 - 30);
+  const rail = new THREE.Mesh(railProfile, materials.rail);
+  rail.position.set(i * CONFIG.LANE_WIDTH / 2 + CONFIG.LANE_WIDTH * 0.5, 0.006, bedZ);
+  rail.castShadow = true;
   groundGroup.add(rail);
-  const rail2 = new THREE.Mesh(railGeo, materials.rail);
-  rail2.position.set(i * CONFIG.LANE_WIDTH / 2 - CONFIG.LANE_WIDTH * 0.5, 0.01, CONFIG.GROUND_LENGTH / 2 - 30);
+  const rail2 = new THREE.Mesh(railProfile, materials.rail);
+  rail2.position.set(i * CONFIG.LANE_WIDTH / 2 - CONFIG.LANE_WIDTH * 0.5, 0.006, bedZ);
+  rail2.castShadow = true;
   groundGroup.add(rail2);
 }
 
@@ -220,38 +234,9 @@ for (let i = -1; i <= 1; i++) {
 const buildings = [];
 
 function createBuilding(x, z) {
-  const height = 4 + Math.random() * 12;
-  const width = 2 + Math.random() * 2;
-  const depth = 2 + Math.random() * 2;
-
-  const geo = new THREE.BoxGeometry(width, height, depth);
-  const mat = materials.building[Math.floor(Math.random() * materials.building.length)];
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(x, height / 2, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  const mesh = createBuildingMesh(x, z);
   scene.add(mesh);
-
-  // Windows
-  const windowMat = new THREE.MeshLambertMaterial({
-    color: 0xfde68a,
-    emissive: 0xfde68a,
-    emissiveIntensity: 0.2,
-  });
-  const floors = Math.floor(height / 2);
-  for (let f = 0; f < floors; f++) {
-    const winGeo = new THREE.BoxGeometry(width * 0.15, 0.4, depth * 0.15);
-    const win = new THREE.Mesh(winGeo, windowMat);
-    win.position.set(
-      x + (x > 0 ? -width * 0.45 : width * 0.45),
-      f * 2 + 1.5,
-      z + (Math.random() - 0.5) * depth * 0.5,
-    );
-    scene.add(win);
-    buildings.push({ mesh: win, originalZ: z, type: "window" });
-  }
-
-  buildings.push({ mesh, originalZ: z, type: "building" });
+  buildings.push({ mesh, originalZ: z });
   return mesh;
 }
 
@@ -269,51 +254,25 @@ function createObstacle(z) {
   let mesh;
 
   if (type < 0.4) {
-    // Train (tall obstacle - must dodge left/right)
-    const geo = new THREE.BoxGeometry(2.2, 3.5, 6);
-    mesh = new THREE.Mesh(geo, materials.obstacle);
-    mesh.position.set(x, 1.75, z);
-
-    // Train details
-    const stripeGeo = new THREE.BoxGeometry(2.25, 0.3, 6.05);
-    const stripe = new THREE.Mesh(stripeGeo, materials.obstacleBarrier);
-    stripe.position.set(x, 1.5, z);
-    scene.add(stripe);
-    obstacles.push({ mesh: stripe, type: "obstacle" });
+    // Train (tall obstacle - must dodge left/right) — liveried subway car
+    // (visual-overhaul D5); the group registers as one collision box
+    mesh = createTrain(x, z);
   } else if (type < 0.7) {
-    // Barrier (low obstacle - must jump)
-    const geo = new THREE.BoxGeometry(2.2, 1.2, 0.5);
-    mesh = new THREE.Mesh(geo, materials.obstacleBarrier);
-    mesh.position.set(x, 0.6, z);
-
-    // Support poles
-    const poleGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.2);
-    const poleMat = materials.rail;
-    const pole1 = new THREE.Mesh(poleGeo, poleMat);
-    pole1.position.set(x - 1, 0.6, z);
-    scene.add(pole1);
-    obstacles.push({ mesh: pole1, type: "obstacle" });
-    const pole2 = new THREE.Mesh(poleGeo, poleMat);
-    pole2.position.set(x + 1, 0.6, z);
-    scene.add(pole2);
-    obstacles.push({ mesh: pole2, type: "obstacle" });
+    // Barrier (low obstacle - must jump) — striped work-zone barrier
+    // (visual-overhaul D5); the group's bounds match the old plank box
+    mesh = createBarrier(x, z);
   } else {
-    // Overhead (must roll under)
-    const geo = new THREE.BoxGeometry(2.5, 0.5, 1.5);
-    mesh = new THREE.Mesh(geo, materials.obstacle);
-    mesh.position.set(x, 2.8, z);
+    // Overhead (must roll under) — truss signal gantry (visual-overhaul D5);
+    // the beam assembly registers as the obstacle (origin rides on the beam,
+    // keeping the y > 2.5 roll-under key), posts register separately like
+    // the old support poles did
+    const gantry = createGantry(x, z);
+    mesh = gantry.beam;
 
-    // Support poles
-    const poleGeo = new THREE.CylinderGeometry(0.08, 0.08, 2.8);
-    const poleMat = materials.rail;
-    const pole1 = new THREE.Mesh(poleGeo, poleMat);
-    pole1.position.set(x - 1.1, 1.4, z);
-    scene.add(pole1);
-    obstacles.push({ mesh: pole1, type: "obstacle" });
-    const pole2 = new THREE.Mesh(poleGeo, poleMat);
-    pole2.position.set(x + 1.1, 1.4, z);
-    scene.add(pole2);
-    obstacles.push({ mesh: pole2, type: "obstacle" });
+    for (const post of gantry.posts) {
+      scene.add(post);
+      obstacles.push({ mesh: post, type: "obstacle" });
+    }
   }
 
   mesh.castShadow = true;
@@ -400,13 +359,27 @@ const skyMat = new THREE.ShaderMaterial({
     uniform vec3 bottomColor;
     varying vec3 vWorldPosition;
     void main() {
-      float h = normalize(vWorldPosition).y;
+      // camera-relative: normalizing world position flattens the gradient as
+      // the run leaves the origin (surfaced by the D7 distance ramp)
+      float h = normalize(vWorldPosition - cameraPosition).y;
       gl_FragColor = vec4(mix(bottomColor, topColor, max(h, 0.0)), 1.0);
     }
   `,
 });
 const sky = new THREE.Mesh(skyGeo, skyMat);
 scene.add(sky);
+
+// ============================================================
+// ATMOSPHERE (distance-driven day -> sunset -> night ramp, per D7)
+// ============================================================
+const atmosphere = createAtmosphere({
+  skyMaterial: skyMat,
+  scene,
+  dirLight,
+  hemiLight,
+  ambientLight,
+  camera, // cloud pool recycles relative to the live camera (D7)
+});
 
 // ============================================================
 // INPUT HANDLING
@@ -666,7 +639,9 @@ function updateGame(delta) {
   score += Math.floor(moveDelta * multiplier);
 
   // Lane movement (smooth lerp)
-  const targetX = targetLane * CONFIG.LANE_WIDTH;
+  // Camera looks down +z from behind the player, so world +x renders on screen-left;
+  // negate so lane +1 (ArrowRight / swipe right) moves screen-right.
+  const targetX = -targetLane * CONFIG.LANE_WIDTH;
   playerX = THREE.MathUtils.lerp(playerX, targetX, CONFIG.PLAYER_LERP_SPEED * delta);
   player.position.x = playerX;
 
@@ -679,38 +654,29 @@ function updateGame(delta) {
       playerY = 0;
       playerVelocityY = 0;
       isJumping = false;
+      camKickTimer = CONFIG.CAM_KICK_TIME; // landing camera dip (D8)
     }
   }
 
-  // Rolling
+  // Rolling (rig owns the tumble pose; timer drives the state window)
   if (isRolling) {
     rollTimer -= delta;
-    player.scale.y = 0.4;
-    body.position.y = 0.5;
-    head.position.y = 0.9;
-    pack.position.y = 0.55;
-    leftShoe.position.y = 0.15;
-    rightShoe.position.y = 0.15;
-
     if (rollTimer <= 0) {
       isRolling = false;
-      player.scale.y = 1;
-      body.position.y = 1.2;
-      head.position.y = 2.1;
-      pack.position.y = 1.3;
-      leftShoe.position.y = 0.22;
-      rightShoe.position.y = 0.22;
     }
   }
 
   player.position.y = playerY;
 
-  // Running animation (slight bounce)
-  if (!isJumping && !isRolling) {
-    const bounce = Math.sin(distance * 3) * 0.1;
-    body.position.y = 1.2 + bounce;
-    head.position.y = 2.1 + bounce;
-  }
+  // Rig pose: run cycle / jump tuck / roll tumble / lane lean (D6)
+  rig.update(delta, {
+    isJumping,
+    isRolling,
+    rollProgress: isRolling ? 1 - rollTimer / ROLL_DURATION : 0,
+    grounded: !isJumping,
+    distance,
+    lean: targetLane * CONFIG.LANE_WIDTH - playerX,
+  });
 
   // Camera follow
   const camTargetX = playerX * 0.3;
@@ -719,8 +685,34 @@ function updateGame(delta) {
     camTargetX,
     5 * delta,
   );
-  camera.position.y = CONFIG.CAMERA_HEIGHT + (isJumping ? 3 : 0);
+  // Landing kick (D8): a timed dip below follow height, easing back up over
+  // CAM_KICK_TIME — reads as suspension compression, not a pop.
+  if (camKickTimer > 0) {
+    camKickTimer = Math.max(camKickTimer - delta, 0);
+  }
+  const camKick =
+    -CONFIG.CAM_KICK_DEPTH * Math.sin((Math.PI * camKickTimer) / CONFIG.CAM_KICK_TIME);
+  camera.position.y = CONFIG.CAMERA_HEIGHT + (isJumping ? 3 : 0) + camKick;
   camera.position.z = player.position.z - CONFIG.CAMERA_DISTANCE;
+
+  // Speed-reactive FOV (D8): widen from FOV toward FOV_MAX as speed ramps
+  // base → max, smoothed frame-rate independently to avoid jitter.
+  const speedProgress = THREE.MathUtils.clamp(
+    (speed - CONFIG.PLAYER_SPEED_BASE) / (CONFIG.PLAYER_SPEED_MAX - CONFIG.PLAYER_SPEED_BASE),
+    0,
+    1,
+  );
+  const targetFov = THREE.MathUtils.lerp(CONFIG.FOV, CONFIG.FOV_MAX, speedProgress);
+  const smoothedFov = THREE.MathUtils.lerp(
+    camera.fov,
+    targetFov,
+    1 - Math.exp(-CONFIG.FOV_SMOOTHING * delta),
+  );
+  if (Math.abs(targetFov - camera.fov) > 0.01) {
+    camera.fov = smoothedFov;
+    camera.updateProjectionMatrix();
+  }
+
   camera.lookAt(
     player.position.x * 0.5,
     2,
@@ -735,6 +727,16 @@ function updateGame(delta) {
   // Sky follows
   sky.position.x = camera.position.x;
   sky.position.z = camera.position.z;
+
+  // Distance-driven atmosphere: sky, fog, lights, window emissive (D7)
+  atmosphere.update(distance, { buildings });
+
+  // Track bed follows the player (recycled — static bed ran out past z=170).
+  // The strip spans [player.z - 30, player.z + 170]; shifts snap to
+  // BALLAST_TILE.meters (2.5m = 1 ballast tile = 4 sleeper pitches) so every
+  // move lands on whole repeats of both track textures — pattern never jumps.
+  groundGroup.position.z =
+    Math.floor(player.position.z / BALLAST_TILE.meters) * BALLAST_TILE.meters;
 
   // Spawn & cleanup
   spawnObjects(delta);
@@ -761,22 +763,10 @@ const comboEl = document.getElementById("combo-display");
 const comboValueEl = document.getElementById("combo-value");
 
 function updateHUD() {
-  scoreEl.textContent = score.toLocaleString();
-  coinsEl.textContent = coins.toLocaleString();
-
-  if (multiplier > 1) {
-    multiplierEl.classList.remove("hidden");
-    multiplierValueEl.textContent = multiplier;
-  } else {
-    multiplierEl.classList.add("hidden");
-  }
-
-  if (combo > 1) {
-    comboEl.classList.remove("hidden");
-    comboValueEl.textContent = combo;
-  } else {
-    comboEl.classList.add("hidden");
-  }
+  uiMotion.setScore(score);
+  uiMotion.setCoins(coins);
+  uiMotion.setMultiplier(multiplier);
+  uiMotion.setCombo(combo);
 }
 
 // ============================================================
@@ -785,6 +775,18 @@ function updateHUD() {
 const menuScreen = document.getElementById("menu-screen");
 const gameoverScreen = document.getElementById("gameover-screen");
 const loadingScreen = document.getElementById("loading-screen");
+
+// HUD/screen motion layer (visual-overhaul 7.3): count-up tweens, combo
+// punch, crash flash, screen fades, play vignette.
+const uiMotion = createUiMotion({
+  scoreEl,
+  coinsEl,
+  comboEl,
+  comboValueEl,
+  multiplierEl,
+  multiplierValueEl,
+  screens: { menu: menuScreen, hud: hudEl, gameover: gameoverScreen },
+});
 
 function startGame() {
   const usernameInput = document.getElementById("username-input");
@@ -811,8 +813,9 @@ function startGame() {
       resetGame();
       state = GameState.PLAYING;
       playStartTime = Date.now();
-      menuScreen.classList.add("hidden");
-      hudEl.classList.remove("hidden");
+      uiMotion.hideScreen("menu");
+      uiMotion.showScreen("hud");
+      uiMotion.setPlaying(true);
     });
 }
 
@@ -830,11 +833,7 @@ function resetGame() {
   // Reset player
   player.position.set(0, 0, 0);
   player.scale.set(1, 1, 1);
-  body.position.y = 1.2;
-  head.position.y = 2.1;
-  pack.position.y = 1.3;
-  leftShoe.position.y = 0.22;
-  rightShoe.position.y = 0.22;
+  rig.reset();
 
   // Reset state
   currentLane = 0;
@@ -844,6 +843,7 @@ function resetGame() {
   playerVelocityY = 0;
   isJumping = false;
   isRolling = false;
+  camKickTimer = 0;
   score = 0;
   coins = 0;
   distance = 0;
@@ -861,13 +861,21 @@ function resetGame() {
   // Reset camera
   camera.position.set(0, CONFIG.CAMERA_HEIGHT, -CONFIG.CAMERA_DISTANCE);
   camera.lookAt(0, 2, 15);
+  camera.fov = CONFIG.FOV;
+  camera.updateProjectionMatrix();
+
+  // Reset track bed offset (bed re-centers on the player as the run advances)
+  groundGroup.position.z = 0;
 
   updateHUD();
+  uiMotion.snapCounters(); // retry zeroes instantly — no count-down from the last run
 }
 
 function gameOver() {
   state = GameState.GAME_OVER;
-  hudEl.classList.add("hidden");
+  uiMotion.crashFlash(); // red spike now; the game-over screen fades in under it
+  uiMotion.hideScreen("hud");
+  uiMotion.setPlaying(false);
 
   const playTimeSeconds = (Date.now() - playStartTime) / 1000;
 
@@ -885,7 +893,7 @@ function gameOver() {
     document.getElementById("new-high-score").classList.add("hidden");
   }
 
-  gameoverScreen.classList.remove("hidden");
+  uiMotion.showScreen("gameover");
 
   // Save run to server
   if (playerId && playerId !== "local") {
@@ -919,8 +927,9 @@ function gameOver() {
 
 function showMenu() {
   state = GameState.MENU;
-  gameoverScreen.classList.add("hidden");
-  menuScreen.classList.remove("hidden");
+  uiMotion.hideScreen("gameover");
+  uiMotion.showScreen("menu");
+  uiMotion.setPlaying(false);
 
   // Load player stats
   if (playerId && playerId !== "local") {
@@ -953,11 +962,12 @@ function loadMenuStats(player) {
 // ============================================================
 document.getElementById("play-btn").addEventListener("click", startGame);
 document.getElementById("retry-btn").addEventListener("click", () => {
-  gameoverScreen.classList.add("hidden");
+  uiMotion.hideScreen("gameover");
   resetGame();
   state = GameState.PLAYING;
   playStartTime = Date.now();
-  hudEl.classList.remove("hidden");
+  uiMotion.showScreen("hud");
+  uiMotion.setPlaying(true);
 });
 document.getElementById("menu-btn").addEventListener("click", showMenu);
 document
@@ -996,6 +1006,7 @@ function gameLoop(currentTime) {
     camera.position.x = Math.sin(t * 0.5) * 2;
     camera.position.z = Math.cos(t * 0.3) * -CONFIG.CAMERA_DISTANCE;
     camera.lookAt(0, 2, 15);
+    atmosphere.update(0, { buildings }); // menu always sits at day (D7)
   }
 
   // Rotate coins
@@ -1011,6 +1022,11 @@ function gameLoop(currentTime) {
   });
 
   renderer.render(scene, camera);
+
+  window.__renderStats.calls = renderer.info.render.calls;
+  window.__renderStats.fps = window.__renderStats.fps * 0.9 + (1 / delta) * 0.1;
+  window.__renderStats.fov = Number(camera.fov.toFixed(1));
+  window.__renderStats.camY = camera.position.y;
 }
 
 // ============================================================

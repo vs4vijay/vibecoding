@@ -18,6 +18,7 @@
   #   /laser-snail/       <- laser-snail/dist    (vite base "./", subpath-safe)
   #   /neon-rush/         <- neon-rush/dist      (no bundler by design — build is a pure staging copy)
   #   /devils-highway/    <- devils-highway/     (no build — adopted game, copied verbatim)
+  #   /metro-dash/        <- metro-dash/dist     (no bundler — staging copy, subpath-safe via relative paths)
 
 name: Deploy Games to Pages
 
@@ -36,6 +37,7 @@ on:
       - "laser-snail/**"
       - "neon-rush/**"
       - "devils-highway/**"
+      - "metro-dash/**"
       - "games-hub/**"
       - ".github/workflows/games-pages-deploy.yml"
   workflow_dispatch:
@@ -141,6 +143,14 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
+      - name: Build metro-dash
+        working-directory: metro-dash
+        # no bundler: ES modules + importmap (three.js from CDN) — `build` is a
+        # pure staging copy (client/ → dist/), subpath-safe via relative paths.
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
       - name: Stage site (preserve per-game URL prefixes)
         run: |
           mkdir -p site
@@ -155,6 +165,7 @@ jobs:
           cp -r vulture-pass/dist site/vulture-pass
           cp -r laser-snail/dist site/laser-snail
           cp -r neon-rush/dist site/neon-rush
+          cp -r metro-dash/dist site/metro-dash
           # devils-highway: NO build step — adopted no-build game (vanilla ES
           # modules + importmap, vendored three r172). Copy the public surface
           # verbatim, like games-hub; keep dev/QA folders out of the site.

@@ -16,7 +16,7 @@ const envSchema = z
             "DATABASE_URL must be a valid PostgreSQL connection string (postgresql://...)",
         },
       ),
-    PORT: z.coerce.number().int().min(1024).max(65535).default(3001),
+    PORT: z.coerce.number().int().min(1024).max(65535).default(37045),
     HOST: z.string().default("0.0.0.0"),
     NODE_ENV: z
       .enum(["development", "production", "test"])

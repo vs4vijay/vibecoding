@@ -7,13 +7,13 @@
       content="width=device-width, initial-scale=1.0, user-scalable=no"
     />
     <meta name="theme-color" content="#1a1a2e" />
-    <meta name="description" content="Subway Surfers Clone - 3D Endless Runner" />
+    <meta name="description" content="Metro Dash - 3D Endless Runner" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="manifest" href="/manifest.json" />
-    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
-    <title>Subway Surfers Clone</title>
-    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/png" href="icons/icon-192.png" />
+    <title>Metro Dash</title>
+    <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
     <canvas id="gameCanvas"></canvas>
@@ -26,7 +26,7 @@
           <span id="score-value" class="hud-value">0</span>
         </div>
         <div id="coins-display">
-          <span class="hud-label">🪙</span>
+          <span class="hud-label"><svg class="icon icon-coin" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M8 .5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Zm0 2.7a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6Z"/><circle cx="8" cy="8" r="2.6"/></svg></span>
           <span id="coins-value" class="hud-value">0</span>
         </div>
       </div>
@@ -42,8 +42,8 @@
     <div id="menu-screen">
       <div class="menu-container">
         <h1 class="game-title">
-          <span class="title-sub">SUBWAY</span>
-          <span class="title-main">SURFERS</span>
+          <span class="title-sub">METRO</span>
+          <span class="title-main">DASH</span>
         </h1>
         <div id="username-form">
           <input
@@ -57,13 +57,13 @@
         </div>
         <div id="menu-stats" class="hidden">
           <div class="stat-row">
-            <span>🏆 High Score: <strong id="menu-high-score">0</strong></span>
+            <span><svg class="icon icon-trophy" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6 2h12v7a6 6 0 0 1-12 0V2Z"/><path fill-rule="evenodd" d="M4 3.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/><path fill-rule="evenodd" d="M20 3.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/><rect x="10.4" y="14" width="3.2" height="5"/><rect x="6.5" y="18" width="11" height="3" rx="1"/></svg> High Score: <strong id="menu-high-score">0</strong></span>
           </div>
           <div class="stat-row">
-            <span>🪙 Coins: <strong id="menu-coins">0</strong></span>
+            <span><svg class="icon icon-coin" viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M8 .5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Zm0 2.7a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6Z"/><circle cx="8" cy="8" r="2.6"/></svg> Coins: <strong id="menu-coins">0</strong></span>
           </div>
           <div class="stat-row">
-            <span>🏃 Runs: <strong id="menu-games">0</strong></span>
+            <span><svg class="icon icon-flag" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5 2h2v20H5V2Zm4 2h10l-3 4.5L19 13H9V4Z"/></svg> Runs: <strong id="menu-games">0</strong></span>
           </div>
         </div>
         <div class="controls-hint">
@@ -93,7 +93,7 @@
           </div>
         </div>
         <div id="new-high-score" class="hidden">
-          <span>🏆 NEW HIGH SCORE! 🏆</span>
+          <span><svg class="icon icon-trophy" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6 2h12v7a6 6 0 0 1-12 0V2Z"/><path fill-rule="evenodd" d="M4 3.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/><path fill-rule="evenodd" d="M20 3.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/><rect x="10.4" y="14" width="3.2" height="5"/><rect x="6.5" y="18" width="11" height="3" rx="1"/></svg> NEW HIGH SCORE!</span>
         </div>
         <div class="gameover-buttons">
           <button id="retry-btn" class="btn btn-primary">RETRY</button>
@@ -118,7 +118,7 @@
       }
     }
     </script>
-    <script type="module" src="/js/game.js"></script>
-    <script src="/js/pwa-register.js"></script>
+    <script type="module" src="js/game.js"></script>
+    <script src="js/pwa-register.js"></script>
   </body>
 </html>

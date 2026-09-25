@@ -1,3 +1,14 @@
+/* === Fonts === */
+/* Bungee — SIL Open Font License 1.1, (c) The Bungee Project Authors
+   (https://github.com/djrrb/Bungee), subset to Basic Latin + Latin-1 Supplement. */
+@font-face {
+  font-family: "Bungee";
+  src: url("../fonts/Bungee-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* === Reset & Base === */
 *,
 *::before,
@@ -61,6 +72,7 @@ body {
 }
 
 .hud-value {
+  font-family: "Bungee", "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 28px;
   font-weight: 900;
   color: #fff;
@@ -113,6 +125,28 @@ body {
   }
 }
 
+/* === Inline Icons === */
+/* Indicator icons (coin/trophy/flag) are inline SVG, hand-authored in
+   index.html. fill="currentColor" lets each context pick the color. */
+.icon {
+  display: inline-block;
+  vertical-align: -0.15em;
+  fill: currentColor;
+}
+
+.icon-coin {
+  color: #ffd700;
+}
+
+#coins-display .icon {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+}
+
+.stat-row .icon,
+#new-high-score .icon {
+  margin-right: 2px;
+}
+
 /* === Menu Screen === */
 #menu-screen,
 #gameover-screen {
@@ -139,6 +173,7 @@ body {
 }
 
 .game-title {
+  font-family: "Bungee", "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 48px;
   font-weight: 900;
   line-height: 1;
@@ -254,6 +289,7 @@ body {
 
 /* === Game Over === */
 .gameover-title {
+  font-family: "Bungee", "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 40px;
   font-weight: 900;
   color: #ff4757;
@@ -285,6 +321,7 @@ body {
 }
 
 .stat-value {
+  font-family: "Bungee", "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 24px;
   font-weight: 900;
   color: #fff;
@@ -337,6 +374,91 @@ body {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* === UI Motion (visual-overhaul 7.3) === */
+/* Screen fades: menu/hud/gameover crossfade instead of instant display
+   toggling (elements opt in via the .screen class, applied by ui-motion.js).
+   Visibility flips only AFTER the fade-out completes, so a faded screen can
+   never intercept clicks; on show it restores immediately so the fade-in is
+   visible. Opacity/visibility only — no layout animation. */
+.screen {
+  transition: opacity 0.3s ease;
+}
+
+.screen.screen-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+/* Play vignette: edge darkening while playing (created by ui-motion.js).
+   Sits under the HUD (z 10) and the screens (z 20); the gradient keeps the
+   center clear so HUD text stays legible. */
+#play-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 42%,
+    rgba(0, 0, 0, 0.38) 100%
+  );
+}
+
+/* Damage flash: full-screen red spike on crash (created by ui-motion.js).
+   Above the screens (z 30) so the tint stays visible while the mostly
+   opaque game-over backdrop fades in; fades out in 0.35s. */
+#damage-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 64, 64, 0.32) 0%,
+    rgba(220, 24, 24, 0.6) 100%
+  );
+}
+
+#damage-flash.flash-active {
+  visibility: visible;
+  animation: damage-flash 0.35s ease-out forwards;
+}
+
+@keyframes damage-flash {
+  0% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Combo punch: scale pop on each combo/multiplier increase (re-triggered by
+   ui-motion.js). Keyframes keep the translateX(-50%) centering from the
+   base rules. */
+@keyframes combo-punch {
+  0% {
+    transform: translateX(-50%) scale(1);
+  }
+  35% {
+    transform: translateX(-50%) scale(1.25);
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* ID-qualified so the punch overrides #multiplier-display's infinite pulse
+   while applied. */
+#combo-display.punch,
+#multiplier-display.punch {
+  animation: combo-punch 0.2s ease-out;
 }
 
 /* === Responsive === */

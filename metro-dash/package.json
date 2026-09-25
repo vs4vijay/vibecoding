@@ -1,7 +1,7 @@
 {
-  "name": "subway-surfers",
+  "name": "metro-dash",
   "version": "1.0.0",
-  "description": "A Subway Surfers clone - 3D endless runner game",
+  "description": "Metro Dash - 3D endless runner game",
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/index.ts",

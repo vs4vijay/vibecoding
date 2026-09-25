@@ -32,24 +32,26 @@ const app = new Elysia()
     timestamp: new Date().toISOString(),
   }))
 
-  // PWA manifest
+  // PWA manifest (kept in sync with client/manifest.json, which GitHub
+  // Pages serves when the API backend is not deployed)
   .get("/manifest.json", () => ({
     name: config.appName,
-    short_name: "SubwaySurfers",
-    description: "A Subway Surfers clone - 3D endless runner",
-    start_url: "/",
+    short_name: "Metro Dash",
+    description: "Metro Dash - 3D endless runner",
+    start_url: "./",
+    scope: "./",
     display: "fullscreen",
     background_color: "#1a1a2e",
     theme_color: "#16213e",
     icons: [
       {
-        src: "/icons/icon-192.png",
+        src: "icons/icon-192.png",
         sizes: "192x192",
         type: "image/png",
         purpose: "any maskable",
       },
       {
-        src: "/icons/icon-512.png",
+        src: "icons/icon-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any maskable",
