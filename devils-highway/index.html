@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#0a0c10" />
+<title>DEVIL'S HIGHWAY</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0c10'/%3E%3Cpath d='M16 4 C20 5.5 23 5.8 26 5.5 L26 15 C26 22 21.5 26.4 16 28 C10.5 26.4 6 22 6 15 L6 5.5 C9 5.8 12 5.5 16 4 Z' fill='%23ffb24d'/%3E%3Ctext x='16' y='19.5' font-family='Arial,sans-serif' font-size='10' font-weight='bold' text-anchor='middle' fill='%230a0c10'%3E666%3C/text%3E%3C/svg%3E" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="gl" aria-hidden="true"></canvas>
+
+  <div id="loading" class="screen on">
+    <div class="load-inner">
+      <div class="wordmark">DEVIL'S&nbsp;HIGHWAY</div>
+      <div class="load-bar"><i id="load-fill"></i></div>
+      <div class="load-sub">OUTRUN&nbsp;THE&nbsp;DEAD</div>
+    </div>
+  </div>
+
+  <div id="menu" class="screen">
+    <div class="menu-scrim"></div>
+    <header class="menu-head">
+      <h1 class="title">DEVIL'S&nbsp;HIGHWAY</h1>
+      <div class="subtitle"><span class="rule"></span><span>OUTRUN&nbsp;THE&nbsp;DEAD</span><span class="rule"></span></div>
+    </header>
+    <div class="cards" id="mode-cards">
+      <button class="card" data-mode="run">
+        <span class="card-key">1</span>
+        <span class="card-name">RUN</span>
+        <span class="card-desc">ON FOOT — OUTRUN THE DEAD</span>
+        <span class="card-best">BEST&nbsp;—&nbsp;—</span>
+      </button>
+      <button class="card sel" data-mode="drive">
+        <span class="card-key">2</span>
+        <span class="card-name">DRIVE</span>
+        <span class="card-desc">HORSEPOWER &amp; BROKEN GLASS</span>
+        <span class="card-best">BEST&nbsp;—&nbsp;—</span>
+      </button>
+      <button class="card" data-mode="ride">
+        <span class="card-key">3</span>
+        <span class="card-name">RIDE</span>
+        <span class="card-desc">TWO WHEELS, NO RULES</span>
+        <span class="card-best">BEST&nbsp;—&nbsp;—</span>
+      </button>
+    </div>
+    <footer class="menu-foot">
+      <span id="menu-best">BEST — —</span>
+      <span class="hint">1·2·3 SELECT&nbsp;&nbsp;&nbsp;ENTER START&nbsp;&nbsp;&nbsp;ESC BACK</span>
+    </footer>
+  </div>
+
+  <div id="gameui" class="screen">
+    <button id="back-btn" class="chip">ESC&nbsp;·&nbsp;MENU</button>
+    <div id="mode-label" class="chip chip-dim">DRIVE</div>
+  </div>
+
+  <div id="hud" class="screen">
+    <div class="hud-strip">
+      <div class="hud-stat">
+        <span class="hud-label">DISTANCE</span>
+        <span class="hud-num"><span id="hud-distance">0</span><span class="hud-unit">M</span></span>
+      </div>
+      <span class="hud-sep"></span>
+      <div class="hud-stat">
+        <span class="hud-label">SCORE</span>
+        <span class="hud-num" id="hud-score">0</span>
+      </div>
+      <span class="hud-sep"></span>
+      <div class="hud-stat">
+        <span class="hud-label">PICKUPS</span>
+        <span class="hud-num" id="hud-pickups">0</span>
+      </div>
+    </div>
+    <button id="hud-pause" class="chip hud-chip">PAUSE</button>
+  </div>
+
+  <div id="pause" class="screen">
+    <div class="pause-scrim"></div>
+    <div class="pause-panel">
+      <div class="pause-title">PAUSED</div>
+      <div class="pause-rule"></div>
+      <button id="pause-resume" class="pause-btn primary">RESUME</button>
+      <button id="pause-restart" class="pause-btn">RESTART</button>
+      <button id="pause-quit" class="pause-btn">QUIT&nbsp;·&nbsp;MENU</button>
+      <div class="pause-hint">ESC&nbsp;RESUMES</div>
+    </div>
+  </div>
+
+  <div id="gameover" class="screen">
+    <div class="gameover-scrim"></div>
+    <div class="gameover-panel">
+      <div class="gameover-title">GAME&nbsp;OVER</div>
+      <div class="gameover-rule"></div>
+      <div id="go-flag" class="go-flag">NEW&nbsp;BEST</div>
+      <div class="go-stats">
+        <div class="go-stat">
+          <div class="go-stat-head"><span class="go-label">DISTANCE</span></div>
+          <div class="go-num"><span id="go-distance">0</span><span class="go-unit">M</span></div>
+        </div>
+        <div class="go-stat">
+          <div class="go-stat-head"><span class="go-label">SCORE</span></div>
+          <div class="go-num" id="go-score">0</div>
+        </div>
+        <div class="go-stat">
+          <div class="go-stat-head"><span class="go-label">PICKUPS</span></div>
+          <div class="go-num" id="go-pickups">0</div>
+        </div>
+      </div>
+      <div id="go-best" class="go-best">BEST&nbsp;—&nbsp;—</div>
+      <button id="go-retry" class="pause-btn primary">RETRY</button>
+      <button id="go-menu" class="pause-btn">MENU&nbsp;·&nbsp;ESC</button>
+      <div class="pause-hint">ENTER&nbsp;RETRIES</div>
+    </div>
+  </div>
+
+  <div id="boot-fail">WEBGL UNAVAILABLE</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/three.module.min.js",
+      "three/addons/": "./vendor/three/addons/"
+    }
+  }
+  </script>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

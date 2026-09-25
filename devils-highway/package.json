@@ -1,0 +1,16 @@
+{
+  "name": "devils-highway",
+  "version": "0.1.0",
+  "description": "DEVIL'S HIGHWAY — desert-highway apocalypse PWA (Three.js r172 vendored, no build step)",
+  "type": "module",
+  "scripts": {
+    "serve": "node serve.mjs",
+    "qa": "node serve.mjs & sleep 1 && bun .qa/shot.mjs \"http://127.0.0.1:8123/index.html?qa=1&scene=menu\" .qa/shots/menu.png"
+  },
+  "dependencies": {
+    "three": "^0.172.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0"
+  }
+}

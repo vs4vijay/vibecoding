@@ -20,6 +20,7 @@ without breaking the others.
 | Vulture Pass | <https://vs4vijay.github.io/vibecoding/vulture-pass/> | [`vulture-pass/`](../vulture-pass) | JavaScript, Vite, three.js, WebAudio | node units + headless-browser suites |
 | Laser Snail | <https://vs4vijay.github.io/vibecoding/laser-snail/> | [`laser-snail/`](../laser-snail) | TS strict · Vite 6 · three.js | vitest (272, incl. render-constants guard) |
 | NEON RUSH | <https://vs4vijay.github.io/vibecoding/neon-rush/> | [`neon-rush/`](../neon-rush) | JavaScript ES modules · three.js r170 (vendored, no build step) | Playwright harness (tools/) |
+| Devil's Highway | <https://vs4vijay.github.io/vibecoding/devils-highway/> | [`devils-highway/`](../devils-highway) | JavaScript ES modules · three.js r172 vendored · no build step | playwright `.qa` probes |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
 status): [`subway-surfers/`](../subway-surfers).
@@ -27,6 +28,10 @@ status): [`subway-surfers/`](../subway-surfers).
 [`dustline/`](../dustline) is the registered exception: complete and playable,
 but it needs its own WebSocket game server, so it can't ship as a static Pages
 site — it gets a hub cabinet with a "Run locally" link instead of a Play URL.
+
+`devils-highway` is the no-build exception: an adopted game (vendored-three
+importmap architecture) deployed by direct copy in the workflow's "Stage site"
+step, exactly like `games-hub/` — no Vite, no `dist/`.
 
 Each game folder is self-contained: its own `package.json` + lockfile, its own
 `AGENTS.md` (commands, invariants, gotchas), `README.md` (controls, quickstart,

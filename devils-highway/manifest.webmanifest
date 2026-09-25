@@ -1,0 +1,25 @@
+{
+  "name": "Devil's Highway",
+  "short_name": "DEVIL'S HWY",
+  "description": "Outrun the dead down a desert interstate at dusk — on foot, behind muscle-car glass, or on two wheels. Kill zombies with guns and bumpers; go as far as the road allows.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0c10",
+  "theme_color": "#0a0c10",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

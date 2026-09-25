@@ -1,0 +1,477 @@
+/* DEVIL'S HIGHWAY — UI shell. Charcoal + amber (#ffb24d), condensed uppercase
+   system stack, hairline rules (art-direction bible). No webfonts, no gradients
+   beyond restrained legibility scrims. */
+
+:root {
+  --ink: #0a0c10;
+  --amber: #ffb24d;
+  --bone: #ece7dd;
+  --dim: rgba(236, 231, 221, 0.55);
+  --hairline: rgba(255, 178, 77, 0.26);
+  --hairline-soft: rgba(236, 231, 221, 0.14);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--ink);
+  color: var(--bone);
+  font-family: "Arial Narrow", "Helvetica Neue Condensed", "Liberation Sans Narrow",
+    "Roboto Condensed", "Segoe UI", system-ui, sans-serif;
+  font-stretch: semi-condensed;
+  overflow: hidden;
+  overscroll-behavior: none;
+  /* Gameplay swipes start over the DOM overlays, not just #gl — no page
+     pan/zoom may steal them (html/body already cut scrolling). */
+  touch-action: none;
+}
+
+#gl {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- screens ---------------------------------------------------------- */
+.screen {
+  position: fixed;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+.screen.on { opacity: 1; pointer-events: auto; }
+
+/* ---- loading ---------------------------------------------------------- */
+#loading { display: grid; place-items: center; background: var(--ink); z-index: 30; }
+.load-inner { display: grid; justify-items: center; gap: 18px; }
+.wordmark {
+  /* Sized for the long mark: 15 tracked caps must hold a 320 px viewport. */
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  margin-right: -0.3em; /* optically recenter tracked caps */
+  color: var(--bone);
+}
+.load-bar {
+  width: 240px;
+  height: 2px;
+  background: rgba(236, 231, 221, 0.12);
+  overflow: hidden;
+}
+#load-fill {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: var(--amber);
+  transition: width 0.25s ease;
+}
+.load-sub {
+  font-size: 11px;
+  letter-spacing: 0.6em;
+  margin-right: -0.6em;
+  color: var(--dim);
+}
+
+/* ---- menu ------------------------------------------------------------- */
+#menu {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 7vh 6vw 4.5vh;
+}
+.menu-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(90deg, rgba(7, 9, 12, 0.66) 0%, rgba(7, 9, 12, 0.28) 38%, rgba(7, 9, 12, 0) 62%),
+    linear-gradient(0deg, rgba(7, 9, 12, 0.72) 0%, rgba(7, 9, 12, 0.25) 26%, rgba(7, 9, 12, 0) 46%);
+}
+.menu-head, .cards, .menu-foot { position: relative; z-index: 1; }
+.title {
+  /* "DEVIL'S HIGHWAY" is ~2.1x the old mark's width — scale down so the
+     single line never wraps or clips (6vw band + capped max). */
+  font-size: clamp(34px, 7.6vw, 108px);
+  line-height: 0.94;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--bone);
+}
+.subtitle {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 2.2vh;
+  font-size: clamp(12px, 1.3vw, 16px);
+  letter-spacing: 0.44em;
+  color: var(--amber);
+}
+.subtitle .rule { flex: 0 0 48px; height: 1px; background: var(--hairline); }
+
+.cards {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-self: center;
+}
+.card {
+  min-width: 196px;
+  padding: 16px 20px 14px;
+  /* Night legibility: solid charcoal fill + amber-tinted hairlines instead of
+     backdrop-filter (SwiftShader cost) — cards must hold over black road. */
+  border: 1px solid rgba(255, 178, 77, 0.38);
+  border-left: 2px solid rgba(255, 178, 77, 0.5);
+  background: rgba(12, 14, 18, 0.78);
+  text-align: left;
+  display: grid;
+  gap: 6px;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+.card:hover { border-color: var(--hairline); transform: translateY(-2px); }
+.card.sel {
+  border-color: rgba(255, 178, 77, 0.95);
+  background: rgba(27, 20, 11, 0.86);
+}
+.card-key {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: var(--dim);
+}
+.card.sel .card-key { color: var(--amber); }
+.card-name {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: rgba(236, 231, 221, 0.82);
+  transition: color 0.18s ease;
+}
+.card.sel .card-name { color: var(--amber); }
+.card-desc {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--dim);
+}
+/* Per-mode best line (task 2.5), footer slot under .card-desc: amber
+   hairline rule, footer-matching tracked caps; dim until the card is
+   selected, then amber — the .card-key pattern. */
+.card-best {
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hairline);
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  color: var(--dim);
+  transition: color 0.18s ease;
+}
+.card.sel .card-best { color: var(--amber); }
+
+.menu-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 20px;
+  border-top: 1px solid var(--hairline-soft);
+  padding-top: 14px;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--dim);
+}
+.menu-foot .hint { letter-spacing: 0.22em; }
+
+/* staged reveal */
+#menu .title, #menu .subtitle, #menu .card, #menu .menu-foot {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+#menu.on .title, #menu.on .subtitle, #menu.on .card, #menu.on .menu-foot {
+  opacity: 1;
+  transform: none;
+}
+#menu.on .card:nth-child(1) { transition-delay: 0.12s; }
+#menu.on .card:nth-child(2) { transition-delay: 0.2s; }
+#menu.on .card:nth-child(3) { transition-delay: 0.28s; }
+
+/* ---- game overlay (attract mode) -------------------------------------- */
+#gameui {
+  padding: 18px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.chip {
+  border: 1px solid var(--hairline-soft);
+  background: rgba(9, 11, 15, 0.55);
+  padding: 8px 14px;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--dim);
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+#back-btn:hover { border-color: var(--amber); color: var(--amber); }
+.chip-dim { border-color: transparent; background: none; color: rgba(236, 231, 221, 0.4); }
+/* The chip's affordance (Esc exits to menu) is FALSE during a live run —
+   Esc pauses and "back" is consumed there (2.2 routing) — so a GAME boot
+   hides it (#gameui.live; the HUD PAUSE chip owns that exit). It returns
+   for GAMEOVER, where Esc really does quit to the menu. The mode label
+   keeps its right corner: with the chip hidden it is the only flex child,
+   so space-between would slide it left. */
+#gameui.live #back-btn { display: none; }
+#gameui.live #mode-label { margin-left: auto; }
+
+/* ---- in-run HUD (task 5.1) --------------------------------------------- */
+/* Minimal numerals strip + touch pause chip; placement comes from the
+   mode's hudLayout() class (.hud-run). The root stays pointer-events:none
+   in EVERY state — only the chip re-enables — so the full-viewport root
+   can never eat gameplay swipes. #pause's scrim (later sibling) covers the
+   idle numerals while paused and blocks the chip (2.3 note: HUD chips
+   unclickable under the overlay, which is wanted). Numerals get one
+   restrained charcoal text-shadow for the bright-dusk-sky case (the only
+   legibility scrim — no boxes; the .chip recipe covers the corner). */
+#hud, #hud.on { pointer-events: none; }
+.hud-run .hud-strip {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+}
+.hud-stat {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+}
+.hud-label {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  margin-right: -0.3em; /* optically recenter tracked caps */
+  color: var(--dim);
+  text-shadow: 0 1px 8px rgba(7, 9, 12, 0.55);
+}
+.hud-num {
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--amber);
+  text-shadow: 0 1px 12px rgba(7, 9, 12, 0.6);
+}
+.hud-unit {
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--dim);
+}
+.hud-sep { width: 1px; background: var(--hairline-soft); }
+.hud-run .hud-chip {
+  position: absolute;
+  right: 22px;
+  bottom: 18px;
+  pointer-events: auto;
+}
+
+/* ---- pause overlay ------------------------------------------------------ */
+/* Panel uses the card recipe (solid charcoal fill + amber-tinted hairlines,
+   no backdrop-filter — SwiftShader cost; must hold over dusk AND night). */
+#pause { display: grid; place-items: center; }
+.pause-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 9, 12, 0.55); /* flat legibility dim; world stays readable behind */
+}
+.pause-panel {
+  position: relative;
+  z-index: 1;
+  width: min(320px, 84vw);
+  padding: 30px 30px 18px;
+  border: 1px solid rgba(255, 178, 77, 0.38);
+  border-top: 2px solid rgba(255, 178, 77, 0.5);
+  background: rgba(12, 14, 18, 0.86);
+  display: grid;
+  gap: 10px;
+}
+.pause-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  margin-right: -0.42em; /* optically recenter tracked caps */
+  text-align: center;
+  color: var(--bone);
+}
+.pause-rule { height: 1px; background: var(--hairline); margin: 2px 0 8px; }
+.pause-btn {
+  padding: 12px 18px;
+  border: 1px solid var(--hairline-soft);
+  background: rgba(9, 11, 15, 0.55);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  margin-right: -0.34em;
+  text-align: center;
+  color: var(--dim);
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+.pause-btn:hover { border-color: var(--hairline); color: var(--bone); }
+.pause-btn.primary {
+  border-color: rgba(255, 178, 77, 0.95);
+  background: rgba(27, 20, 11, 0.86);
+  color: var(--amber);
+}
+.pause-hint {
+  margin-top: 6px;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  margin-right: -0.3em;
+  color: var(--dim);
+}
+
+/* staged reveal (menu pattern) */
+#pause .pause-title, #pause .pause-rule, #pause .pause-btn, #pause .pause-hint {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+#pause.on .pause-title, #pause.on .pause-rule, #pause.on .pause-btn, #pause.on .pause-hint {
+  opacity: 1;
+  transform: none;
+}
+#pause.on .pause-btn:nth-of-type(1) { transition-delay: 0.12s; }
+#pause.on .pause-btn:nth-of-type(2) { transition-delay: 0.18s; }
+#pause.on .pause-btn:nth-of-type(3) { transition-delay: 0.24s; }
+#pause.on .pause-hint { transition-delay: 0.3s; }
+
+/* ---- gameover overlay ---------------------------------------------------- */
+/* PAUSED's panel recipe (solid charcoal + amber hairlines, no
+   backdrop-filter) with a stats grid: giant amber numerals over hairline
+   rules; the world stays readable behind the flat scrim (death reveal). */
+#gameover { display: grid; place-items: center; }
+.gameover-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 9, 12, 0.6); /* a touch deeper than pause: stats legibility */
+}
+.gameover-panel {
+  position: relative;
+  z-index: 1;
+  width: min(360px, 88vw);
+  padding: 30px 30px 18px;
+  border: 1px solid rgba(255, 178, 77, 0.38);
+  border-top: 2px solid rgba(255, 178, 77, 0.5);
+  background: rgba(12, 14, 18, 0.86);
+  display: grid;
+  gap: 10px;
+}
+.gameover-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  margin-right: -0.42em; /* optically recenter tracked caps */
+  text-align: center;
+  color: var(--bone);
+}
+.gameover-rule { height: 1px; background: var(--hairline); margin: 2px 0 2px; }
+.go-flag {
+  display: none; /* only set with the stats; never an empty slot */
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  margin-right: -0.42em;
+  color: var(--amber);
+}
+.go-flag.on { display: flex; }
+.go-flag::before, .go-flag::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hairline);
+}
+.go-stat + .go-stat {
+  border-top: 1px solid var(--hairline-soft);
+  padding-top: 8px;
+}
+.go-stat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: var(--dim);
+}
+.go-num {
+  font-size: 44px;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--amber);
+}
+.go-unit {
+  margin-left: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--dim);
+}
+.go-best {
+  border-top: 1px solid var(--hairline-soft);
+  padding-top: 10px;
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: var(--dim);
+  text-align: center;
+}
+
+/* staged reveal (menu/pause pattern) */
+#gameover .gameover-title, #gameover .gameover-rule, #gameover .go-flag,
+#gameover .go-stat, #gameover .go-best, #gameover .pause-btn,
+#gameover .pause-hint {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+#gameover.on .gameover-title, #gameover.on .gameover-rule, #gameover.on .go-flag,
+#gameover.on .go-stat, #gameover.on .go-best, #gameover.on .pause-btn,
+#gameover.on .pause-hint {
+  opacity: 1;
+  transform: none;
+}
+#gameover.on .go-stat:nth-child(1) { transition-delay: 0.1s; }
+#gameover.on .go-stat:nth-child(2) { transition-delay: 0.16s; }
+#gameover.on .go-stat:nth-child(3) { transition-delay: 0.22s; }
+#gameover.on .go-best { transition-delay: 0.28s; }
+#gameover.on .pause-btn:nth-of-type(1) { transition-delay: 0.34s; }
+#gameover.on .pause-btn:nth-of-type(2) { transition-delay: 0.4s; }
+#gameover.on .pause-hint { transition-delay: 0.46s; }
+
+/* webgl failure notice */
+#boot-fail {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  z-index: 40;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  color: var(--dim);
+}

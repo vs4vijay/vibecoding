@@ -346,12 +346,15 @@ single combined workflow (`.github/workflows/games-pages-deploy.yml`).
 | **Vulture Pass** | [vs4vijay.github.io/vibecoding/vulture-pass](https://vs4vijay.github.io/vibecoding/vulture-pass/) | [`vulture-pass/`](./vulture-pass) | JavaScript, Vite, three.js, WebAudio |
 | **Laser Snail** | [vs4vijay.github.io/vibecoding/laser-snail](https://vs4vijay.github.io/vibecoding/laser-snail/) | [`laser-snail/`](./laser-snail) | TypeScript, Vite, three.js |
 | **NEON RUSH** | [vs4vijay.github.io/vibecoding/neon-rush](https://vs4vijay.github.io/vibecoding/neon-rush/) | [`neon-rush/`](./neon-rush) | JavaScript ES modules, three.js r170 (vendored, no build step) |
+| **Devil's Highway** | [vs4vijay.github.io/vibecoding/devils-highway](https://vs4vijay.github.io/vibecoding/devils-highway/) | [`devils-highway/`](./devils-highway) | JavaScript ES modules, three.js r172 vendored, no build step (deployed by direct copy) |
 | **Dustline** | local server — `cd dustline && bun run dev` ([quickstart](./dustline#readme)) | [`dustline/`](./dustline) | TypeScript, Vite, three.js · Bun + Hono + WebSocket |
 
 In development: [`subway-surfers/`](./subway-surfers).
 
 Dustline is the exception to the Pages flow: it needs its own WebSocket game
-server, so it runs locally instead of as a static site.
+server, so it runs locally instead of as a static site. Devil's Highway is the
+no-build exception on Pages: an adopted game (vendored-three importmap
+architecture) that the deploy workflow stages verbatim.
 
 Building a new game? Follow the playbook: [docs/GAMES.md](./docs/GAMES.md) —
 scaffolding conventions, test/verification expectations, the deployment

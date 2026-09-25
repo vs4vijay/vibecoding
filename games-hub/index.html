@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0b12">
-<meta name="description" content="Vibecoding Arcade: browser games built with AI — procedural everything, zero assets, no installs. Play Undead Driver, Tank Racer, Lugaru Combat, Dave Dangerous, Tiny Fighters and Claude of Duty right in your browser.">
+<meta name="description" content="Vibecoding Arcade: browser games built with AI — procedural everything, zero assets, no installs. Play Undead Driver, Tank Racer, Lugaru Combat, Dave Dangerous, Tiny Fighters, Claude of Duty, Asphalt Outlaws, Vulture Pass, Laser Snail, NEON RUSH and Devil's Highway right in your browser.">
 <title>Vibecoding Arcade — browser games built with AI</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a1030'/%3E%3Cpath d='M11 8 L25 16 L11 24 Z' fill='%23ff7733'/%3E%3C/svg%3E">
 <style>
@@ -212,6 +212,15 @@
     --ink:#021018;
     --marquee-bg:#0b0518;
   }
+  .cab--devils{
+    --accent:#ffb24d;
+    --accent-soft:rgba(255,178,77,.14);
+    --accent-line:rgba(255,178,77,.42);
+    --genre:#ffb24d;
+    --label:#ffd9a3;
+    --ink:#0a0c10;
+    --marquee-bg:#11151b;
+  }
 
   .cab__marquee{
     position:relative;
@@ -417,7 +426,7 @@
 <header class="hero">
 
 
-  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 10 cabinets online · 1 runs locally</p>
+  <p class="hero__eyebrow"><span class="coin" aria-hidden="true"></span>Free play · 11 cabinets online · 1 runs locally</p>
   <h1 class="hero__title">Vibecoding <span class="hero__hollow">Arcade</span></h1>
   <p class="hero__sub">Browser games built with AI — procedural everything, zero assets, no installs. <strong>Click a cabinet and play.</strong></p>
 </header>
@@ -871,6 +880,40 @@
             <p class="cab__keys"><kbd>←</kbd>/<kbd>→</kbd> move · <kbd>↑</kbd>/<kbd>Space</kbd> jump · <kbd>↓</kbd> slide · <kbd>P</kbd> pause</p>
           </div>
           <a class="play" href="https://vs4vijay.github.io/vibecoding/neon-rush/" aria-label="Play NEON RUSH">
+            <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
+            Play
+          </a>
+        </div>
+      </article>
+    </li>
+    <li>
+      <article class="cab cab--devils" aria-labelledby="cab-devils-title">
+        <div class="cab__marquee">
+          <svg class="motif" viewBox="0 0 120 100" width="148" height="123" role="img" aria-label="Route 666 highway shield emblem for Devil's Highway" focusable="false">
+            <defs>
+              <radialGradient id="glowDH" cx="50%" cy="50%" r="62%">
+                <stop offset="0%" stop-color="#ffb24d" stop-opacity=".24"/>
+                <stop offset="100%" stop-color="#ffb24d" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="120" height="100" fill="url(#glowDH)"/>
+            <path fill="#ffb24d" d="M60 10 C69 13.2 77 13.8 86 13.2 L86 46 C86 65 75 78.5 60 90 C45 78.5 34 65 34 46 L34 13.2 C43 13.8 51 13.2 60 10 Z"/>
+            <text x="60" y="52" font-family="Arial, sans-serif" font-size="21" font-weight="bold" letter-spacing="1" text-anchor="middle" fill="#0a0c10">666</text>
+            <g stroke="#ffb24d" stroke-width="2.6" stroke-linecap="round" opacity=".8">
+              <line x1="46" y1="94" x2="56" y2="94"/>
+              <line x1="62" y1="94" x2="74" y2="94"/>
+            </g>
+          </svg>
+        </div>
+        <div class="cab__body">
+          <p class="cab__genre">Run · Drive · Ride</p>
+          <h2 class="cab__title" id="cab-devils-title">Devil's Highway</h2>
+          <p class="cab__desc">Desert-highway apocalypse at dusk — a burning city on the horizon and three ways down one shared interstate: outrun the dead on foot, behind muscle-car glass, or on two wheels. Every texture and sound is procedural: zero art assets.</p>
+          <div class="cab__panel">
+            <span class="cab__panel-label">Controls</span>
+            <p class="cab__keys"><kbd>WASD</kbd>/arrows move · <kbd>Space</kbd> jump · <kbd>S</kbd> slide · <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> mode · swipes on touch</p>
+          </div>
+          <a class="play" href="https://vs4vijay.github.io/vibecoding/devils-highway/" aria-label="Play Devil's Highway">
             <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
             Play
           </a>

@@ -17,6 +17,7 @@
   #   /vulture-pass/      <- vulture-pass/dist   (vite base "./", subpath-safe)
   #   /laser-snail/       <- laser-snail/dist    (vite base "./", subpath-safe)
   #   /neon-rush/         <- neon-rush/dist      (no bundler by design — build is a pure staging copy)
+  #   /devils-highway/    <- devils-highway/     (no build — adopted game, copied verbatim)
 
 name: Deploy Games to Pages
 
@@ -34,6 +35,7 @@ on:
       - "vulture-pass/**"
       - "laser-snail/**"
       - "neon-rush/**"
+      - "devils-highway/**"
       - "games-hub/**"
       - ".github/workflows/games-pages-deploy.yml"
   workflow_dispatch:
@@ -153,6 +155,13 @@ jobs:
           cp -r vulture-pass/dist site/vulture-pass
           cp -r laser-snail/dist site/laser-snail
           cp -r neon-rush/dist site/neon-rush
+          # devils-highway: NO build step — adopted no-build game (vanilla ES
+          # modules + importmap, vendored three r172). Copy the public surface
+          # verbatim, like games-hub; keep dev/QA folders out of the site.
+          mkdir -p site/devils-highway
+          cp devils-highway/index.html devils-highway/styles.css devils-highway/sw.js \
+            devils-highway/manifest.webmanifest devils-highway/serve.mjs site/devils-highway/
+          cp -r devils-highway/js devils-highway/vendor devils-highway/icons site/devils-highway/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
