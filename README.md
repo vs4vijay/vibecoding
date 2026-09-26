@@ -55,7 +55,15 @@ https://github.com/code-yeongyu/oh-my-openagent
 
 The best agent harness - a plugin that transforms OpenCode into a powerful multi-agent orchestration system with specialized agents (Sisyphus, Oracle, Librarian, etc.), MCP support, and parallel execution capabilities.
 
+```bash
 bunx oh-my-openagent install
+```
+
+◇  The Magic Word ──────────────────────────────────────────────────╮
+│                                                                   │
+│  Include ultrawork (or ulw) in your prompt.                       │
+│  All features work like magic-parallel agents, background tasks,  │
+│  deep exploration, and relentless execution until completion.
 
 
 ### Pi Coding Agent
@@ -116,6 +124,8 @@ providers:
 - rtk-ai - `brew install rtk-ai/tap/rtk`
 - context-mode `bun add -g context-mode`
 - omniroute - `bun add -g omniroute`
+- omp
+- OpenSpec
 - gnhf - `bun add -g gnhf`
 - gsd - `bunx @opengsd/gsd-core@latest` https://github.com/open-gsd/gsd-core
 - playwright-cli - `bun add -g playwright-cli`
@@ -166,6 +176,13 @@ android skills add --skill base
 
 # OLD
 bun x skills add https://github.com/coleam00/excalidraw-diagram-skill --skill excalidraw-diagram
+
+https://impeccable.style
+
+android-cli - https://developer.android.com/tools/agents/android-cli
+bun x skills add ParthJadhav/app-store-screenshots
+bun x skills add https://github.com/code-with-beto/skills --skill app-icon
+
 ```
 
 ## MCP used
@@ -212,16 +229,22 @@ curl -fsSL https://herdr.dev/install.sh | sh
 paseo
 bun install -g @getpaseo/cli
 
-GSD
+Superpowers
 
-BMAD
+GSD
 
 OpenSpec
 https://github.com/Fission-AI/OpenSpec
+openspec init
+openspec config set telemetry.enabled false
+/opsx:propose
+/opsx:apply
+
+BMAD
 
 https://github.com/Priivacy-ai/spec-kitty
 
-Superpowers
+SpecKit
 
 ECC
 https://github.com/affaan-m/ecc
@@ -309,6 +332,8 @@ https://github.com/AltanS/collie
 https://github.com/kunchenguid/firstmate
 
 OpenClaude
+
+pi install npm:@earendil-works/pi-radius
 
 ```
 

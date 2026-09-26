@@ -25,3 +25,9 @@ tmpclaude-*
 .playwright-cli/
 .DS_Store
 tiny-fighters/.git
+
+# undead-driver: aaa-visual-overhaul evidence (design D9 — downscaled contact
+# sheets and verdicts commit; full-res captures stay local).
+undead-driver/evidence/**/fullres/
+# AAA reference stills arrive later — local only.
+undead-driver/evidence/ref/
