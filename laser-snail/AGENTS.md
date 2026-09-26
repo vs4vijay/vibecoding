@@ -48,9 +48,9 @@ so `tests/RenderConstants.test.ts` can pin the envelope in node.
 - Two-tier bloom discipline: compact accents (rings, ribbons, pods, lip
   strips) sit above the bloom threshold and glow; **the edge rails must stay
   below it** — UnrealBloom's mip chain turns any large-area source into a
-  full-screen white flood (verified empirically; see the
-  `fix-render-readability` change archive in the old snailmail repo and
-  design decision D5).
+  full-screen white flood (verified empirically during the 2026-09
+  readability pass: a control probe with rails forced below threshold
+  produced a fully readable scene while every other accent kept its halo).
 - Never retune brightness by editing literals in `main.ts`, `Lighting.ts`,
   `TrackMesh.ts`, or `factories.ts` — they only import from `tuning.ts`.
 - If a retune is deliberate: adjust `tuning.ts`, re-run a browser screenshot
