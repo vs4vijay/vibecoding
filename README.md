@@ -348,6 +348,7 @@ single combined workflow (`.github/workflows/games-pages-deploy.yml`).
 | **NEON RUSH** | [vs4vijay.github.io/vibecoding/neon-rush](https://vs4vijay.github.io/vibecoding/neon-rush/) | [`neon-rush/`](./neon-rush) | JavaScript ES modules, three.js r170 (vendored, no build step) |
 | **Devil's Highway** | [vs4vijay.github.io/vibecoding/devils-highway](https://vs4vijay.github.io/vibecoding/devils-highway/) | [`devils-highway/`](./devils-highway) | JavaScript ES modules, three.js r172 vendored, no build step (deployed by direct copy) |
 | **Metro Dash** | [vs4vijay.github.io/vibecoding/metro-dash](https://vs4vijay.github.io/vibecoding/metro-dash/) | [`metro-dash/`](./metro-dash) | JavaScript ES modules, three.js r172 (CDN importmap), no build step · optional Elysia leaderboard API |
+| **Midtown Blitz** | [vs4vijay.github.io/vibecoding/midtown-blitz](https://vs4vijay.github.io/vibecoding/midtown-blitz/) | [`midtown-blitz/`](./midtown-blitz) | JavaScript, Vite 6, three.js r171, WebAudio synthesis |
 | **Dustline** | local server — `cd dustline && bun run dev` ([quickstart](./dustline#readme)) | [`dustline/`](./dustline) | TypeScript, Vite, three.js · Bun + Hono + WebSocket |
 
 Dustline is the exception to the Pages flow: it needs its own WebSocket game

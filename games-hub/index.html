@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0b12">
-<meta name="description" content="Vibecoding Arcade: browser games built with AI — procedural everything, zero assets, no installs. Play Undead Driver, Tank Racer, Lugaru Combat, Dave Dangerous, Tiny Fighters, Claude of Duty, Asphalt Outlaws, Vulture Pass, Laser Snail, NEON RUSH and Devil's Highway right in your browser.">
+<meta name="description" content="Vibecoding Arcade: browser games built with AI — procedural everything, zero assets, no installs. Play Undead Driver, Tank Racer, Lugaru Combat, Dave Dangerous, Tiny Fighters, Claude of Duty, Asphalt Outlaws, Vulture Pass, Laser Snail, NEON RUSH, Devil's Highway, Metro Dash and Midtown Blitz right in your browser.">
 <title>Vibecoding Arcade — browser games built with AI</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a1030'/%3E%3Cpath d='M11 8 L25 16 L11 24 Z' fill='%23ff7733'/%3E%3C/svg%3E">
 <style>
@@ -229,6 +229,15 @@
     --label:#ffd9a3;
     --ink:#0a0c10;
     --marquee-bg:#11151b;
+  }
+  .cab--midtown-blitz{
+    --accent:#ffd452;
+    --accent-soft:rgba(255,212,82,.13);
+    --accent-line:rgba(255,212,82,.42);
+    --genre:#ff8a3d;
+    --label:#ffe6a8;
+    --ink:#05070c;
+    --marquee-bg:#0a0f1c;
   }
 
   .cab__marquee{
@@ -962,6 +971,50 @@
             <p class="cab__keys"><kbd>←</kbd>/<kbd>→</kbd> move · <kbd>↑</kbd>/<kbd>Space</kbd> jump · <kbd>↓</kbd> roll · swipes on touch</p>
           </div>
           <a class="play" href="https://vs4vijay.github.io/vibecoding/metro-dash/" aria-label="Play METRO DASH">
+            <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
+            Play
+          </a>
+        </div>
+      </article>
+    </li>
+    <li>
+      <article class="cab cab--midtown-blitz" aria-labelledby="cab-midtown-blitz-title">
+        <div class="cab__marquee">
+          <svg class="motif" viewBox="0 0 120 100" width="148" height="123" role="img" aria-label="Checkpoint light beam rising over a city skyline emblem for Midtown Blitz" focusable="false">
+            <defs>
+              <radialGradient id="glowMB" cx="50%" cy="50%" r="62%">
+                <stop offset="0%" stop-color="#ffd452" stop-opacity=".22"/>
+                <stop offset="100%" stop-color="#ffd452" stop-opacity="0"/>
+              </radialGradient>
+              <linearGradient id="beamMB" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ffd452" stop-opacity="0"/>
+                <stop offset="100%" stop-color="#ffd452"/>
+              </linearGradient>
+            </defs>
+            <rect width="120" height="100" fill="url(#glowMB)"/>
+            <g fill="#141b2e">
+              <rect x="8" y="46" width="16" height="54"/>
+              <rect x="30" y="30" width="14" height="70"/>
+              <rect x="78" y="38" width="15" height="62"/>
+              <rect x="99" y="52" width="14" height="48"/>
+            </g>
+            <rect x="50" y="22" width="20" height="78" fill="#1b2440"/>
+            <polygon points="60,4 66,22 54,22" fill="#ff8a3d"/>
+            <rect x="58.4" y="8" width="3.2" height="66" fill="url(#beamMB)" opacity=".9"/>
+            <ellipse cx="60" cy="76" rx="17" ry="5.4" fill="none" stroke="#ffd452" stroke-width="2.6"/>
+            <ellipse cx="60" cy="76" rx="17" ry="5.4" fill="#ffd452" opacity=".12"/>
+            <path d="M30 92 L42 92 L44 88 L58 88 L61 92 L84 92 L86 96 L28 96 Z" fill="#ff8a3d"/>
+          </svg>
+        </div>
+        <div class="cab__body">
+          <p class="cab__genre">Open city · Checkpoints · Beat the clock</p>
+          <h2 class="cab__title" id="cab-midtown-blitz-title">MIDTOWN BLITZ</h2>
+          <p class="cab__desc">Arcade racing in a procedurally generated downtown — sprint checkpoint routes for gold medals, thread ambient traffic with handbrake slides, and cruise a deterministic 10×10 city with a landmark tower. Every building and sound synthesized in code.</p>
+          <div class="cab__panel">
+            <span class="cab__panel-label">Controls</span>
+            <p class="cab__keys"><kbd>W</kbd>/<kbd>↑</kbd> throttle · <kbd>A</kbd>/<kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>C</kbd> camera · <kbd>R</kbd> reset</p>
+          </div>
+          <a class="play" href="https://vs4vijay.github.io/vibecoding/midtown-blitz/" aria-label="Play MIDTOWN BLITZ">
             <svg class="play__icon" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true" focusable="false"><path d="M0 0 L12 7 L0 14 Z" fill="currentColor"/></svg>
             Play
           </a>
