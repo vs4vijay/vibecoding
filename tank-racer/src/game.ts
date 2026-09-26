@@ -31,6 +31,11 @@ import {
 } from "./track";
 import { createWeapons } from "./weapons";
 import { createPowerups, type Powerups } from "./powerups";
+import {
+  createPositionCalloutTracker,
+  createWrongWayDetector,
+} from "./race-events";
+import type { Hud } from "./hud"; // type-only: no runtime cycle with main.ts
 import { AI_PERSONALITIES, createAIController, type AIController } from "./ai";
 import {
   createScreens,
@@ -106,11 +111,13 @@ export interface Game {
   dispose(): void;
   /** Phase 13: notified whenever the 1P/2P mode changes (HUD rebuild). */
   setOnModeChange(cb: (twoPlayer: boolean) => void): void;
+  /** Phase 6: HUD handle for transient race feedback; fire sites guard on it. */
+  setHud(hud: Hud): void;
 }
 
 const START_T = 0.005; // just past the start/finish line
 
-const COUNTDOWN_STEP = 0.8; // seconds per 3/2/1/GO step
+const COUNTDOWN_STEP = 0.8; // seconds per 3/2/1/GO step — CSS keyframes countdownPop (src/style.css) is sized to this; do not change one without the other
 const COUNTDOWN_LABELS = ["3", "2", "1", "GO!"] as const;
 
 const BASE_FOV = 65;
@@ -118,6 +125,12 @@ const BOOST_FOV_KICK = 8; // extra FOV while a boost is active
 const SHAKE_DECAY = 7; // 1/s exponential falloff of screen shake
 const PLAYER_HIT_SHAKE = 0.5;
 const PLAYER_WRECK_SHAKE = 1.0;
+
+/** Phase 6.4 juice tuning — skid marks + boost flames, humans and AI alike. */
+const SKID_STEER = 0.85; // |steer| needed to lay marks in a corner
+const SKID_SPEED = 0.6 * MAX_SPEED; // cornering speed floor for marks (u/s)
+const SKID_SPACING = 1.2; // u of travel between consecutive marks per tank
+const FLAME_INTERVAL = 0.05; // s between exhaust flames while boosting
 
 /** Phase 13: P2's fixed livery (orange — pairs with P1's cyan HUD accent). */
 const P2_HULL_COLOR = 0xff8c00;
@@ -677,9 +690,11 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     track = createTrack(def);
     scene.add(track.group);
     powerups = createPowerups(scene, track.points, def.crateTs, {
-      onPickup: (_tank, kind) => {
+      onPickup: (tank, kind) => {
+        hud?.onPickup(tank, kind);
         if (kind === "boost") sfx.boost();
-        else sfx.pickup();
+        else if (kind === "shield") sfx.shield();
+        else sfx.triple();
       },
     });
     applyTheme(def);
@@ -783,6 +798,19 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   // Declared before the boot-time applyMode() restore call, which fires the
   // onModeChange callback (a later `let` here would be a TDZ crash).
   let onModeChange: ((twoPlayer: boolean) => void) | null = null;
+  // Phase 6: HUD handle, injected by main.ts via setHud(); every fire site
+  // guards with `hud?.` so headless paths (scripts/sim-ai.ts) stay no-op.
+  let hud: Hud | null = null;
+  // Per-human race-event state (parallel to the humans-first head of
+  // world.tanks): wrong-way detectors + position trackers are rebuilt fresh
+  // in beginCountdown() so every race starts clean.
+  const wrongWayDetectors: Array<ReturnType<typeof createWrongWayDetector>> = [];
+  const wrongWayArmed: boolean[] = []; // previous armed state, for edges
+  const positionTrackers: Array<
+    ReturnType<typeof createPositionCalloutTracker>
+  > = [];
+  /** Distance since each tank's last skid mark (parallel to world.tanks). */
+  const skidOdometer: number[] = [];
 
   // Phase 13: the third AI is benched (hidden + excluded) in 2P so the grid
   // stays at 4 tanks: P1, P2, then 2 AI.
@@ -819,6 +847,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     onHit: (target) => {
       sfx.hit();
       juice.impactSparks(target.position.x, 1.2, target.position.z);
+      hud?.onHit(target);
       if (target === player) rig1.shake = PLAYER_HIT_SHAKE;
       else if (target === player2) rig2.shake = PLAYER_HIT_SHAKE;
     },
@@ -884,6 +913,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   let countdownStep = -1;
   let goHideTimer = 0;  // Phase 9: pause freezes the whole sim; dust-puff spawn timer lives here too.
   let dustTimer = 0;
+  let flameTimer = 0; // Phase 6: boost-flame spawn timer, same pattern as dustTimer.
 
   /**
    * Freeze/resume everything. The AudioContext suspends with the sim, which
@@ -1032,6 +1062,21 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     countdownClock = 0;
     countdownStep = -1;
     goHideTimer = 0;
+    // Phase 6: fresh per-race feedback state. Detectors/trackers seed on their
+    // first sample, so new instances (not clears) start every race clean;
+    // odometers zero and stale wrong-way / low-HP HUD state drops off.
+    const humans = humanCount();
+    wrongWayDetectors.length = 0;
+    wrongWayArmed.length = 0;
+    positionTrackers.length = 0;
+    for (let i = 0; i < humans; i++) {
+      wrongWayDetectors.push(createWrongWayDetector());
+      wrongWayArmed.push(false);
+      positionTrackers.push(createPositionCalloutTracker());
+      hud?.onWrongWay(world.tanks[i], false);
+      hud?.setLowHp(world.tanks[i], false);
+    }
+    for (let i = 0; i < world.tanks.length; i++) skidOdometer[i] = 0;
     screens.hideResults();
     // Phase 14: fresh recording for this race; ghost (if stored + enabled)
     // rewinds to the line and starts replaying from GO.
@@ -1258,13 +1303,25 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     });
   }
 
-  /** Lap/gate event side effects: FINAL LAP banner + finish detection. */
-  function handleProgressEvent(tank: TankState, racer: Racer, ev: ProgressEvent): void {
+  /** Lap/gate event side effects: lap feedback, FINAL LAP banner + finish. */
+  function handleProgressEvent(
+    tank: TankState,
+    racer: Racer,
+    ev: ProgressEvent,
+    completedLapTime: number,
+  ): void {
     if (ev !== "lap") return;
     // Phase 14: a P1 lap just completed — keep its recording if it's the
     // best one driven this race (P2 laps are never recorded; see above).
     if (tank === player) ghostRecorder.completeLap();
     const prog = racer.progress;
+    // Phase 6: every completed human lap short of the finish pops lap
+    // feedback — including the lap that STARTS the final one, whose FINAL
+    // LAP banner below still shows in addition. AI laps stay silent.
+    if (prog.lap <= TOTAL_LAPS && isHumanTank(tank)) {
+      hud?.onLap(tank, completedLapTime);
+      sfx.lap();
+    }
     if (prog.lap > TOTAL_LAPS) {
       if (racer.finishTime === null) racer.finishTime = world.raceTime;
       if (isHumanTank(tank)) {
@@ -1356,15 +1413,57 @@ export function createGame(canvas: HTMLCanvasElement): Game {
         const lateral = Math.abs(tank.velocity.x * fz - tank.velocity.z * fx);
         if (tank.velocity.length() > 10 && lateral > 5) juice.dust(tank);
       }
+      // Phase 6: exhaust flames while boosting — same shared-timer pattern as
+      // the dust above; every boosting tank flames, humans and AI alike.
+      flameTimer -= dt;
+      const dropFlame = flameTimer <= 0;
+      if (dropFlame) flameTimer = FLAME_INTERVAL;
+      if (dropFlame && tank.wreckTimer <= 0 && tank.boostTimer > 0) {
+        juice.flame(tank);
+      }
+      // Phase 6: rubber skid marks, rate-gated by distance — the per-tank
+      // odometer collects travel every driving frame and a mark drops only
+      // when hard cornering (or a spin-out) coincides with a full spacing.
+      if (driving) skidOdometer[i] += tank.velocity.length() * dt;
+      const skidSpin = tank.spinTimer > 0;
+      const skidCorner =
+        Math.abs(tank.input.steer) >= SKID_STEER &&
+        tank.velocity.length() >= SKID_SPEED;
+      if (
+        driving &&
+        tank.wreckTimer <= 0 &&
+        (skidSpin || skidCorner) &&
+        skidOdometer[i] >= SKID_SPACING
+      ) {
+        skidOdometer[i] = 0;
+        juice.skid(tank);
+      }
       // Progress: closest point on the centerline drives gates/laps.
       // Frozen once the race is over so times stay exactly as displayed.
       if (driving) {
         const hit = closestT(track, tank);
-        handleProgressEvent(
-          tank,
-          racers[i],
-          updateTankProgress(racers[i].progress, hit, dt, track.def.gates),
+        // updateTankProgress zeroes lapTime when the "lap" event fires —
+        // capture it first so handleProgressEvent can report the lap just run.
+        const lapTimeBefore = racers[i].progress.lapTime;
+        const ev = updateTankProgress(
+          racers[i].progress,
+          hit,
+          dt,
+          track.def.gates,
         );
+        handleProgressEvent(tank, racers[i], ev, lapTimeBefore);
+        // Human-only feedback; driving is race-phase only, so the detector
+        // never ticks during countdown/results and AI tanks are skipped.
+        if (i < humans) {
+          const armed = wrongWayDetectors[i](hit, dt);
+          if (armed !== wrongWayArmed[i]) {
+            wrongWayArmed[i] = armed;
+            if (armed) sfx.wrongWay(); // rising edge only — never per frame
+            hud?.onWrongWay(tank, armed);
+          }
+          // Idempotent classList.toggle inside; respawn refills hp → clears.
+          hud?.setLowHp(tank, tank.hp <= tank.maxHp * 0.3);
+        }
       }
     }
     if (driving) {
@@ -1373,6 +1472,18 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       // event above — immune to progress-reset ordering.
       ghostRecorder.observe(dt, player.position.x, player.position.z, player.heading);
       updateStandings(world);
+      // Phase 6: position callouts once standings settle. raceTime is the
+      // race clock (a pause stops simulate, freezing it), so the trackers'
+      // cooldown holds; null means nothing to show this frame.
+      const p1Dir = positionTrackers[0](world.playerPosition, world.raceTime);
+      if (p1Dir !== null) hud?.onPositionChange(player, p1Dir === 1);
+      if (world.twoPlayer && p2) {
+        const p2Dir = positionTrackers[1](
+          world.playerPosition2,
+          world.raceTime,
+        );
+        if (p2Dir !== null) hud?.onPositionChange(p2, p2Dir === 1);
+      }
     }
     // Phase 14: cosmetic replay — advances only while the sim runs, so pause
     // freezes it too. It stops once P1 has finished: the ghost replays P1's
@@ -1668,6 +1779,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     },
     setOnModeChange(cb) {
       onModeChange = cb;
+    },
+    setHud(next) {
+      hud = next;
     },
     dispose() {
       window.removeEventListener("keydown", onKeyDown);

@@ -114,6 +114,28 @@ Boost pads on the track give an automatic speed burst. Power-up crates grant a
 random pickup: Speed Boost (auto), Shield (absorbs one hit), or Triple-Shot
 (next 3 trigger pulls fire a spread).
 
+## Race feedback
+
+The race answers everything you do with a flash, a pop, or a sound:
+
+- **Countdown** — animated **3 / 2 / 1 / GO!**, the "GO!" landing in gold
+- **Laps** — the lap counter flashes, a lap-time pop floats up, and a chime
+  rings on every completed lap
+- **Positions** — the POS readout pulses with a **▲ / ▼** chip on every
+  overtake (yours or theirs)
+- **Damage** — a red vignette flashes on each hit, then pulses continuously
+  below 30% health
+- **Wrong way** — a flashing **WRONG WAY!** banner while driving backwards
+- **Sliding** — skid marks appear under hard cornering and spin-outs
+- **Boosting** — exhaust flames trail the tank while boosting
+- **Pickups** — each plays its own sound: shield and triple-shot chime
+  distinctly from the boost whoosh
+
+In 2-player split-screen every effect is per-half — each player only sees
+their own countdown, vignettes, and banners. If the OS requests reduced
+motion, all of these animations degrade to simple opacity fades (no scale,
+no strobe).
+
 ## Run it
 
 Requires [bun](https://bun.sh).

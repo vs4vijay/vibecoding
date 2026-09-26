@@ -292,6 +292,59 @@ body {
   text-shadow: 4px 4px 0 rgba(0, 0, 0, 0.6);
 }
 
+/* Countdown pop: each 3/2/1 step scales in and fades out, spanning exactly
+ * one step. 0.8s — must equal COUNTDOWN_STEP in src/game.ts (~L113) — change
+ * the two together (and vice versa), or a digit gets clipped by the next step
+ * or lingers past it. game.ts replaces the text each step and force-reflows,
+ * so re-adding .pop restarts the animation cleanly. */
+#screen-countdown.pop {
+  animation: countdownPop 0.8s ease-out forwards;
+}
+
+/* "GO!" celebrates in gold with a bigger, punchier pop. */
+#screen-countdown.pop.go {
+  color: #ffd23d;
+  animation: countdownPopGo 0.8s ease-out forwards;
+}
+
+@keyframes countdownPop {
+  0% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes countdownPopGo {
+  0% {
+    opacity: 0;
+    transform: scale(2.1);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+
 /* Phase 7: selected tank name under the countdown */
 #screen-countdown-tag {
   position: absolute;
@@ -993,5 +1046,285 @@ body {
 
   .podium-champion-line {
     font-size: clamp(13px, 4vw, 20px);
+  }
+}
+
+/* --- Phase 16: transient HUD events (hit vignette, laps, positions, wrong way)
+ *
+ * Every element here is an absolutely-positioned overlay inside ONE view
+ * (#hud in 1P, each .hud-half in 2P), so the classic layout never reflows and
+ * the 2P halves stay independent. One-shot classes (.flash/.pulse/.pop/.show)
+ * are re-triggered from hud.ts with the remove → reflow → add idiom. */
+
+/* Red damage vignette. The element itself carries the persistent low-HP pulse
+ * (.low); the one-shot shell-hit flash runs on ::after, so a low player who
+ * takes a hit still flashes while the pulse keeps looping underneath. */
+.hud-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: inset 0 0 60px 18px rgba(224, 90, 78, 0.55);
+}
+
+.hud-vignette.low {
+  animation: vignetteLow 1.4s ease-in-out infinite alternate;
+}
+
+.hud-vignette.flash::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 60px 18px rgba(224, 90, 78, 0.85);
+  opacity: 0;
+  animation: vignetteFlash 0.45s ease-out forwards;
+}
+
+@keyframes vignetteLow {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 0.8;
+  }
+}
+
+@keyframes vignetteFlash {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* WRONG WAY! banner, centered in the upper area of one view. .active holds the
+ * element visible and strobes it — deliberate, it's safety-critical feedback. */
+.hud-wrongway {
+  position: absolute;
+  top: 18%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: clamp(24px, 7vw, 44px);
+  font-weight: bold;
+  letter-spacing: 6px;
+  color: #e05a4e;
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6);
+  visibility: hidden;
+}
+
+.hud-wrongway.active {
+  visibility: visible;
+  animation: wrongwayBlink 0.5s step-end infinite;
+}
+
+@keyframes wrongwayBlink {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Completed-lap pop: gold readout right under the race block (its parent is
+ * the positioned #hud-race / .hud-half .hud-race block). Reusable element. */
+.hud-lap-pop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #ffd23d;
+  white-space: nowrap;
+  opacity: 0;
+}
+
+.hud-half .hud-lap-pop {
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.hud-lap-pop.show {
+  animation: lapPopFade 1.4s ease-out forwards;
+}
+
+@keyframes lapPopFade {
+  0% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* One-shot flashes on the persistent readouts; scale from the anchored edge so
+ * right-aligned lap/pos text doesn't swim. Color is left alone so the 2P
+ * accent classes survive the flash. */
+.hud-lap.flash {
+  animation: lapPulse 0.5s ease-out;
+  transform-origin: 100% 50%;
+}
+
+@keyframes lapPulse {
+  0% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.hud-pos.pulse {
+  animation: posPulse 0.6s ease-out;
+  transform-origin: 100% 50%;
+}
+
+@keyframes posPulse {
+  0% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Direction chip beside the POS readout: ▲ gained / ▼ lost. */
+.hud-pos-chip {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 45%;
+  font-size: 16px;
+  font-weight: bold;
+  opacity: 0;
+}
+
+.hud-pos-chip.gain {
+  color: #41d9ff;
+}
+
+.hud-pos-chip.loss {
+  color: #e05a4e;
+}
+
+.hud-pos-chip.show {
+  animation: posChipFade 0.9s ease-out forwards;
+}
+
+@keyframes posChipFade {
+  0% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Power-up slot pop (scale only — updatePanel owns the slot's inline opacity). */
+.hud-power.pop {
+  animation: powerPop 0.35s ease-out;
+  transform-origin: 0 50%;
+}
+
+@keyframes powerPop {
+  0% {
+    transform: scale(1.4);
+  }
+  60% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* --- Reduced motion: every pop/strobe above becomes a gentle opacity fade ----
+ * Re-points the selectors (and, via same-name overrides below, the countdown
+ * keyframes from Phase 7) to opacity-only curves — no scale, no blink. The
+ * countdown's gold "GO!" recolor is a plain color rule and survives as-is. */
+@media (prefers-reduced-motion: reduce) {
+  #screen-countdown.pop {
+    animation: hudFade 0.8s ease-out forwards;
+  }
+
+  #screen-countdown.pop.go {
+    animation: hudFade 0.8s ease-out forwards;
+  }
+
+  .hud-vignette.low {
+    animation: hudBreathe 1.4s ease-in-out infinite alternate;
+  }
+
+  .hud-vignette.flash::after {
+    animation: hudFade 0.45s ease-out forwards;
+  }
+
+  .hud-wrongway.active {
+    animation: hudBreathe 1.4s ease-in-out infinite alternate;
+  }
+
+  .hud-lap.flash {
+    animation: hudBreathe 0.5s ease-in-out;
+  }
+
+  .hud-lap-pop.show {
+    animation: hudFade 1.4s ease-out forwards;
+  }
+
+  .hud-pos.pulse {
+    animation: hudBreathe 0.6s ease-in-out;
+  }
+
+  .hud-pos-chip.show {
+    animation: hudFade 0.9s ease-out forwards;
+  }
+
+  .hud-power.pop {
+    animation: hudBreathe 0.35s ease-in-out;
+  }
+
+  @keyframes hudFade {
+    0% {
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    70% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes hudBreathe {
+    from {
+      opacity: 0.55;
+    }
+    to {
+      opacity: 1;
+    }
   }
 }

@@ -41,16 +41,17 @@ export function toggleMute(): boolean {
 // Tiny synth primitives
 // ---------------------------------------------------------------------------
 
-/** Pitch-sweeping oscillator blip. */
+/** Pitch-sweeping oscillator blip; `delaySec` offsets the start so a sound can sequence notes. */
 function blip(
   fromHz: number,
   toHz: number,
   dur: number,
   type: OscillatorType,
   vol: number,
+  delaySec = 0,
 ): void {
   if (!ctx || !master) return;
-  const t = ctx.currentTime;
+  const t = ctx.currentTime + delaySec;
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
   osc.type = type;
@@ -121,6 +122,28 @@ export const sfx = {
   /** Shield / triple-shot pickup: rising chime. */
   pickup(): void {
     blip(620, 1240, 0.16, "sine", 0.2);
+  },
+  /** Lap complete: rising two-note fanfare (C5 → G5, a fifth apart). */
+  lap(): void {
+    blip(523.25, 523.25, 0.12, "sine", 0.2);
+    blip(784, 784, 0.2, "sine", 0.2, 0.11);
+  },
+  /** Wrong-way warning: harsh descending square buzz + noise grit. */
+  wrongWay(): void {
+    blip(220, 185, 0.16, "square", 0.3);
+    blip(165, 110, 0.24, "square", 0.3, 0.14);
+    noiseBurst(0.18, 0.09, 500, 100);
+  },
+  /** Shield armed: warm root+fifth sine chord swell (E4 + B4). */
+  shield(): void {
+    blip(330, 330, 0.34, "sine", 0.18);
+    blip(494, 494, 0.34, "sine", 0.13);
+  },
+  /** Triple-shot armed: three quick ascending square ticks ("x3"). */
+  triple(): void {
+    blip(660, 660, 0.07, "square", 0.16);
+    blip(880, 880, 0.07, "square", 0.16, 0.08);
+    blip(1175, 1175, 0.1, "square", 0.18, 0.16);
   },
 };
 

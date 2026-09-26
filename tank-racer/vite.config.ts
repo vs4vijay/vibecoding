@@ -8,4 +8,6 @@ const basePath = process.env.BASE_PATH || "/";
 
 export default defineConfig({
   base: basePath,
+  server: { port: 7443, strictPort: true },
+  preview: { port: 7443 },
 });

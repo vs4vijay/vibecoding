@@ -19,6 +19,13 @@ interface PanelRefs {
   best: HTMLDivElement;
   healthFill: HTMLDivElement;
   power: HTMLDivElement;
+  // Transient event elements (hit vignette, wrong-way banner, lap/pos pops).
+  // Only the on*() API touches these — updatePanel's cached writer never does,
+  // and buildHud recreates them fresh so no transient class survives a rebuild.
+  vignette: HTMLDivElement;
+  wrongway: HTMLDivElement;
+  lapPop: HTMLDivElement;
+  posChip: HTMLDivElement;
 }
 
 /** Last-rendered values per panel — DOM is only touched on change. */
@@ -43,6 +50,18 @@ interface Panel {
 export interface Hud {
   /** Rebuild the HUD layout for the given mode (Phase 13). */
   setMode(twoPlayer: boolean): void;
+  /** One-shot red edge flash over this player's view (shell hit). */
+  onHit(tank: TankState): void;
+  /** Persistent pulsing low-HP vignette while true; clears when false. */
+  setLowHp(tank: TankState, low: boolean): void;
+  /** Flash the lap counter and pop the completed lap time near it. */
+  onLap(tank: TankState, lapTime: number): void;
+  /** Pulse the POS readout; gained=true shows ▲, false ▼. */
+  onPositionChange(tank: TankState, gained: boolean): void;
+  /** Pop the power-up slot when a pickup arms/consumes. kind: "boost" | "shield" | "triple". */
+  onPickup(tank: TankState, kind: "boost" | "shield" | "triple"): void;
+  /** Show/hide the flashing WRONG WAY! banner for this player's view. */
+  onWrongWay(tank: TankState, active: boolean): void;
 }
 
 /**
@@ -52,7 +71,18 @@ export interface Hud {
  */
 export function initHud(world: World): Hud {
   const rootEl = document.getElementById("hud");
-  if (!rootEl) return { setMode() { /* no #hud in DOM */ } };
+  if (!rootEl) {
+    // No #hud in the DOM — every transient event becomes a no-op.
+    return {
+      setMode() { /* no #hud in DOM */ },
+      onHit() {},
+      setLowHp() {},
+      onLap() {},
+      onPositionChange() {},
+      onPickup() {},
+      onWrongWay() {},
+    };
+  }
   const root: HTMLElement = rootEl;
 
   // --- Minimap canvas + geometry caches (survive setMode rebuilds) ----------
@@ -117,6 +147,40 @@ export function initHud(world: World): Hud {
     return d;
   }
 
+  /** Restart a one-shot CSS animation by force-reflowing between class toggles
+   * (same idiom as replayAnimation in screens.ts). */
+  function replay(el: HTMLElement, className: string): void {
+    el.classList.remove(className);
+    void el.offsetWidth; // reflow so the animation can restart
+    el.classList.add(className);
+  }
+
+  /** The panel owning this tank — undefined for unknown/AI tanks. */
+  function panelOf(tank: TankState): Panel | undefined {
+    return panels.find((p) => p.tank === tank);
+  }
+
+  /**
+   * Per-view event overlays. Vignette + wrong-way banner cover the whole view
+   * (#hud in 1P, one .hud-half in 2P — same elements, different parent), while
+   * the lap/pos pops live inside the view's race block next to the readouts
+   * they annotate. Both pops are persistent reusable elements replayed via the
+   * idiom above, so triggering them never allocates.
+   */
+  function buildTransients(
+    view: HTMLElement,
+    raceBlock: HTMLElement,
+  ): Pick<PanelRefs, "vignette" | "wrongway" | "lapPop" | "posChip"> {
+    const vignette = div(undefined, "hud-vignette");
+    const wrongway = div(undefined, "hud-wrongway");
+    wrongway.textContent = "WRONG WAY!";
+    const lapPop = div(undefined, "hud-lap-pop");
+    const posChip = div(undefined, "hud-pos-chip");
+    raceBlock.append(lapPop, posChip);
+    view.append(vignette, wrongway);
+    return { vignette, wrongway, lapPop, posChip };
+  }
+
   function makeMinimap(className?: string): void {
     minimap = document.createElement("canvas");
     minimap.id = "hud-minimap";
@@ -160,7 +224,11 @@ export function initHud(world: World): Hud {
     label.textContent = tag;
 
     half.append(label, power, healthBlock, speed, raceBlock);
-    panels.push(mkPanel(tank, posOf, { speed, lap, pos, time, best, healthFill, power }));
+    // Overlays are built inside THIS half, so P1/P2 transients stay independent.
+    const trans = buildTransients(half, raceBlock);
+    panels.push(
+      mkPanel(tank, posOf, { speed, lap, pos, time, best, healthFill, power, ...trans }),
+    );
   }
 
   /** Build the whole HUD for the active mode; wipes whatever existed. */
@@ -193,9 +261,12 @@ export function initHud(world: World): Hud {
 
       makeMinimap();
 
+      // Overlays cover the whole #hud; the pops sit inside #hud-race. All are
+      // absolutely positioned, so the classic layout geometry is untouched.
+      const trans = buildTransients(root, raceBlock);
       panels.push(
         mkPanel(world.player, () => world.playerPosition, {
-          speed, lap, pos, time, best, healthFill, power,
+          speed, lap, pos, time, best, healthFill, power, ...trans,
         }),
       );
       return;
@@ -359,6 +430,10 @@ export function initHud(world: World): Hud {
   buildHud(world.twoPlayer);
   update();
 
+  // --- Transient event API (fire-and-forget; game.ts wires these later) ------
+  // All lookups go by tank identity so each call lands on exactly one panel —
+  // in 2P that keeps P1/P2 vignettes, banners and chips fully independent.
+
   return {
     setMode(twoPlayer: boolean) {
       if (
@@ -368,6 +443,50 @@ export function initHud(world: World): Hud {
         return; // already in the requested layout
       }
       buildHud(twoPlayer);
+    },
+
+    onHit(tank: TankState): void {
+      const p = panelOf(tank);
+      if (p) replay(p.refs.vignette, "flash");
+    },
+
+    setLowHp(tank: TankState, low: boolean): void {
+      const p = panelOf(tank);
+      // Persistent class, not a one-shot: the CSS pulse loops while it's set.
+      // It composes with .flash, which runs on the vignette's ::after layer.
+      if (p) p.refs.vignette.classList.toggle("low", low);
+    },
+
+    onLap(tank: TankState, lapTime: number): void {
+      const p = panelOf(tank);
+      if (!p) return;
+      replay(p.refs.lap, "flash");
+      p.refs.lapPop.textContent = `LAP ${formatRaceTime(lapTime)}`;
+      replay(p.refs.lapPop, "show");
+    },
+
+    onPositionChange(tank: TankState, gained: boolean): void {
+      const p = panelOf(tank);
+      if (!p) return;
+      replay(p.refs.pos, "pulse");
+      const chip = p.refs.posChip;
+      chip.textContent = gained ? "▲" : "▼";
+      chip.classList.remove("gain", "loss", "show");
+      chip.classList.add(gained ? "gain" : "loss");
+      void chip.offsetWidth; // reflow so the animation can restart
+      chip.classList.add("show");
+    },
+
+    onPickup(tank: TankState, _kind: "boost" | "shield" | "triple"): void {
+      // One pop for every kind — the slot text (already cached in updatePanel)
+      // is what tells the kinds apart.
+      const p = panelOf(tank);
+      if (p) replay(p.refs.power, "pop");
+    },
+
+    onWrongWay(tank: TankState, active: boolean): void {
+      const p = panelOf(tank);
+      if (p) p.refs.wrongway.classList.toggle("active", active);
     },
   };
 }

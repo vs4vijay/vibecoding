@@ -106,6 +106,10 @@ export interface Screens {
   hidePaused(): void;
 }
 
+/** Final countdown label that gets the accent-colored "GO!" styling.
+ * Must match the last entry of COUNTDOWN_LABELS in src/game.ts. */
+const GO_LABEL = "GO!";
+
 export function createScreens(rootId = "screens"): Screens {
   const rootEl = document.getElementById(rootId);
   if (!rootEl) throw new Error(`#${rootId} missing from index.html`);
@@ -258,6 +262,16 @@ export function createScreens(rootId = "screens"): Screens {
     el.classList.add("show");
   }
 
+  /** Restart the countdown pop animation (scale-in + fade-out, CSS-side).
+   * `go` recolors/repunches the final "GO!" step via the extra class. */
+  function countdownPop(el: HTMLElement, text: string, go: boolean): void {
+    el.textContent = text;
+    el.classList.remove("pop", "go");
+    void el.offsetWidth; // reflow so the animation can restart
+    el.classList.add("pop");
+    if (go) el.classList.add("go");
+  }
+
   // --- Results -----------------------------------------------------------------
   let results: HTMLDivElement | null = null;
   function ensureResults(): HTMLDivElement {
@@ -295,7 +309,12 @@ export function createScreens(rootId = "screens"): Screens {
     }
   }
   function hideCountdownNow(): void {
-    if (countdown) countdown.textContent = "";
+    if (countdown) {
+      countdown.textContent = "";
+      // Belt and braces: drop the animation classes too so a stale pop never
+      // persists into the next race and the first step re-triggers cleanly.
+      countdown.classList.remove("pop", "go");
+    }
     if (countdownTag) countdownTag.textContent = "";
   }
 
@@ -464,7 +483,7 @@ export function createScreens(rootId = "screens"): Screens {
       // Leaving the title card: a starting race must not keep it on screen
       // (showTitle restores visibility when returning to the title).
       if (title) title.style.display = "none";
-      el.textContent = text;
+      countdownPop(el, text, text === GO_LABEL);
     },
     hideCountdown() {
       hideCountdownNow();
