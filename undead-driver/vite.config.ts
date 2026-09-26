@@ -2,6 +2,8 @@
 import { defineConfig } from "vitest/config";
 export default defineConfig({
   base: "./",
+  // Default port 3413 = leetspeak of "undead-driver" (e->3, a->4, i->1, e->3).
+  server: { port: 3413 },
   build: {
     // three.js is a single unavoidable vendor chunk for this single-screen game;
     // keep the warning limit above its bundled size (~570 kB) so the build stays clean.

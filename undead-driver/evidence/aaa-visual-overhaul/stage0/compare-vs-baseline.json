@@ -1,0 +1,348 @@
+{
+  "generatedAt": "2026-09-20T23:17:42.098Z",
+  "purpose": "aaa-visual-overhaul task 1.8 — stage0 captures vs pre-change baseline",
+  "grid": {
+    "w": 64,
+    "h": 36,
+    "cellThreshold": 24
+  },
+  "verdictThresholds": {
+    "nearIdentical": {
+      "mad": 3,
+      "hotFrac": 0.01
+    },
+    "changedSubtle": {
+      "mad": 12,
+      "hotFrac": 0.35
+    }
+  },
+  "baselineDir": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/baseline/fullres",
+  "stageDir": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/stage0/fullres",
+  "pairs": [
+    {
+      "scenario": "car-side-profile",
+      "baseline": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/baseline/fullres/car-side-profile.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 63.53,
+            "std": 84.28
+          },
+          "g": {
+            "mean": 29.48,
+            "std": 41.84
+          },
+          "b": {
+            "mean": 17.36,
+            "std": 21.43
+          },
+          "luma": {
+            "mean": 35.84,
+            "std": 49.06
+          }
+        }
+      },
+      "stage": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/stage0/fullres/car-side-profile.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 85.4,
+            "std": 88.16
+          },
+          "g": {
+            "mean": 40.79,
+            "std": 44.84
+          },
+          "b": {
+            "mean": 21.99,
+            "std": 23.15
+          },
+          "luma": {
+            "mean": 48.91,
+            "std": 50.99
+          }
+        }
+      },
+      "dimensionsMatch": true,
+      "mad": 26.8,
+      "hotCellFraction": 0.2943,
+      "verdict": "changed-significant",
+      "notes": []
+    },
+    {
+      "scenario": "combat-mid",
+      "baseline": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/baseline/fullres/combat-mid.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 82.71,
+            "std": 91.13
+          },
+          "g": {
+            "mean": 37.88,
+            "std": 45.41
+          },
+          "b": {
+            "mean": 20.72,
+            "std": 22.63
+          },
+          "luma": {
+            "mean": 46.18,
+            "std": 53.16
+          }
+        }
+      },
+      "stage": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/stage0/fullres/combat-mid.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 100.51,
+            "std": 89.07
+          },
+          "g": {
+            "mean": 50.1,
+            "std": 49.81
+          },
+          "b": {
+            "mean": 25.29,
+            "std": 24.82
+          },
+          "luma": {
+            "mean": 59.03,
+            "std": 55.64
+          }
+        }
+      },
+      "dimensionsMatch": true,
+      "mad": 20.56,
+      "hotCellFraction": 0.1962,
+      "verdict": "changed-significant",
+      "notes": []
+    },
+    {
+      "scenario": "horde-max",
+      "baseline": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/baseline/fullres/horde-max.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 85.77,
+            "std": 89.66
+          },
+          "g": {
+            "mean": 38.67,
+            "std": 44.29
+          },
+          "b": {
+            "mean": 20.84,
+            "std": 22.26
+          },
+          "luma": {
+            "mean": 47.39,
+            "std": 51.95
+          }
+        }
+      },
+      "stage": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/stage0/fullres/horde-max.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 94.79,
+            "std": 87.17
+          },
+          "g": {
+            "mean": 46.17,
+            "std": 47.94
+          },
+          "b": {
+            "mean": 23.92,
+            "std": 24.26
+          },
+          "luma": {
+            "mean": 54.9,
+            "std": 53.61
+          }
+        }
+      },
+      "dimensionsMatch": true,
+      "mad": 19.34,
+      "hotCellFraction": 0.1536,
+      "verdict": "changed-significant",
+      "notes": []
+    },
+    {
+      "scenario": "lamp-pool",
+      "baseline": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/baseline/fullres/lamp-pool.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 109.07,
+            "std": 97.83
+          },
+          "g": {
+            "mean": 50.2,
+            "std": 48.34
+          },
+          "b": {
+            "mean": 25.75,
+            "std": 23.39
+          },
+          "luma": {
+            "mean": 60.95,
+            "std": 56.65
+          }
+        }
+      },
+      "stage": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/stage0/fullres/lamp-pool.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 111.33,
+            "std": 94.23
+          },
+          "g": {
+            "mean": 56.5,
+            "std": 53.19
+          },
+          "b": {
+            "mean": 28.08,
+            "std": 26.19
+          },
+          "luma": {
+            "mean": 66.1,
+            "std": 58.91
+          }
+        }
+      },
+      "dimensionsMatch": true,
+      "mad": 18.46,
+      "hotCellFraction": 0.1502,
+      "verdict": "changed-significant",
+      "notes": []
+    },
+    {
+      "scenario": "title",
+      "baseline": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/baseline/fullres/title.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 51.77,
+            "std": 45.71
+          },
+          "g": {
+            "mean": 20.08,
+            "std": 22.52
+          },
+          "b": {
+            "mean": 26.07,
+            "std": 16.11
+          },
+          "luma": {
+            "mean": 27.25,
+            "std": 25.89
+          }
+        }
+      },
+      "stage": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/stage0/fullres/title.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 55.02,
+            "std": 44.15
+          },
+          "g": {
+            "mean": 22.36,
+            "std": 22.64
+          },
+          "b": {
+            "mean": 27,
+            "std": 16.18
+          },
+          "luma": {
+            "mean": 29.64,
+            "std": 25.49
+          }
+        }
+      },
+      "dimensionsMatch": true,
+      "mad": 7.29,
+      "hotCellFraction": 0.0951,
+      "verdict": "changed-subtle",
+      "notes": []
+    },
+    {
+      "scenario": "game-over",
+      "baseline": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/baseline/fullres/game-over.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 50.89,
+            "std": 45.73
+          },
+          "g": {
+            "mean": 21.68,
+            "std": 26.43
+          },
+          "b": {
+            "mean": 25.77,
+            "std": 14.58
+          },
+          "luma": {
+            "mean": 28.19,
+            "std": 28.77
+          }
+        }
+      },
+      "stage": {
+        "path": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/stage0/fullres/game-over.png",
+        "width": 1280,
+        "height": 720,
+        "stats": {
+          "r": {
+            "mean": 52.85,
+            "std": 43.93
+          },
+          "g": {
+            "mean": 23.51,
+            "std": 26.5
+          },
+          "b": {
+            "mean": 26.27,
+            "std": 14.55
+          },
+          "luma": {
+            "mean": 29.95,
+            "std": 28.37
+          }
+        }
+      },
+      "dimensionsMatch": true,
+      "mad": 6.55,
+      "hotCellFraction": 0.0812,
+      "verdict": "changed-subtle",
+      "notes": []
+    }
+  ],
+  "failures": 0
+}

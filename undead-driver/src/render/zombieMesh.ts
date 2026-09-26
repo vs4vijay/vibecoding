@@ -82,6 +82,7 @@ export function createZombieMeshes(
   for (const m of [torsoMesh, headMesh, armLMesh, armRMesh]) {
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     m.frustumCulled = false; // instances span the visible band
+    m.castShadow = true; // instanced casters are supported (task 2.1)
     scene.add(m);
   }
   const slots: Slot[] = [];

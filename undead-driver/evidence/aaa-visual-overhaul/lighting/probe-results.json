@@ -1,0 +1,295 @@
+{
+  "thresholds": {
+    "shadowContrastMin": 6,
+    "coneContrastMin": 6,
+    "poolContrastMin": 6,
+    "glowMinLuma": 60,
+    "readabilityContrastMin": 10,
+    "moodMadMin": 2.5
+  },
+  "floorPin": 16,
+  "checks": {
+    "shadow": {
+      "shadowPatches": [
+        {
+          "x": 705,
+          "y": 567,
+          "n": 225,
+          "mean": 15.33,
+          "min": 0,
+          "rgb": [
+            18.7,
+            14.3,
+            15.5
+          ]
+        },
+        {
+          "x": 745,
+          "y": 590,
+          "n": 225,
+          "mean": 14.57,
+          "min": 0,
+          "rgb": [
+            18.1,
+            13.5,
+            14.8
+          ]
+        },
+        {
+          "x": 792,
+          "y": 616,
+          "n": 225,
+          "mean": 12.87,
+          "min": 0,
+          "rgb": [
+            16.2,
+            11.9,
+            13.1
+          ]
+        },
+        {
+          "x": 849,
+          "y": 648,
+          "n": 225,
+          "mean": 12.35,
+          "min": 0,
+          "rgb": [
+            15.4,
+            11.5,
+            12.1
+          ]
+        }
+      ],
+      "control": {
+        "x": 329,
+        "y": 638,
+        "n": 225,
+        "mean": 25.44,
+        "min": 2.6234,
+        "rgb": [
+          45.1,
+          20.5,
+          16.3
+        ]
+      },
+      "shadowMean": 13.78,
+      "contrast": 11.66,
+      "pass": true
+    },
+    "shadowFloor": {
+      "darkestPatchMean": 12.35,
+      "pin": 16,
+      "pass": false
+    },
+    "cone": {
+      "pose": "side",
+      "inCone": {
+        "x": 123,
+        "y": 461,
+        "n": 225,
+        "mean": 25.27,
+        "min": 3.2612,
+        "rgb": [
+          47.1,
+          19.8,
+          15.2
+        ]
+      },
+      "outConeFar": {
+        "x": 385,
+        "y": 365,
+        "n": 225,
+        "mean": 99.01,
+        "min": 31.6216,
+        "rgb": [
+          127,
+          94.2,
+          63.9
+        ]
+      },
+      "outConeFarNear": {
+        "x": 264,
+        "y": 363,
+        "n": 225,
+        "mean": 75.47,
+        "min": 41.337999999999994,
+        "rgb": [
+          102.8,
+          70.2,
+          47.1
+        ]
+      },
+      "contrast": -61.97,
+      "pass": false
+    },
+    "lampPool": {
+      "lamp": {
+        "x": 7.35,
+        "z": 60
+      },
+      "poolSide": {
+        "x": 625,
+        "y": 454,
+        "n": 225,
+        "mean": 34.24,
+        "min": 5.9528,
+        "rgb": [
+          62.6,
+          27.3,
+          19
+        ]
+      },
+      "control": {
+        "x": 828,
+        "y": 456,
+        "n": 225,
+        "mean": 44.29,
+        "min": 10.63,
+        "rgb": [
+          78.5,
+          36.3,
+          22.4
+        ]
+      },
+      "contrast": -10.05,
+      "zSamplesAboveHalf": 0,
+      "xSamplesAboveHalf": 5,
+      "aspectZOverX": 0,
+      "glow": {
+        "x": 560,
+        "y": 320,
+        "n": 225,
+        "mean": 182.3,
+        "min": 151.74479999999997,
+        "rgb": [
+          240.9,
+          174.1,
+          91.3
+        ]
+      },
+      "pass": false
+    }
+  },
+  "captures": {
+    "combat-mid": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/lighting/fullres/combat-mid.png",
+    "car-side-profile": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/lighting/fullres/car-side-profile.png",
+    "lamp-pool": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/lighting/fullres/lamp-pool.png",
+    "combat-late-level": "/Volumes/Main/GitHub/vibecoding/undead-driver/evidence/aaa-visual-overhaul/lighting/fullres/combat-late-level.png"
+  },
+  "popping": [],
+  "mood": {
+    "earlyLevel": 1,
+    "lateLevel": 9,
+    "farRoadEarly": {
+      "x": 640,
+      "y": 322,
+      "n": 625,
+      "mean": 41.56,
+      "min": 0.1444,
+      "rgb": [
+        67.8,
+        35.6,
+        23.7
+      ]
+    },
+    "farRoadLate": {
+      "x": 640,
+      "y": 322,
+      "n": 625,
+      "mean": 23.42,
+      "min": 0,
+      "rgb": [
+        27.6,
+        22.7,
+        18.6
+      ]
+    },
+    "farRoadMad": 18.14,
+    "farRoadColorEarly": [
+      67.8,
+      35.6,
+      23.7
+    ],
+    "farRoadColorLate": [
+      27.6,
+      22.7,
+      18.6
+    ],
+    "horizonRowEarly": 312,
+    "horizonRowLate": 307,
+    "frameMeanEarly": 69.81,
+    "frameMeanLate": 65.19,
+    "pass": true
+  },
+  "readability": {
+    "early": {
+      "zombie": {
+        "x": 698,
+        "y": 422,
+        "n": 225,
+        "mean": 143.53,
+        "min": 43.296,
+        "rgb": [
+          190.2,
+          135.8,
+          82.6
+        ]
+      },
+      "road": {
+        "x": 655,
+        "y": 439,
+        "n": 225,
+        "mean": 17.99,
+        "min": 0.6498,
+        "rgb": [
+          36.4,
+          13.2,
+          11.5
+        ]
+      },
+      "contrast": 125.54
+    },
+    "late": {
+      "zombie": {
+        "x": 626,
+        "y": 338,
+        "n": 225,
+        "mean": 23.32,
+        "min": 0,
+        "rgb": [
+          30.1,
+          22.2,
+          14.9
+        ]
+      },
+      "road": {
+        "x": 586,
+        "y": 354,
+        "n": 225,
+        "mean": 14.39,
+        "min": 0,
+        "rgb": [
+          18.4,
+          13.3,
+          13.6
+        ]
+      },
+      "contrast": 8.93
+    },
+    "pass": false
+  },
+  "rendererInfo": {
+    "calls": 88,
+    "renderPath": "composer",
+    "fps": 89.99798055776861,
+    "tier": 3,
+    "pixelRatio": 1,
+    "systems": {
+      "world": 43,
+      "characters": 29,
+      "fx": 0,
+      "post": 15,
+      "other": 1
+    }
+  }
+}

@@ -1,11 +1,16 @@
 import * as THREE from "three";
 import { CONFIG } from "../config";
+import { getBeamFalloffTexture, getLightPoolTexture } from "./textures";
+import { buildBeamCrossGeometry, makeBeamMaterial } from "./scene";
 
 const R = CONFIG.road;
 const SEG_LEN = R.segmentLength;
 
 export type Segment = { id: number; z: number };
 export type RecycleMove = { id: number; newZ: number };
+
+/** World x of a segment's streetlamp head (pole sits 0.55 m further out). */
+export const LAMP_HEAD_X = 7.35;
 
 /**
  * Pure streaming plan: any segment whose FRONT edge (anchor z plus segLen/2 —
@@ -112,13 +117,23 @@ function mergeGeometriesImpl(geos: THREE.BufferGeometry[]): THREE.BufferGeometry
 /** Pooled dusk highway: asphalt, dashed lines, guardrails, streetlights, sand shoulders, skyline. */
 export class World {
   group = new THREE.Group();
-  private segs: { mesh: THREE.Group; z: number }[] = [];
+  private segs: { mesh: THREE.Group; z: number; lampX: number }[] = [];
+  /** Shared out-object for nearestLampAhead (dev-only query, never per frame). */
+  private lampQuery = { x: 0, z: 0 };
   private skyline: THREE.InstancedMesh;
   private skyBaseX = new Float32Array(SKY_COUNT);
   private skyH = new Float32Array(SKY_COUNT);
   private skyW = new Float32Array(SKY_COUNT);
   private skyZ = new Float32Array(SKY_COUNT);
   private tmpM = new THREE.Matrix4();
+
+  // ── Lamp light fakes (task 2.2, design D4) ─────────────────────────────
+  // One InstancedMesh each for pool decal / beam cross / head glow, instance
+  // i bound to segment i. Recycling rewrites instance matrices in place —
+  // zero allocation, three extra draw calls steady state.
+  private lampPools: THREE.InstancedMesh;
+  private lampBeams: THREE.InstancedMesh;
+  private lampGlows: THREE.InstancedMesh;
 
   constructor(scene: THREE.Scene) {
     // --- Shared materials, built once and reused by the pool ---
@@ -190,25 +205,80 @@ export class World {
     // --- Pooled road segments: one merged mesh per material ---
     for (let i = 0; i < R.visibleSegments; i++) {
       const g = new THREE.Group();
-      g.add(new THREE.Mesh(asphaltGeo, asphaltMat));
+      const asphalt = new THREE.Mesh(asphaltGeo, asphaltMat);
+      asphalt.receiveShadow = true; // sun shadows land on the road (task 2.1)
+      g.add(asphalt);
       g.add(new THREE.Mesh(dashGeo, dashMat));
-      g.add(new THREE.Mesh(railGeo, railMat));
-      g.add(new THREE.Mesh(sandGeo, sandMat));
+      const rail = new THREE.Mesh(railGeo, railMat);
+      // Rails cast the long roadside dusk stripes; they also receive.
+      rail.castShadow = true;
+      rail.receiveShadow = true;
+      g.add(rail);
+      const sand = new THREE.Mesh(sandGeo, sandMat);
+      sand.receiveShadow = true;
+      g.add(sand);
 
       // Streetlight every segment, alternating sides; emissive-looking head,
       // no real light. (Side varies per segment, so pole/head stay separate.)
       const lampSide = i % 2 === 0 ? -1 : 1;
       const pole = new THREE.Mesh(poleGeo, poleMat);
       pole.position.set(lampSide * 7.9, 0, 0);
+      pole.castShadow = true; // 6 m poles throw long shadows at dusk sun angles
       g.add(pole);
       const head = new THREE.Mesh(headGeo, headMat);
       head.position.set(lampSide * 7.35, 0, 0);
       g.add(head);
 
       g.position.z = -i * SEG_LEN;
-      this.segs.push({ mesh: g, z: -i * SEG_LEN });
+      this.segs.push({ mesh: g, z: -i * SEG_LEN, lampX: lampSide * LAMP_HEAD_X });
       this.group.add(g);
     }
+
+    // --- Lamp light fakes (task 2.2) ---
+    // Preallocated instance pools, instance i ↔ segment i. Additive, so the
+    // configured color × opacity bakes into the material color (black adds
+    // nothing). All three ride this.group so they stream with the segments.
+    const lamp = CONFIG.look.lampPool;
+    const poolGeo = new THREE.CircleGeometry(1, 28);
+    poolGeo.rotateX(-Math.PI / 2); // lie flat on the road
+    const poolMat = new THREE.MeshBasicMaterial({
+      map: getLightPoolTexture(),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false,
+    });
+    poolMat.color.setHex(lamp.color).multiplyScalar(lamp.poolOpacity);
+    this.lampPools = new THREE.InstancedMesh(poolGeo, poolMat, R.visibleSegments);
+
+    this.lampBeams = new THREE.InstancedMesh(
+      buildBeamCrossGeometry(
+        2 * lamp.beamRadiusTop,
+        2 * lamp.beamRadiusBottom,
+        lamp.beamHeight,
+      ),
+      makeBeamMaterial(lamp.color, lamp.beamOpacity),
+      R.visibleSegments,
+    );
+
+    const glowGeo = new THREE.PlaneGeometry(lamp.headGlowSize, lamp.headGlowSize);
+    const glowMat = new THREE.MeshBasicMaterial({
+      map: getBeamFalloffTexture(),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide, // chase cam sees the -z face
+      fog: false,
+    });
+    glowMat.color.setHex(lamp.color);
+    this.lampGlows = new THREE.InstancedMesh(glowGeo, glowMat, R.visibleSegments);
+    for (const inst of [this.lampPools, this.lampBeams, this.lampGlows]) {
+      inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      inst.frustumCulled = false; // instances span the streamed window
+      inst.renderOrder = 1; // above the road decal pass, additive anyway
+      this.group.add(inst);
+    }
+    for (let i = 0; i < R.visibleSegments; i++) this.placeLamp(i);
 
     scene.add(this.group);
     scene.add(this.skyline);
@@ -228,16 +298,20 @@ export class World {
     if (minZ - SEG_LEN / 2 > keepBehind) {
       // Backward teleport (retry): slide the whole window back to the car.
       const delta = keepBehind + SEG_LEN / 2 - minZ;
-      for (const s of this.segs) {
+      for (let i = 0; i < this.segs.length; i++) {
+        const s = this.segs[i];
         s.z += delta;
         s.mesh.position.z = s.z;
+        this.placeLamp(i);
       }
     } else {
       let next = Math.max(maxZ + SEG_LEN, carZ - 30);
-      for (const s of this.segs) {
+      for (let i = 0; i < this.segs.length; i++) {
+        const s = this.segs[i];
         if (s.z + SEG_LEN / 2 < keepBehind) {
           s.z = next;
           s.mesh.position.z = next;
+          this.placeLamp(i);
           next += SEG_LEN;
         }
       }
@@ -265,5 +339,52 @@ export class World {
     this.tmpM.makeScale(this.skyW[i], this.skyH[i], this.skyW[i]);
     this.tmpM.setPosition(this.skyBaseX[i], this.skyH[i] / 2, this.skyZ[i]);
     this.skyline.setMatrixAt(i, this.tmpM);
+  }
+
+  /**
+   * Rewrites segment i's pool/beam/glow instance matrices after its z changed
+   * (recycle, teleport, or initial build). Mutates shared scratch only.
+   */
+  private placeLamp(i: number): void {
+    const s = this.segs[i];
+    const lamp = CONFIG.look.lampPool;
+    const headY = 5.9; // headGeo bakes the lamp head at y 5.9
+    // Pool: flat ellipse on the road, stretched along the travel axis.
+    this.tmpM.makeScale(lamp.poolRadius, 1, lamp.poolRadius * lamp.poolStretchZ);
+    this.tmpM.setPosition(s.lampX, 0.02, s.z);
+    this.lampPools.setMatrixAt(i, this.tmpM);
+    // Beam: crossed quads hanging from the lamp head (geometry spans
+    // y 0..-beamHeight, so the instance pose is the head position).
+    this.tmpM.identity();
+    this.tmpM.setPosition(s.lampX, headY, s.z);
+    this.lampBeams.setMatrixAt(i, this.tmpM);
+    // Glow quad at the head.
+    this.tmpM.identity();
+    this.tmpM.setPosition(s.lampX, headY, s.z);
+    this.lampGlows.setMatrixAt(i, this.tmpM);
+    this.lampPools.instanceMatrix.needsUpdate = true;
+    this.lampBeams.instanceMatrix.needsUpdate = true;
+    this.lampGlows.instanceMatrix.needsUpdate = true;
+  }
+
+  /**
+   * Capture-harness query (dev hooks only): world pose of the nearest
+   * streetlamp head at or ahead of `z`. Writes into a shared object — never
+   * called from an update path, so the out-param pattern costs nothing.
+   */
+  nearestLampAhead(z: number): { x: number; z: number } {
+    let best = -1;
+    for (let i = 0; i < this.segs.length; i++) {
+      const s = this.segs[i];
+      if (s.z >= z && (best === -1 || s.z < this.segs[best].z)) best = i;
+    }
+    if (best === -1) {
+      this.lampQuery.x = 0;
+      this.lampQuery.z = z;
+    } else {
+      this.lampQuery.x = this.segs[best].lampX;
+      this.lampQuery.z = this.segs[best].z;
+    }
+    return this.lampQuery;
   }
 }

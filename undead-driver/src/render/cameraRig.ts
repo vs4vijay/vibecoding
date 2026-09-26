@@ -15,6 +15,12 @@ const DEATH_PULL_S = 1.4;
  */
 export class CameraRig {
   camera: THREE.PerspectiveCamera;
+  /**
+   * Capture-harness override: when true, follow() stands down and the camera
+   * stays wherever a debug pose (__zh.pose) put it. Never set by gameplay —
+   * chase framing is the only production path.
+   */
+  holdPose = false;
   private shakeAmp = 0;
   private tmp = new THREE.Vector3();
   /** Death cam: >0 while the rig is lerping up/back away from the wreck. */
@@ -31,6 +37,7 @@ export class CameraRig {
    * (carX * 0.55, 8, carZ - 16) — mirrored z like every other offset here.
    */
   follow(carX: number, carZ: number, speed01: number, dt: number): void {
+    if (this.holdPose) return; // capture-harness pose held; chase framing paused
     const pull = this.deathPull;
     const target = this.tmp.set(
       carX * C.offset.x,

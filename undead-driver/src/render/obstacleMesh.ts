@@ -204,15 +204,18 @@ export function createObstacleMeshes(
     const wreck = new THREE.Group();
     const hull = new THREE.Mesh(wreckGeo, wreckMat);
     hull.position.y = 0.55;
+    hull.castShadow = true; // sun-caster (task 2.1); emissive bits stay exempt
     const cabin = new THREE.Mesh(wreckCabinGeo, wreckCabinMat);
     cabin.position.set(0, 1.35, -0.2);
     cabin.rotation.z = 0.06; // settled tilt
+    cabin.castShadow = true;
     const brakes = new THREE.Mesh(brakeGeo, brakeMat);
     wreck.add(hull, cabin, brakes);
 
     const barrier = new THREE.Group();
     const plank = new THREE.Mesh(plankGeo, plankMat);
     plank.position.y = 0.45;
+    plank.castShadow = true;
     const stripe = new THREE.Mesh(stripeGeo, stripeMat);
     stripe.position.y = 0.74;
     const chevrons = new THREE.Mesh(chevronGeo, chevronMat);

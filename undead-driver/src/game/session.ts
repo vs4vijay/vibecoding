@@ -351,6 +351,26 @@ export class Session {
     this.obstacles.spawn(kind, x, z);
   }
 
+  /**
+   * Advances exactly n fixed sim steps and re-syncs render bindings
+   * (capture harness). Bypasses the wall-clock accumulator so choreographed
+   * scenarios stay deterministic — call after freezing via __zh.freeze(true)
+   * so the RAF loop stops stepping too.
+   */
+  debugStep(n: number): void {
+    for (let i = 0; i < n; i++) this.step(CONFIG.sim.dt);
+    this.syncVisuals(n * CONFIG.sim.dt);
+  }
+
+  /**
+   * Queues one shot for the next executed step regardless of pause state
+   * (capture harness). The input path gates on phase === "running"; the
+   * harness fires while frozen so the muzzle flash is alive at capture time.
+   */
+  debugFire(side: "left" | "right"): void {
+    this.pendingShots.push(side);
+  }
+
   // --- simulation ----------------------------------------------------------
 
   private step(dt: number): void {
