@@ -1,0 +1,551 @@
+/* ------------------------------------------------------------------ */
+/* DOM shell (design D1): title / pause / results / how-to screens.    */
+/* Palette + voice inherited from Hud.ts (storybook creams and golds); */
+/* Baloo 2 ships via the bundled @fontsource imports in main.ts.       */
+/*                                                                     */
+/* Capture contract: the `.pinned` class on #shell is the kill-switch  */
+/* — it forces `transition: none`, so showing/hiding a screen jumps    */
+/* straight to its settled end state and pinned page screenshots stay  */
+/* byte-stable. `prefers-reduced-motion` flattens motion the same way. */
+/* ------------------------------------------------------------------ */
+
+#shell {
+  /* The shell is the safe-area owner: screens position inside the inset
+     box, so controls never sit under notches or home indicators. */
+  position: fixed;
+  inset: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  z-index: 10; /* above the WebGL canvas and the #ui HUD canvas */
+  pointer-events: none; /* screens re-enable it; the world stays draggable */
+  font-family: "Baloo 2", "Trebuchet MS", ui-rounded, system-ui, sans-serif;
+  color: #fff3d9;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* --- screens ----------------------------------------------------------- */
+
+/*
+ * Screens never hide the 3D world: each is a full-layer scrim (bottom-heavy
+ * on the title, an even dim behind pause/results) with the content column or
+ * parchment panel centered in it. Hidden screens keep `visibility` so the
+ * exit fade can play; visibility (not display) also keeps them out of the
+ * tab order and the accessibility tree while hidden.
+ */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 200ms ease-out,
+    visibility 0s linear 200ms;
+}
+.screen.on {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 200ms ease-out;
+}
+
+.s-title {
+  /* Bottom-heavy: the dawn meadow reads at the top, text sits on shade. */
+  background: linear-gradient(
+    to top,
+    rgba(30, 20, 4, 0.64) 0%,
+    rgba(30, 20, 4, 0.36) 32%,
+    rgba(30, 20, 4, 0.12) 60%,
+    rgba(30, 20, 4, 0) 82%
+  );
+}
+.s-pause,
+.s-howto {
+  background: rgba(26, 17, 4, 0.52);
+}
+.s-win {
+  /* Warm gold wash for the celebration. */
+  background: radial-gradient(
+    120% 95% at 50% 38%,
+    rgba(112, 68, 8, 0.42) 0%,
+    rgba(54, 33, 5, 0.62) 100%
+  );
+}
+.s-lose {
+  /* Dusky cool wash: clearly a different mood from the win at a glance. */
+  background: linear-gradient(to bottom, rgba(20, 18, 34, 0.48), rgba(9, 8, 18, 0.64));
+}
+
+/* --- title column -------------------------------------------------------- */
+
+.title-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px;
+  padding-bottom: 72px; /* breathing room above the hint line */
+  text-align: center;
+  transform: translateY(-3%);
+}
+
+.title-ant {
+  width: clamp(68px, 8vw, 96px);
+  height: auto;
+  filter: drop-shadow(0 4px 8px rgba(30, 20, 4, 0.5));
+  margin-bottom: -6px;
+}
+
+.logo {
+  margin: 0;
+  font-size: clamp(50px, 8.5vw, 92px);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  background: linear-gradient(180deg, #fff3d9 12%, #ffd884 56%, #e8a13d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 3px 0 rgba(61, 39, 8, 0.55)) drop-shadow(0 12px 26px rgba(30, 20, 4, 0.55));
+}
+
+.tagline {
+  margin: 2px 0 18px;
+  font-weight: 700;
+  font-size: clamp(16px, 2.2vw, 21px);
+  letter-spacing: 0.03em;
+  color: rgba(255, 243, 217, 0.92);
+  text-shadow: 0 2px 8px rgba(30, 20, 4, 0.65);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: min(320px, 80vw);
+}
+
+.hint {
+  position: absolute;
+  right: 24px;
+  bottom: 14px;
+  margin: 0;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: rgba(255, 243, 217, 0.62);
+  text-shadow: 0 1px 4px rgba(30, 20, 4, 0.6);
+}
+
+/* --- buttons -------------------------------------------------------------- */
+
+.btn {
+  min-height: 48px;
+  min-width: 44px;
+  padding: 10px 28px;
+  border-radius: 16px;
+  border: 2px solid rgba(122, 86, 38, 0.85);
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #5c421e;
+  background: linear-gradient(180deg, #fff3d9 0%, #ffd884 100%);
+  box-shadow:
+    0 3px 0 rgba(122, 86, 38, 0.4),
+    0 10px 22px rgba(30, 20, 4, 0.38);
+  cursor: pointer;
+  transition:
+    filter 130ms ease-out,
+    transform 130ms ease-out,
+    box-shadow 130ms ease-out;
+}
+.btn:hover {
+  filter: brightness(1.06);
+}
+.btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 0 rgba(122, 86, 38, 0.4),
+    0 5px 12px rgba(30, 20, 4, 0.32);
+}
+.btn:focus-visible {
+  outline: 3px solid #ffd884;
+  outline-offset: 3px;
+}
+
+.btn-primary {
+  min-height: 56px;
+  padding: 12px 40px;
+  font-size: 19px;
+  background: linear-gradient(180deg, #ffe6a3 0%, #f0b954 55%, #e8a13d 100%);
+}
+
+.btn-secondary {
+  color: #fff3d9;
+  background: linear-gradient(180deg, rgba(66, 47, 22, 0.74), rgba(48, 35, 18, 0.68));
+  border-color: rgba(255, 231, 178, 0.4);
+  box-shadow:
+    0 3px 0 rgba(20, 13, 3, 0.45),
+    0 10px 20px rgba(30, 20, 4, 0.3);
+}
+.btn-secondary:hover {
+  filter: brightness(1.16);
+}
+
+/* Audio toggles (wired for real in the audio batch — pressed state works). */
+.toggles {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 8px;
+}
+.toggle {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 22px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 243, 217, 0.82);
+  background: rgba(48, 35, 18, 0.55);
+  border: 2px solid rgba(255, 231, 178, 0.35);
+  cursor: pointer;
+  transition:
+    background 140ms ease-out,
+    color 140ms ease-out;
+}
+.toggle:hover {
+  filter: brightness(1.12);
+}
+.toggle[aria-pressed="true"] {
+  color: #5c421e;
+  background: linear-gradient(180deg, #ffe6a3, #e8a13d);
+  border-color: rgba(122, 86, 38, 0.85);
+}
+.toggle:focus-visible {
+  outline: 3px solid #ffd884;
+  outline-offset: 3px;
+}
+
+/* --- parchment panel (pause / results / how-to) --------------------------- */
+
+.panel {
+  box-sizing: border-box;
+  width: min(420px, calc(100% - 40px));
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  padding: 28px 30px 26px;
+  text-align: center;
+  color: #5c421e;
+  background: linear-gradient(180deg, #fff8e6 0%, #f8ecca 100%);
+  border: 2px solid rgba(232, 161, 61, 0.55);
+  border-radius: 24px;
+  box-shadow:
+    0 30px 70px rgba(30, 20, 4, 0.5),
+    0 6px 16px rgba(30, 20, 4, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  transform: translateY(10px);
+  transition: transform 200ms ease-out;
+}
+.screen.on .panel {
+  transform: translateY(0);
+}
+
+.panel h2 {
+  margin: 0;
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 1.12;
+  color: #4a3113;
+}
+
+.panel .stack {
+  width: 100%;
+}
+
+/* WIN: celebration treatment — gold glow, gradient heading, Day-2 tease. */
+.panel-win {
+  border-color: rgba(232, 161, 61, 0.8);
+  box-shadow:
+    0 30px 70px rgba(30, 20, 4, 0.5),
+    0 0 70px rgba(255, 196, 90, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+.panel-win h2 {
+  font-size: 38px;
+  background: linear-gradient(180deg, #f0b954 20%, #c47f1c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(122, 74, 10, 0.3));
+}
+
+.r-sub {
+  margin: -8px 0 0;
+  font-weight: 700;
+  font-size: 16px;
+  color: rgba(92, 66, 30, 0.85);
+}
+
+.tease {
+  margin: 0;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  color: #b4791e;
+}
+
+/* LOSE: the same parchment, desaturated toward dusk. */
+.panel-lose {
+  background: linear-gradient(180deg, #efebf2 0%, #d8d2df 100%);
+  border-color: rgba(126, 114, 156, 0.55);
+  box-shadow:
+    0 30px 70px rgba(9, 8, 18, 0.55),
+    0 6px 16px rgba(9, 8, 18, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.panel-lose h2 {
+  color: #574b6e;
+}
+.panel-lose .r-sub {
+  color: rgba(87, 75, 110, 0.85);
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  justify-content: center;
+}
+.row .btn-primary {
+  flex: 1.5;
+}
+.row .btn-secondary {
+  flex: 1;
+}
+
+/* Pause hint line: the scheme-flavored "how to leave this menu" copy. */
+.hint-line {
+  margin: -4px 0 0;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: rgba(92, 66, 30, 0.66);
+}
+
+/* Stats rows: quiet label left, big tabular number right. */
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 2px 0 0;
+}
+.stats > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: rgba(92, 66, 30, 0.08);
+}
+.stats dt {
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: left;
+  color: rgba(92, 66, 30, 0.72);
+}
+.stats dd {
+  margin: 0;
+  font-weight: 800;
+  font-size: 22px;
+  color: #4a3113;
+  font-variant-numeric: tabular-nums;
+}
+.panel-lose .stats > div {
+  background: rgba(87, 75, 110, 0.1);
+}
+.panel-lose .stats dd {
+  color: #453a5c;
+}
+
+/* --- how-to ---------------------------------------------------------------- */
+
+.goal {
+  margin: 0;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.45;
+  color: rgba(74, 49, 19, 0.9);
+}
+
+/* One element holds the control listing; the HINTS table (Hints.ts) rebuilds
+   its rows per input scheme — key rows wear the keycap face, touch rows the
+   brown-glass button chip. */
+.controls {
+  list-style: none;
+  margin: 0;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  background: rgba(92, 66, 30, 0.07);
+  border-radius: 14px;
+}
+.controls li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 700;
+  font-size: 14.5px;
+  text-align: left;
+  color: rgba(74, 49, 19, 0.92);
+}
+.controls .key {
+  flex: 0 0 104px;
+  box-sizing: border-box;
+  text-align: center;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #5c421e;
+  background: linear-gradient(180deg, #fff1cf, #e5c489);
+  border: 1.5px solid rgba(122, 86, 38, 0.75);
+  box-shadow: 0 2px 0 rgba(122, 86, 38, 0.35);
+}
+/* Touch variant: the chip reads as the on-screen button it names, not a key. */
+.controls .key.chip {
+  color: #fff3d9;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 243, 217, 0.12), rgba(255, 243, 217, 0) 62%),
+    rgba(48, 35, 18, 0.46);
+  border-color: rgba(255, 231, 178, 0.38);
+  box-shadow: 0 2px 0 rgba(20, 13, 3, 0.45);
+}
+/* Flavor line under the listing — scheme-neutral, no control names. */
+.tip {
+  margin: 2px 4px 0;
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: rgba(74, 49, 19, 0.72);
+}
+.panel-howto .btn-primary {
+  align-self: center;
+  min-width: 200px;
+}
+
+/* --- resume-grace chip ------------------------------------------------------ */
+
+/*
+ * Small, centered, non-blocking: the world stays visible and the chip itself
+ * is the skip control (activate, or Enter/Space while it holds focus).
+ */
+.grace-chip {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  min-height: 68px;
+  min-width: 96px;
+  padding: 10px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  border: 2px solid rgba(255, 231, 178, 0.42);
+  background: rgba(48, 35, 18, 0.58);
+  color: #fff3d9;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 14px 34px rgba(30, 20, 4, 0.4);
+}
+.grace-chip[hidden] {
+  display: none;
+}
+.grace-chip:focus-visible {
+  outline: 3px solid #ffd884;
+  outline-offset: 3px;
+}
+.grace-num {
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 1;
+  color: #ffd884;
+  font-variant-numeric: tabular-nums;
+}
+.grace-label {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 243, 217, 0.8);
+}
+
+/* --- motion guards ------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .panel,
+  .btn,
+  .toggle,
+  .grace-chip {
+    transition: none;
+  }
+  .panel {
+    transform: none;
+  }
+}
+
+/* Capture kill-switch (design D1): pinned frames must be settled and stable,
+   so every transition collapses to none and fades sit at their end state. */
+#shell.pinned,
+#shell.pinned * {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* --- narrow viewports ----------------------------------------------------------- */
+
+@media (max-width: 560px) {
+  .hint {
+    right: 50%;
+    transform: translateX(50%);
+    text-align: center;
+    white-space: nowrap;
+  }
+  .panel {
+    padding: 22px 20px 20px;
+  }
+  .row {
+    flex-direction: column;
+  }
+  .row .btn-primary,
+  .row .btn-secondary {
+    flex: initial;
+    width: 100%;
+  }
+}

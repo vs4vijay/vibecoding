@@ -1,0 +1,202 @@
+/* ------------------------------------------------------------------ */
+/* Touch widget layer (design D3): virtual joystick, JUMP + context    */
+/* ACTION buttons, pause control. Palette + voice inherited from       */
+/* Hud.ts / shell.css (storybook creams and golds on brown glass).     */
+/*                                                                     */
+/* The layer is a synthetic input provider: widgets write into the     */
+/* existing Input surface (move / sprint / action queues / orbit /     */
+/* wheel) and never touch the sim. Scene gestures bind to the WebGL    */
+/* canvas, and widgets stop propagation — gestures near controls       */
+/* still steer, drags on controls never orbit the camera.              */
+/*                                                                     */
+/* Capture contract: the `.pinned` class on #touch is the same         */
+/* kill-switch as #shell.pinned — transitions collapse so pinned page  */
+/* screenshots of the `touch` scene stay byte-stable.                  */
+/* ------------------------------------------------------------------ */
+
+html,
+body {
+  /* The meadow never scrolls; kill pull-to-refresh / overscroll glow. */
+  overscroll-behavior: none;
+}
+
+#touch {
+  /* Same inset box discipline as #shell: widget offsets live inside the
+     safe area, so nothing sits under notches or home indicators. */
+  position: fixed;
+  inset: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  z-index: 9; /* above the WebGL + HUD canvases, below #shell (10) */
+  pointer-events: none; /* widgets re-enable it; the world stays draggable */
+  font-family: "Baloo 2", "Trebuchet MS", ui-rounded, system-ui, sans-serif;
+  color: #fff3d9;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#touch[hidden] {
+  display: none;
+}
+
+/* Capture kill-switch (mirrors #shell.pinned in shell.css). */
+#touch.pinned,
+#touch.pinned * {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Shared translucent brown-glass face for every widget. */
+.tc-stick,
+.tc-btn,
+.tc-pause {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 243, 217, 0.12), rgba(255, 243, 217, 0) 62%),
+    rgba(48, 35, 18, 0.46);
+  border: 2px solid rgba(255, 231, 178, 0.38);
+  box-shadow:
+    0 10px 24px rgba(30, 20, 4, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -10px 18px rgba(20, 13, 3, 0.26);
+}
+
+/* --- virtual joystick (bottom-left) --------------------------------------- */
+
+.tc-stick {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.tc-nub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffe6a3 0%, #f0b954 55%, #e8a13d 100%);
+  border: 2px solid rgba(122, 86, 38, 0.85);
+  box-shadow:
+    0 3px 0 rgba(122, 86, 38, 0.4),
+    0 8px 16px rgba(30, 20, 4, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  /* Direct 1:1 tracking — no transition on the drag-driven transform. */
+  will-change: transform;
+}
+
+/* --- action buttons (bottom-right cluster) --------------------------------- */
+
+.tc-btn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  pointer-events: auto;
+  touch-action: none;
+  padding: 0;
+  font-family: inherit;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 243, 217, 0.55);
+  cursor: pointer;
+  transition:
+    filter 110ms ease-out,
+    transform 110ms ease-out,
+    box-shadow 110ms ease-out;
+}
+.tc-btn.pressed {
+  transform: scale(0.93);
+  filter: brightness(1.18);
+}
+.tc-btn:focus-visible {
+  outline: 3px solid #ffd884;
+  outline-offset: 3px;
+}
+
+.tc-jump {
+  right: 36px;
+  bottom: 136px;
+  width: 62px;
+  height: 62px;
+  font-size: 12px;
+}
+
+.tc-act {
+  right: 26px;
+  bottom: 36px;
+  width: 84px;
+  height: 84px;
+  font-size: 14.5px;
+}
+/* Ready state: the verb applies — light it up like the primary buttons. */
+.tc-act.ready {
+  color: #5c421e;
+  background: linear-gradient(180deg, #ffe6a3 0%, #f0b954 55%, #e8a13d 100%);
+  border-color: rgba(122, 86, 38, 0.85);
+  box-shadow:
+    0 4px 0 rgba(122, 86, 38, 0.45),
+    0 10px 22px rgba(30, 20, 4, 0.38),
+    0 0 26px rgba(255, 196, 90, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* --- pause control (top-right, clear of plaque + sun track) ---------------- */
+
+.tc-pause {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  touch-action: none;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    filter 110ms ease-out,
+    transform 110ms ease-out;
+}
+.tc-pause:active {
+  transform: scale(0.93);
+  filter: brightness(1.18);
+}
+.tc-pause:focus-visible {
+  outline: 3px solid #ffd884;
+  outline-offset: 3px;
+}
+.tc-pause svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+/* --- session mute control (left of pause, design D4) ---------------------- */
+
+.tc-mute {
+  right: 74px; /* one 48px pause control + 10px gap from the edge */
+}
+/* Muted: the wave collapses, the slash crosses the speaker. */
+.tc-mute .snd-slash {
+  opacity: 0;
+}
+.tc-mute.muted .snd-wave {
+  opacity: 0;
+}
+.tc-mute.muted .snd-slash {
+  opacity: 1;
+}
+.tc-mute[aria-pressed="true"] {
+  border-color: rgba(255, 157, 92, 0.6);
+}

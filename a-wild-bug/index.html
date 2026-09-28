@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐞</text></svg>"
+    />
+    <title>A Wild Bug</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        overflow: hidden;
+        height: 100%;
+        background: #101410;
+      }
+      canvas {
+        display: block;
+      }
+      /* The UI canvas stacks above the WebGL canvas; captures composite both. */
+      #ui {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- The DOM screen layer (title / pause / results / how-to); Shell.ts fills it. -->
+    <div id="shell"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

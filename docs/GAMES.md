@@ -23,6 +23,7 @@ without breaking the others.
 | Devil's Highway | <https://vs4vijay.github.io/vibecoding/devils-highway/> | [`devils-highway/`](../devils-highway) | JavaScript ES modules · three.js r172 vendored · no build step | playwright `.qa` probes |
 | Metro Dash | <https://vs4vijay.github.io/vibecoding/metro-dash/> | [`metro-dash/`](../metro-dash) | JavaScript ES modules · three.js r172 (CDN importmap) · no build step · optional Elysia leaderboard API | OpenSpec walkthrough (`openspec/`) |
 | Midtown Blitz | <https://vs4vijay.github.io/vibecoding/midtown-blitz/> | [`midtown-blitz/`](../midtown-blitz) | JavaScript, Vite 6, three.js r171, WebAudio synthesis | 21 plain-node harnesses (`scripts/*-test.mjs`) |
+| A Wild Bug | <https://vs4vijay.github.io/vibecoding/a-wild-bug/> | [`a-wild-bug/`](../a-wild-bug) | TS strict · Vite 6 · three.js · WebAudio synthesis | Playwright probe suite (`tools/probe-ui.mjs`, 35 sections) + pinned capture harness |
 
 **In development** (not deployed yet; check each folder's README/AGENTS.md for
 status): none — [`dustline/`](../dustline) below is the server-backed
