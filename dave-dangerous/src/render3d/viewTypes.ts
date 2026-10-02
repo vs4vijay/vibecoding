@@ -39,6 +39,8 @@ export interface RenderUiState {
   fuel: number; // 0..fuelMax
   fuelMax: number;
   lowFuel: boolean;
+  best: number; // best banked score across runs
+  newBest: boolean; // true only for the run that just set the best
 }
 
 export interface FxHooks {

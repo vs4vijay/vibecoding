@@ -2,7 +2,8 @@
 // Self-contained presentation layer: builds its own DOM and scoped stylesheet
 // inside the container game.ts passes in (index.html only supplies the page
 // shell, Google Fonts and the canvas mount). Screens: title menu (with
-// settings / how-to-play), playing HUD, pause, game over, level clear, toasts.
+// settings / how-to-play / new-game confirm), playing HUD, pause, game over,
+// level clear, toasts.
 //
 // setState() receives the full RenderUiState every frame and is diff-driven —
 // DOM is touched only when a value actually changes, so there is no layout
@@ -12,6 +13,7 @@ import type { RenderUiState } from "../viewTypes";
 
 export interface UiCallbacks {
   onStart(): void;      // title screen → play
+  onStartConfirmed(): void; // new-game confirm accepted → fresh game
   onResume(): void;     // pause → resume
   onRestart(): void;    // game over / pause → restart
   onNext(): void;       // level clear → continue
@@ -43,6 +45,17 @@ function fuelFrac(fuel: number, fuelMax: number): number {
   const n = fuel / fuelMax;
   return n < 0 ? 0 : n > 1 ? 1 : n;
 }
+/** New-game gate (design D3): a fresh start over a saved run asks first. */
+export function shouldConfirmNewGame(hasSave: boolean): boolean {
+  return hasSave;
+}
+/** Low-fuel toast edge (pure, DOM-free): fires only on the false→true rise. */
+export function fuelWarningEdge(prev: boolean, curr: boolean): "warn" | null {
+  return !prev && curr ? "warn" : null;
+}
+
+/** First-session controls-hint marker (BestScore-style try/catch persistence). */
+const HINT_STORAGE_KEY = "dave-dangerous-hinted";
 
 // --- stylesheet (scoped to .ddui-*, tokens mirror src/render3d/palette.ts) ----
 const CSS = `
@@ -111,7 +124,7 @@ const CSS = `
 .ddui-panel::before, .ddui-panel::after { content: ""; position: absolute; width: 9px; height: 9px; pointer-events: none; }
 .ddui-panel::before { top: -1px; left: -1px; border-top: 1px solid rgba(255, 179, 71, 0.75); border-left: 1px solid rgba(255, 179, 71, 0.75); border-top-left-radius: 8px; }
 .ddui-panel::after { bottom: -1px; right: -1px; border-bottom: 1px solid rgba(255, 179, 71, 0.75); border-right: 1px solid rgba(255, 179, 71, 0.75); border-bottom-right-radius: 8px; }
-.ddui-panel.is-pop { animation: ddui-pop 0.38s var(--ddui-ease); }
+.ddui-panel.is-pop, .ddui-best-badge.is-pop { animation: ddui-pop 0.38s var(--ddui-ease); }
 @keyframes ddui-pop { 0% { transform: scale(1); } 35% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
 .ddui-hud-label { font-size: 10px; font-weight: 600; letter-spacing: 0.32em; color: var(--ddui-dim); white-space: nowrap; }
@@ -242,8 +255,29 @@ const CSS = `
 .ddui-howto-row:last-child { border-bottom: 0; }
 .ddui-howto-keys { display: flex; gap: 4px; }
 
+/* new-game confirm — modal overlay scoped to the menu screen (not a flow) */
+.ddui-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.5s var(--ddui-ease), visibility 0s linear 0.5s;
+}
+.ddui-confirm.is-open { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s, 0s; }
+.ddui-confirm .ddui-card { min-width: min(380px, 86vw); padding: 32px 40px; }
+.ddui-confirm.is-open .ddui-card { opacity: 1; transform: translateY(0) scale(1); transition-delay: 0.08s; }
+.ddui-confirm .ddui-card-title { font-size: clamp(24px, 4vw, 32px); }
+.ddui-confirm-note { margin-top: 12px; font-size: 11px; font-weight: 500; letter-spacing: 0.18em; color: var(--ddui-dim); }
+
 .ddui-menu-foot { position: absolute; left: 0; right: 0; bottom: 28px; z-index: 1; display: flex; justify-content: center; gap: 28px; font-size: 10px; font-weight: 500; letter-spacing: 0.28em; color: var(--ddui-dim); }
 .ddui-menu-foot span { display: flex; align-items: center; gap: 8px; }
+.ddui-menu-best { color: var(--ddui-gold); font-variant-numeric: tabular-nums; }
+.ddui-menu-best.is-hidden { display: none; }
 
 /* --- HUD ---------------------------------------------------------------------- */
 .ddui-hud { display: block; padding: 24px 28px; }
@@ -258,7 +292,18 @@ const CSS = `
 .ddui-pips { display: flex; gap: 9px; padding: 0 2px; }
 .ddui-pip { width: 9px; height: 9px; transform: rotate(45deg); border: 1px solid rgba(217, 164, 65, 0.45); transition: background 0.35s var(--ddui-ease), border-color 0.35s var(--ddui-ease), box-shadow 0.35s var(--ddui-ease); }
 .ddui-pip.is-filled { background: linear-gradient(135deg, #c93b2e, #e8683f); border-color: rgba(255, 210, 122, 0.9); box-shadow: 0 0 9px rgba(201, 59, 46, 0.55); }
-.ddui-sound-pill { padding: 10px 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+/* real <button>: the one clickable child of the .ddui-passive HUD screen; also
+   re-asserts the panel visuals the .ddui-root button reset would strip */
+.ddui-root button.ddui-sound-pill {
+  pointer-events: auto;
+  padding: 10px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  background: var(--ddui-panel-bg);
+  border: 1px solid var(--ddui-hairline);
+}
 .ddui-eq { position: relative; display: flex; align-items: flex-end; gap: 3px; height: 13px; }
 .ddui-eq i { width: 3px; height: 100%; border-radius: 1px; background: var(--ddui-ember-hot); transform-origin: bottom; animation: ddui-eq 1s ease-in-out infinite; }
 .ddui-eq i:nth-child(2) { animation-delay: 0.18s; }
@@ -282,6 +327,64 @@ const CSS = `
 .ddui-gun.is-armed .ddui-hud-label { color: var(--ddui-ember-hot); }
 .ddui-play-hint { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border: 1px solid rgba(217, 164, 65, 0.16); border-radius: 6px; background: rgba(10, 15, 20, 0.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-size: 10px; font-weight: 500; letter-spacing: 0.26em; color: var(--ddui-dim); }
 
+/* --- top-center notes (HUD, passive): level banner above, first-session
+   controls hint below; both slots always reserved so they never collide ----- */
+.ddui-topnote {
+  position: absolute;
+  top: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.ddui-topnote > * {
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.45s var(--ddui-ease), transform 0.45s var(--ddui-ease), visibility 0s linear 0.45s;
+}
+.ddui-topnote > .is-on { visibility: visible; opacity: 1; transform: translateY(0); transition-delay: 0s, 0s, 0s; }
+.ddui-level-banner {
+  padding: 10px 22px 11px;
+  border: 1px solid var(--ddui-hairline);
+  border-radius: 6px;
+  background: var(--ddui-panel-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(5, 8, 12, 0.4);
+  font-family: var(--ddui-font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  color: var(--ddui-ember-hot);
+  white-space: nowrap;
+}
+.ddui-controls-hint {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 9px 16px 10px;
+  border: 1px solid rgba(217, 164, 65, 0.16);
+  border-radius: 6px;
+  background: rgba(10, 15, 20, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.ddui-controls-hint > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  color: var(--ddui-dim);
+  white-space: nowrap;
+}
+
 /* --- modal cards (pause / game over / clear) ---------------------------------- */
 .ddui-modal { align-items: center; justify-content: center; }
 .ddui-backdrop { position: absolute; inset: 0; background: radial-gradient(100% 100% at 50% 42%, rgba(5, 8, 12, 0.42) 0%, rgba(5, 8, 12, 0.8) 100%); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
@@ -296,6 +399,30 @@ const CSS = `
 @keyframes ddui-shimmer { 0% { background-position: 130% 0; } 100% { background-position: -130% 0; } }
 .ddui-card-score-label { margin-top: 20px; font-size: 10px; font-weight: 600; letter-spacing: 0.34em; color: var(--ddui-dim); }
 .ddui-card-score { margin-top: 6px; font-size: 34px; font-weight: 600; letter-spacing: 0.14em; color: var(--ddui-ember-hot); font-variant-numeric: tabular-nums; }
+.ddui-card-best {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  color: var(--ddui-dim);
+  font-variant-numeric: tabular-nums;
+}
+.ddui-best-badge {
+  display: none;
+  padding: 3px 10px 4px;
+  border: 1px solid rgba(255, 210, 122, 0.85);
+  border-radius: 999px;
+  background: rgba(255, 179, 71, 0.16);
+  color: var(--ddui-ember-hot);
+  font-size: 9px;
+  letter-spacing: 0.28em;
+  text-indent: 0.28em;
+}
+.ddui-best-badge.is-on { display: inline-block; }
 .ddui-btnrow { display: flex; justify-content: center; gap: 14px; margin-top: 28px; }
 .ddui-btn {
   pointer-events: auto;
@@ -355,12 +482,46 @@ const CSS = `
   .ddui-play-hint { display: none; }
   .ddui-jet { width: 52vw; }
 }
+/* narrow viewports: the four top HUD chips (SCORE/DEPTH/LIVES/SOUND) must share
+   one row — tighten the gutters and panel chrome so nothing clips off-screen */
+@media (max-width: 520px) {
+  .ddui-hud { padding: 24px 14px; }
+  .ddui-hud-top { gap: 8px; }
+  .ddui-hud-side { gap: 8px; }
+  .ddui-hud-label { letter-spacing: 0.22em; }
+  .ddui-score-panel { padding: 8px 12px 9px; min-width: 118px; }
+  .ddui-score { font-size: 18px; }
+  .ddui-depth-chip { padding: 8px 10px 9px; min-width: 68px; }
+  .ddui-lives-panel { padding: 8px 10px 9px; }
+  .ddui-pips { gap: 6px; padding: 0; }
+  .ddui-root button.ddui-sound-pill { padding: 8px 10px 9px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .ddui-root *, .ddui-root *::before, .ddui-root *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+/* coarse pointers: the TouchControls pads occupy the bottom corners, so lift
+   the HUD's bottom row clear of them; touch players get the on-screen pause
+   chip instead of the keyboard pause hint */
+@media (pointer: coarse) {
+  .ddui-hud-bottom { bottom: calc(132px + env(safe-area-inset-bottom)); }
+  .ddui-play-hint { display: none; }
+  /* the touch pause chip hangs below the HUD chips (ends ~140px): drop the
+     banner stack under it, and let the long DEPTH line wrap instead of clip.
+     The stack needs an explicit width — as a left:50% absolute box its natural
+     extent is only half the viewport, which would wrap the banner far too soon */
+  .ddui-topnote { top: calc(148px + env(safe-area-inset-top)); width: min(92vw, 560px); }
+  .ddui-level-banner {
+    max-width: min(92vw, 560px);
+    white-space: normal;
+    text-align: center;
+    line-height: 1.6;
+  }
+  .ddui-controls-hint { max-width: min(92vw, 560px); }
+  .ddui-controls-hint > span { white-space: normal; text-align: center; line-height: 1.6; }
 }
 `;
 
@@ -385,7 +546,13 @@ export class UI {
   private fuelPct: HTMLSpanElement;
   private jetPanel: HTMLDivElement;
   private gunChip: HTMLDivElement;
-  private soundPill: HTMLDivElement;
+  private soundPill: HTMLButtonElement;
+  // top-center HUD notes (passive): level banner + first-session controls hint
+  private bannerEl: HTMLDivElement;
+  private hintEl: HTMLDivElement;
+  private bannerTimer = 0;
+  private hintTimer = 0;
+  private hintShown = false;
   // menu refs
   private continueBtn: HTMLButtonElement;
   private continueSub: HTMLSpanElement;
@@ -393,9 +560,30 @@ export class UI {
   private howtoEl: HTMLDivElement;
   private howtoItem: HTMLButtonElement;
   private pauseBackdrop: HTMLDivElement;
+  // new-game confirm dialog (menu-scoped, not a flow): open state + focus restore
+  private confirmEl: HTMLDivElement;
+  private confirmPrimary: HTMLButtonElement;
+  private confirmOpen = false;
+  private confirmRestore: HTMLElement | null = null;
+  // save presence mirrored from syncMenuProgress — gates the NEW GAME confirm
+  private hasSave = false;
   // modal score readouts
   private overScore: HTMLDivElement;
   private clearScore: HTMLDivElement;
+  // best-score surfaces (menu foot line + game-over best row/badge)
+  private menuBest: HTMLSpanElement;
+  private overBest: HTMLSpanElement;
+  private overBestBadge: HTMLSpanElement;
+  // dialog state — primary button per modal, open modal, focus restore target
+  private pausePrimary: HTMLButtonElement;
+  private overPrimary: HTMLButtonElement;
+  private clearPrimary: HTMLButtonElement;
+  private openModal: Flow | null = null;
+  private modalRestore: HTMLElement | null = null;
+  // JS mirror of the stylesheet's prefers-reduced-motion override (JS-driven
+  // animation steps need it too — the CSS override alone doesn't stop them)
+  private motionMq: MediaQueryList | null = null;
+  private reducedMotion = false;
   // menu selection model
   private allItems: MenuItem[] = [];
   private menuItems: MenuItem[] = [];
@@ -414,10 +602,14 @@ export class UI {
     fuelMax: -1,
     lowFuel: false,
     muted: false,
+    best: -1,
+    newBest: false,
   };
   private toasts: ToastEntry[] = [];
   private pendingTimers = new Set<number>();
   private booted = false;
+  // end-of-run card score count-up (rAF handle, 0 = idle)
+  private countRaf = 0;
 
   constructor(root: HTMLElement, private cb: UiCallbacks) {
     this.styleEl = document.createElement("style");
@@ -428,7 +620,8 @@ export class UI {
     root.appendChild(this.rootEl);
 
     // --- title menu -----------------------------------------------------
-    this.menuEl = this.div("ddui-screen ddui-menu");
+    // screens mount into the overlay root (absolute, stacked below the toasts)
+    this.menuEl = this.div("ddui-screen ddui-menu", this.rootEl);
     this.div("ddui-menu-bg", this.menuEl);
     const title = this.div("ddui-title ddui-rise", this.menuEl);
     title.style.setProperty("--d", "60ms");
@@ -451,7 +644,7 @@ export class UI {
     this.addItem(continueBtn.btn, () => this.cb.onStart());
 
     const startBtn = this.buildMenuItem(nav, "NEW GAME");
-    this.addItem(startBtn.btn, () => this.cb.onStart());
+    this.addItem(startBtn.btn, () => this.requestNewGame());
 
     const soundBtn = this.buildMenuItem(nav, "SOUND");
     this.soundValue = soundBtn.value;
@@ -464,15 +657,23 @@ export class UI {
     this.addItem(howtoBtn.btn, () => this.setHowto(!this.howtoOpen));
 
     this.howtoEl = this.buildHowto(this.menuEl);
+    const confirm = this.buildConfirm(this.menuEl);
+    this.confirmEl = confirm.overlay;
+    this.confirmPrimary = confirm.primary;
 
     const foot = this.div("ddui-menu-foot ddui-rise", this.menuEl);
     foot.style.setProperty("--d", "260ms");
     foot.appendChild(this.hint("↑↓", "SELECT"));
     foot.appendChild(this.hint("ENTER", "CONFIRM"));
     foot.appendChild(this.hint("M", "SOUND"));
+    this.menuBest = this.tag("span", "ddui-menu-best", foot);
+    this.menuBest.textContent = `BEST ${padScore(0)}`;
+    this.menuBest.classList.add("is-hidden"); // revealed by the best diff once best > 0
 
     // --- HUD --------------------------------------------------------------
-    this.hudEl = this.div("ddui-screen ddui-hud ddui-passive");
+    this.hudEl = this.div("ddui-screen ddui-hud ddui-passive", this.rootEl);
+    this.hudEl.setAttribute("role", "region");
+    this.hudEl.setAttribute("aria-label", "Game status");
     const hudTop = this.div("ddui-hud-top ddui-rise ddui-rise--down", this.hudEl);
     hudTop.style.setProperty("--d", "40ms");
     const hudLeft = this.div("ddui-hud-side", hudTop);
@@ -488,9 +689,14 @@ export class UI {
     const livesPanel = this.div("ddui-panel ddui-lives-panel", hudRight);
     this.div("ddui-hud-label", livesPanel).textContent = "LIVES";
     this.pipsEl = this.div("ddui-pips", livesPanel);
-    this.soundPill = this.div("ddui-panel ddui-sound-pill", hudRight);
-    this.div("ddui-hud-label", this.soundPill).textContent = "SOUND";
-    const eq = this.tag("div", "ddui-eq", this.soundPill);
+    // real button (spans inside — a button may not contain divs); the only
+    // interactive control on the otherwise passive HUD screen
+    this.soundPill = this.tag("button", "ddui-panel ddui-sound-pill", hudRight);
+    this.soundPill.type = "button";
+    this.soundPill.setAttribute("aria-pressed", "false");
+    this.soundPill.addEventListener("click", () => this.cb.onToggleMute());
+    this.tag("span", "ddui-hud-label", this.soundPill).textContent = "SOUND";
+    const eq = this.tag("span", "ddui-eq", this.soundPill);
     this.tag("i", "", eq);
     this.tag("i", "", eq);
     this.tag("i", "", eq);
@@ -513,12 +719,18 @@ export class UI {
     playHint.appendChild(this.kbd("P"));
     this.tag("span", "", playHint).textContent = "PAUSE";
 
+    // top-center note stack — banner and hint slots are always laid out, so the
+    // two can never overlap when both are visible
+    const topnote = this.div("ddui-topnote", this.hudEl);
+    this.bannerEl = this.div("ddui-level-banner", topnote);
+    this.hintEl = this.div("ddui-controls-hint", topnote);
+
     // --- pause --------------------------------------------------------------
-    this.pauseEl = this.div("ddui-screen ddui-modal");
+    this.pauseEl = this.div("ddui-screen ddui-modal", this.rootEl);
     this.pauseBackdrop = this.div("ddui-backdrop", this.pauseEl);
-    const pauseCard = this.buildCard(this.pauseEl, "DESCENT SUSPENDED", "PAUSED");
+    const pauseCard = this.buildCard(this.pauseEl, "ddui-pause-title", "DESCENT SUSPENDED", "PAUSED");
     const pauseRow = this.div("ddui-btnrow", pauseCard);
-    this.button("ddui-btn ddui-btn--primary", pauseRow, "RESUME", () => this.cb.onResume());
+    this.pausePrimary = this.button("ddui-btn ddui-btn--primary", pauseRow, "RESUME", () => this.cb.onResume());
     this.button("ddui-btn", pauseRow, "RESTART", () => this.cb.onRestart());
     const pauseHints = this.div("ddui-card-hints", pauseCard);
     pauseHints.appendChild(this.hint("ESC", "RESUME"));
@@ -528,31 +740,37 @@ export class UI {
     });
 
     // --- game over ----------------------------------------------------------
-    this.overEl = this.div("ddui-screen ddui-modal ddui-modal--over");
+    this.overEl = this.div("ddui-screen ddui-modal ddui-modal--over", this.rootEl);
     this.div("ddui-backdrop", this.overEl);
-    const overCard = this.buildCard(this.overEl, "THE CATACOMB CLAIMS YOU", "GAME OVER");
+    const overCard = this.buildCard(this.overEl, "ddui-over-title", "THE CATACOMB CLAIMS YOU", "GAME OVER");
     this.div("ddui-card-score-label", overCard).textContent = "FINAL SCORE";
     this.overScore = this.div("ddui-card-score", overCard);
     this.overScore.textContent = padScore(0);
+    const overBestRow = this.div("ddui-card-best", overCard);
+    this.overBest = this.tag("span", "", overBestRow);
+    this.overBest.textContent = `BEST ${padScore(0)}`;
+    this.overBestBadge = this.tag("span", "ddui-best-badge", overBestRow);
+    this.overBestBadge.textContent = "NEW BEST";
     const overRow = this.div("ddui-btnrow", overCard);
-    this.button("ddui-btn ddui-btn--primary", overRow, "TRY AGAIN", () => this.cb.onRestart());
+    this.overPrimary = this.button("ddui-btn ddui-btn--primary", overRow, "TRY AGAIN", () => this.cb.onRestart());
     const overHints = this.div("ddui-card-hints", overCard);
     overHints.appendChild(this.hint("R", "RETRY"));
 
     // --- level clear ----------------------------------------------------------
-    this.clearEl = this.div("ddui-screen ddui-modal ddui-modal--clear");
+    this.clearEl = this.div("ddui-screen ddui-modal ddui-modal--clear", this.rootEl);
     this.div("ddui-backdrop", this.clearEl);
-    const clearCard = this.buildCard(this.clearEl, "SECTION SECURED", "DEPTH CLEARED");
+    const clearCard = this.buildCard(this.clearEl, "ddui-clear-title", "SECTION SECURED", "DEPTH CLEARED");
     this.div("ddui-card-score-label", clearCard).textContent = "SCORE";
     this.clearScore = this.div("ddui-card-score", clearCard);
     this.clearScore.textContent = padScore(0);
     const clearRow = this.div("ddui-btnrow", clearCard);
-    this.button("ddui-btn ddui-btn--primary", clearRow, "DESCEND", () => this.cb.onNext());
+    this.clearPrimary = this.button("ddui-btn ddui-btn--primary", clearRow, "DESCEND", () => this.cb.onNext());
     const clearHints = this.div("ddui-card-hints", clearCard);
     clearHints.appendChild(this.hint("", "DESCENDING…"));
 
     // --- toasts ---------------------------------------------------------------
     this.toastsEl = this.div("ddui-toasts", this.rootEl);
+    this.toastsEl.setAttribute("aria-live", "polite");
 
     // menu selection model (continue starts hidden)
     this.rebuildMenuItems();
@@ -561,15 +779,36 @@ export class UI {
     // forwarding happens for every input (audio unlock).
     window.addEventListener("keydown", this.onKeyDown, true);
     window.addEventListener("pointerdown", this.onPointerDown, true);
+
+    // JS reduced-motion guard, kept fresh for the JS-driven animations
+    this.motionMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    this.reducedMotion = this.motionMq.matches;
+    this.motionMq.addEventListener("change", this.onMotionPreferenceChange);
+
+    // boot paint: flow diffs fire on change only, and the first setState usually
+    // matches cache.flow ("menu"), so the deferred first paint must be kicked here
+    this.showFlow(this.cache.flow);
   }
 
   /** Diff-driven DOM update; call every frame. */
   setState(s: RenderUiState): void {
     if (s.flow !== this.cache.flow) {
+      const prevFlow = this.cache.flow;
       this.cache.flow = s.flow;
+      this.cancelCountUp();
       this.showFlow(s.flow);
-      if (s.flow === "gameover") this.overScore.textContent = padScore(s.score);
-      if (s.flow === "clear") this.clearScore.textContent = padScore(s.score);
+      if (s.flow === "playing") {
+        this.maybeShowControlsHint();
+        // a run/next level began (startLevel ran): every entry into playing
+        // except resume from pause; mid-run level-ups covered by the diff below
+        if (prevFlow !== "paused") this.showLevelBanner(s.level);
+      }
+      if (s.flow === "gameover") {
+        this.renderBest(s.best, s.newBest);
+        this.countUp(this.overScore, s.score);
+      } else if (s.flow === "clear") {
+        this.countUp(this.clearScore, s.score);
+      }
     }
     if (s.score !== this.cache.score) {
       this.cache.score = s.score;
@@ -584,6 +823,8 @@ export class UI {
       this.cache.level = s.level;
       this.depthEl.textContent = padLevel(s.level);
       this.pop(this.depthChip);
+      // banner only mid-play: skips the boot-time -1→1 diff carried by the menu
+      if (s.flow === "playing") this.showLevelBanner(s.level);
     }
     if (s.hasGun !== this.cache.hasGun) {
       this.cache.hasGun = s.hasGun;
@@ -597,8 +838,15 @@ export class UI {
       this.fuelPct.textContent = `${Math.round(n * 100)}%`;
     }
     if (s.lowFuel !== this.cache.lowFuel) {
+      const warn = fuelWarningEdge(this.cache.lowFuel, s.lowFuel);
       this.cache.lowFuel = s.lowFuel;
       this.jetPanel.classList.toggle("is-low", s.lowFuel);
+      if (warn) this.toast("FUEL LOW", warn);
+    }
+    if (s.best !== this.cache.best || s.newBest !== this.cache.newBest) {
+      this.cache.best = s.best;
+      this.cache.newBest = s.newBest;
+      this.renderBest(s.best, s.newBest);
     }
     this.syncMenuProgress(s.score, s.level);
   }
@@ -625,12 +873,98 @@ export class UI {
     if (m === this.cache.muted) return;
     this.cache.muted = m;
     this.soundPill.classList.toggle("is-muted", m);
+    this.soundPill.setAttribute("aria-pressed", m ? "true" : "false");
     this.soundValue.textContent = m ? "OFF" : "ON";
+  }
+
+  // --- guidance: level banner / controls hint / best surfaces / count-up ----------
+
+  /** DEPTH NN banner mid-play; a repeated level diff re-arms the auto-dismiss. */
+  private showLevelBanner(level: number): void {
+    this.bannerEl.textContent = `DEPTH ${padLevel(level)} — FIND THE TROPHY · OPEN THE EXIT`;
+    this.bannerEl.classList.add("is-on");
+    if (this.bannerTimer) {
+      window.clearTimeout(this.bannerTimer);
+      this.pendingTimers.delete(this.bannerTimer);
+    }
+    this.bannerTimer = this.later(() => {
+      this.bannerTimer = 0;
+      this.bannerEl.classList.remove("is-on");
+    }, 2600);
+  }
+
+  /** Once per page load, on the first "playing" entry, only without the stored marker. */
+  private maybeShowControlsHint(): void {
+    if (this.hintShown) return;
+    this.hintShown = true;
+    let hinted = false;
+    try { hinted = localStorage.getItem(HINT_STORAGE_KEY) !== null; } catch { /* store unusable → show anyway */ }
+    if (hinted) return;
+    try { localStorage.setItem(HINT_STORAGE_KEY, "1"); } catch { /* noop, as BestScore */ }
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      this.tag("span", "", this.hintEl).textContent =
+        "HOLD PADS TO MOVE · TAP FIRE TO SHOOT · JUMP + JETPACK ON THE RIGHT";
+    } else {
+      for (const [key, label] of [["←→", "MOVE"], ["SPACE", "JUMP"], ["CTRL", "JETPACK"], ["SHIFT", "FIRE"]] as const) {
+        this.hintEl.appendChild(this.hint(key, label));
+      }
+    }
+    window.requestAnimationFrame(() => {
+      if (this.hintEl.isConnected) this.hintEl.classList.add("is-on");
+    });
+    this.hintTimer = this.later(() => {
+      this.hintTimer = 0;
+      this.hintEl.classList.remove("is-on");
+    }, 6000);
+  }
+
+  /** Any key/pointer gesture ends the hint early (capture listeners call this). */
+  private dismissHint(): void {
+    if (!this.hintTimer) return;
+    window.clearTimeout(this.hintTimer);
+    this.pendingTimers.delete(this.hintTimer);
+    this.hintTimer = 0;
+    this.hintEl.classList.remove("is-on");
+  }
+
+  /** Best-score surfaces: menu foot line (best > 0 only) + game-over best row/badge. */
+  private renderBest(best: number, newBest: boolean): void {
+    const text = `BEST ${padScore(best)}`;
+    this.menuBest.textContent = text;
+    this.menuBest.classList.toggle("is-hidden", best <= 0);
+    this.overBest.textContent = text;
+    this.overBestBadge.classList.toggle("is-on", newBest && best > 0);
+    if (newBest && best > 0) this.pop(this.overBestBadge);
+  }
+
+  /** Card score counts 0→target over ~0.8s cubic ease-out; last frame is exact. */
+  private countUp(el: HTMLElement, target: number): void {
+    this.cancelCountUp();
+    if (this.prefersReducedMotion || target <= 0) {
+      el.textContent = padScore(target);
+      return;
+    }
+    const start = performance.now();
+    const duration = 800;
+    const tick = (now: number): void => {
+      const t = Math.min(1, (now - start) / duration);
+      el.textContent = padScore(Math.round(target * (1 - Math.pow(1 - t, 3))));
+      this.countRaf = t < 1 ? window.requestAnimationFrame(tick) : 0;
+    };
+    this.countRaf = window.requestAnimationFrame(tick);
+  }
+
+  private cancelCountUp(): void {
+    if (!this.countRaf) return;
+    window.cancelAnimationFrame(this.countRaf);
+    this.countRaf = 0;
   }
 
   dispose(): void {
     window.removeEventListener("keydown", this.onKeyDown, true);
     window.removeEventListener("pointerdown", this.onPointerDown, true);
+    this.motionMq?.removeEventListener("change", this.onMotionPreferenceChange);
+    this.cancelCountUp();
     for (const id of this.pendingTimers) window.clearTimeout(id);
     this.pendingTimers.clear();
     this.toasts = [];
@@ -638,9 +972,22 @@ export class UI {
   }
 
   // --- event wiring -----------------------------------------------------------
+  // Capture-phase decision table by flow: the menu owns its keys (split again by
+  // the new-game confirm dialog), an open dialog owns Tab, everything else passes
+  // through to game.ts unchanged (P/ESC pause, M sound, R restart…).
   private onKeyDown = (e: KeyboardEvent): void => {
     this.cb.onGesture();
-    if (this.cache.flow !== "menu" || e.metaKey || e.ctrlKey || e.altKey) return;
+    this.dismissHint();
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (this.cache.flow === "menu") {
+      if (this.confirmOpen) this.onConfirmKey(e);
+      else this.onMenuKey(e);
+    } else if (this.openModal && e.code === "Tab") {
+      this.trapTab(e, this.modalScreen(this.openModal));
+    }
+  };
+
+  private onMenuKey(e: KeyboardEvent): void {
     switch (e.code) {
       case "ArrowUp":
         e.preventDefault();
@@ -651,6 +998,13 @@ export class UI {
         e.preventDefault();
         e.stopPropagation();
         this.move(1);
+        return;
+      case "Tab":
+        // roving tabindex: Tab/Shift+Tab walk the same selection as the arrows
+        e.preventDefault();
+        e.stopPropagation();
+        this.move(e.shiftKey ? -1 : 1);
+        this.menuItems[this.sel]?.el.focus();
         return;
       case "Enter":
       case "NumpadEnter":
@@ -668,10 +1022,61 @@ export class UI {
       default:
         return; // M and other keys pass through to game.ts
     }
+  }
+
+  /** Key table while the new-game confirm is open: the menu model stays frozen. */
+  private onConfirmKey(e: KeyboardEvent): void {
+    switch (e.code) {
+      case "Escape":
+        e.preventDefault();
+        e.stopPropagation();
+        this.closeConfirm(true);
+        return;
+      case "Enter":
+      case "NumpadEnter":
+        e.preventDefault();
+        e.stopPropagation();
+        this.confirmNewGame();
+        return;
+      case "Tab":
+        this.trapTab(e, this.confirmEl);
+        return;
+      case "ArrowUp":
+      case "ArrowDown":
+      case "ArrowLeft":
+      case "ArrowRight":
+        e.preventDefault();
+        e.stopPropagation(); // selection must not move under the dialog
+        return;
+      default:
+        return; // other keys (M…) pass through as in the plain menu
+    }
+  }
+
+  /** Focus trap: while a dialog is open, Tab cycles among its scope's buttons and never escapes. */
+  private trapTab(e: KeyboardEvent, scope: HTMLElement): void {
+    const btns = Array.from(scope.querySelectorAll<HTMLButtonElement>(".ddui-btn"));
+    if (btns.length === 0) return;
+    const dir = e.shiftKey ? -1 : 1;
+    const idx = btns.indexOf(document.activeElement as HTMLButtonElement);
+    const next = idx < 0 ? btns[dir < 0 ? btns.length - 1 : 0] : btns[(idx + dir + btns.length) % btns.length];
+    e.preventDefault();
+    e.stopPropagation();
+    next?.focus();
+  }
+
+  private onMotionPreferenceChange = (e: MediaQueryListEvent): void => {
+    this.reducedMotion = e.matches;
   };
+
+  /** Guard for JS-driven animation steps (count-up, banner…); CSS handles its own override. */
+  private get prefersReducedMotion(): boolean {
+    return this.reducedMotion;
+  }
 
   private onPointerDown = (): void => {
     this.cb.onGesture();
+    this.dismissHint();
   };
 
   // --- flow / screens -----------------------------------------------------------
@@ -693,7 +1098,35 @@ export class UI {
     this.pauseEl.classList.toggle("is-on", f === "paused");
     this.overEl.classList.toggle("is-on", f === "gameover");
     this.clearEl.classList.toggle("is-on", f === "clear");
+    if (f !== "menu") this.closeConfirm(false); // leaving the menu never leaves the dialog behind
+    this.syncModalFocus(f);
     if (f === "menu") this.rebuildMenuItems();
+  }
+
+  /** Dialog focus management (runs on flow changes only): stash focus when a
+   *  modal opens and move it to the primary button, restore on close. */
+  private syncModalFocus(f: Flow): void {
+    const modal = f === "paused" || f === "gameover" || f === "clear" ? f : null;
+    if (modal) {
+      if (!this.openModal) {
+        this.modalRestore = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      }
+      this.openModal = modal;
+      this.primaryOf(modal).focus();
+    } else if (this.openModal) {
+      this.openModal = null;
+      const restore = this.modalRestore;
+      this.modalRestore = null;
+      if (restore?.isConnected) restore.focus();
+    }
+  }
+
+  private primaryOf(modal: Flow): HTMLButtonElement {
+    return modal === "paused" ? this.pausePrimary : modal === "gameover" ? this.overPrimary : this.clearPrimary;
+  }
+
+  private modalScreen(modal: Flow): HTMLElement {
+    return modal === "paused" ? this.pauseEl : modal === "gameover" ? this.overEl : this.clearEl;
   }
 
   // --- menu model -----------------------------------------------------------------
@@ -701,6 +1134,7 @@ export class UI {
     const item: MenuItem = { el, action };
     this.allItems.push(item);
     el.addEventListener("pointerenter", () => this.selectItem(item));
+    el.addEventListener("focus", () => this.selectItem(item)); // Tab focus and selection stay in sync
     el.addEventListener("click", () => {
       this.selectItem(item);
       item.action();
@@ -714,7 +1148,13 @@ export class UI {
   }
 
   private applySelection(): void {
-    this.menuItems.forEach((it, i) => it.el.classList.toggle("is-selected", i === this.sel));
+    this.menuItems.forEach((it, i) => {
+      const selected = i === this.sel;
+      it.el.classList.toggle("is-selected", selected);
+      it.el.tabIndex = selected ? 0 : -1; // roving tabindex
+      if (selected) it.el.setAttribute("aria-current", "true");
+      else it.el.removeAttribute("aria-current");
+    });
   }
 
   private selectItem(item: MenuItem): void {
@@ -743,9 +1183,39 @@ export class UI {
     this.howtoItem.classList.toggle("is-open", open);
   }
 
+  /** NEW GAME action: a saved run gets the confirm dialog, none starts at once. */
+  private requestNewGame(): void {
+    if (shouldConfirmNewGame(this.hasSave)) this.openConfirm();
+    else this.cb.onStart();
+  }
+
+  private openConfirm(): void {
+    if (this.confirmOpen) return;
+    this.confirmOpen = true;
+    this.confirmEl.classList.add("is-open");
+    this.confirmRestore = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    this.confirmPrimary.focus();
+  }
+
+  /** Closes the dialog; focus returns to the opener unless the flow moved on. */
+  private closeConfirm(restoreFocus: boolean): void {
+    if (!this.confirmOpen) return;
+    this.confirmOpen = false;
+    this.confirmEl.classList.remove("is-open");
+    const restore = this.confirmRestore;
+    this.confirmRestore = null;
+    if (restoreFocus && restore?.isConnected) restore.focus();
+  }
+
+  private confirmNewGame(): void {
+    this.closeConfirm(true);
+    this.cb.onStartConfirmed();
+  }
+
   /** CONTINUE visibility + sublabel, inferred from the restored run state. */
   private syncMenuProgress(score: number, level: number): void {
     const hasSave = score > 0 || level > 1;
+    this.hasSave = hasSave;
     const sig = `${hasSave ? 1 : 0}:${score}:${level}`;
     if (sig === this.menuSig) return;
     this.menuSig = sig;
@@ -822,11 +1292,16 @@ export class UI {
     return { btn, main, value };
   }
 
-  private buildCard(screen: HTMLElement, overline: string, title: string): HTMLDivElement {
+  private buildCard(screen: HTMLElement, titleId: string, overline: string, title: string): HTMLDivElement {
+    screen.setAttribute("role", "dialog");
+    screen.setAttribute("aria-modal", "true");
+    screen.setAttribute("aria-labelledby", titleId);
     this.div("ddui-backdrop", screen);
     const card = this.div("ddui-panel ddui-card", screen);
     this.div("ddui-overline", card).textContent = overline;
-    this.tag("h2", "ddui-card-title", card).textContent = title;
+    const titleEl = this.tag("h2", "ddui-card-title", card);
+    titleEl.id = titleId;
+    titleEl.textContent = title;
     return card;
   }
 
@@ -849,6 +1324,29 @@ export class UI {
       for (const k of keys) keysEl.appendChild(this.kbd(k));
     }
     return panel;
+  }
+
+  /** New-game confirm — a sibling overlay of the howto panel inside the menu
+   *  screen, so no flow change is involved and the save is never touched here. */
+  private buildConfirm(parent: HTMLElement): { overlay: HTMLDivElement; primary: HTMLButtonElement } {
+    const overlay = this.div("ddui-confirm", parent);
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", "ddui-confirm-title");
+    const backdrop = this.div("ddui-backdrop", overlay);
+    const card = this.div("ddui-panel ddui-card", overlay);
+    this.div("ddui-overline", card).textContent = "UNFINISHED DESCENT";
+    const title = this.tag("h2", "ddui-card-title", card);
+    title.id = "ddui-confirm-title";
+    title.textContent = "START OVER?";
+    this.div("ddui-confirm-note", card).textContent = "This overwrites your saved descent.";
+    const row = this.div("ddui-btnrow", card);
+    const primary = this.button("ddui-btn ddui-btn--primary", row, "NEW GAME", () => this.confirmNewGame());
+    this.button("ddui-btn", row, "CANCEL", () => this.closeConfirm(true));
+    overlay.addEventListener("click", e => {
+      if (e.target === backdrop) this.closeConfirm(true); // backdrop click = cancel
+    });
+    return { overlay, primary };
   }
 
   private kbd(text: string): HTMLElement {

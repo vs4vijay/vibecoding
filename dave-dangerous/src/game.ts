@@ -4,12 +4,14 @@ import { Input } from "./core/Input";
 import { World } from "./world/World";
 import { GameState } from "./state/GameState";
 import { SaveState } from "./state/SaveState";
+import { BestScore } from "./state/BestScore";
 import { CinematicAudio } from "./audio/CinematicAudio";
 import { RNG } from "./core/RNG";
 import { LEVEL_1, LEVELS, BONUS_ROOMS } from "./levels/levels";
 import { on } from "./core/Events";
 import { GameView } from "./render3d/GameView";
 import { UI } from "./render3d/ui/UI";
+import { TouchControls } from "./render3d/ui/TouchControls";
 import type { RenderUiState } from "./render3d/viewTypes";
 import type { LevelData } from "./core/types";
 
@@ -25,6 +27,7 @@ type Mode = "menu" | "ingame";
 export class Game {
   private view: GameView;
   private ui: UI;
+  private touch: TouchControls;
   private audio = new CinematicAudio();
   private input = new Input();
   private state: GameState;
@@ -41,6 +44,8 @@ export class Game {
   private prevVelY = 0;
   private jetpackSfxCooldown = 0;
   private jetpackFxOn = false;
+  private best = BestScore.load();
+  private newBest = false;
 
   constructor(container: HTMLElement) {
     this.view = new GameView(container);
@@ -50,11 +55,19 @@ export class Game {
     this.rng = new RNG(Date.now() >>> 0);
     this.ui = new UI(container, {
       onStart: () => this.startGame(),
+      onStartConfirmed: () => this.startGame(true), // confirmed NEW GAME = fresh run; save file overwritten at the next level:complete persist
       onResume: () => { if (this.paused) this.togglePause(); },
       onRestart: () => this.startGame(true),
       onNext: () => this.finishClear(),
-      onToggleMute: () => { this.toggleMute(); },
+      onToggleMute: () => { this.toggleMute(); this.ui.setMuted(this.audio.muted); },
       onGesture: () => this.unlockAudio(),
+    });
+    // on-screen touch pads (coarse pointers only) share Input with the keyboard
+    this.touch = new TouchControls(container, {
+      onPress: a => this.input.press(a),
+      onRelease: a => this.input.release(a),
+      onFire: () => this.input.queueFire(),
+      onPause: () => this.togglePause(),
     });
     this.loop = new GameLoop({
       update: dt => this.update(dt),
@@ -98,14 +111,14 @@ export class Game {
     this.loop.attach(f => requestAnimationFrame(f));
   }
 
-  /** leave the title screen (or game over) and (re)enter play */
-  startGame(fromGameOver = false): void {
-    void fromGameOver;
+  /** leave the title screen (or game over) and (re)enter play; fresh wipes the run state first */
+  startGame(fresh = false): void {
     this.unlockAudio();
     this.mode = "ingame";
     this.paused = false;
     this.clearTimer = 0;
-    if (this.flow === GAME_FLOW_KEYS.gameover || this.state.lives <= 0) this.state.reset(1);
+    this.newBest = false;
+    if (fresh || this.flow === GAME_FLOW_KEYS.gameover || this.state.lives <= 0) this.state.reset(1);
     this.inBonus = false;
     this.startLevel(1);
     this.audio.playMusic("cave");
@@ -176,6 +189,7 @@ export class Game {
     this.view.setMenuMode(this.mode === "menu");
     this.view.sync(world, dtReal, ui);
     this.ui.setState(ui);
+    this.touch.setVisible(ui.flow);
   }
 
   private uiState(): RenderUiState {
@@ -194,7 +208,16 @@ export class Game {
       fuel: this.state.jetpackFuel,
       fuelMax: 60,
       lowFuel: this.state.jetpackFuel > 0 && this.state.jetpackFuel < 15,
+      best: this.best,
+      newBest: this.newBest,
     };
+  }
+
+  private bankBest(): void {
+    if (BestScore.submit(this.state.score)) {
+      this.best = this.state.score;
+      this.newBest = true;
+    }
   }
 
   private onDeath(): void {
@@ -204,6 +227,7 @@ export class Game {
     const alive = this.state.loseLife();
     if (!alive) {
       this.flow = GAME_FLOW_KEYS.gameover;
+      this.bankBest();
       this.audio.playMusic("danger");
       return;
     }
@@ -215,6 +239,7 @@ export class Game {
 
   private onComplete(): void {
     SaveState.persist(this.state.snapshot());
+    this.bankBest();
     this.view.fx.doorOpen({ x: this.world?.door.pos.x ?? 0, y: this.world?.door.pos.y ?? 0 });
     this.view.fx.warp();
     this.audio.playSfx("warp");

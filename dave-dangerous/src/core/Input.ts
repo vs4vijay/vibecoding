@@ -75,6 +75,22 @@ export class Input {
     return { ...this.frames };
   }
 
+  // Injection API (touch controls): shares the keyboard's `held` set on purpose —
+  // single source of truth, no per-source refcounting.
+  press(action: Action): void {
+    if (!this.held.has(action)) {
+      this.held.add(action);
+      this.frames[action] = 0;
+      if (action === "fire") this.fireQueued = true;
+    }
+  }
+  release(action: Action): void {
+    this.held.delete(action);
+  }
+  queueFire(): void {
+    this.fireQueued = true;
+  }
+
   /** test-only hooks */
   keyDown(code: string): void { this.onKeyDown({ code, preventDefault() {} }); }
   keyUp(code: string): void { this.onKeyUp({ code, preventDefault() {} }); }

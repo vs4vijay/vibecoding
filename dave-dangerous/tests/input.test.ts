@@ -56,4 +56,70 @@ describe("Input", () => {
     input.detach();
     expect(removed).toEqual(added);
   });
+  it("press holds the action", () => {
+    const input = new Input();
+    input.press("left");
+    expect(input.read().left).toBe(true);
+  });
+  it("press accumulates hold frames like a keydown", () => {
+    const input = new Input();
+    input.press("right");
+    input.tick(); input.tick(); input.tick();
+    expect(input.holdFrames().right).toBe(3);
+  });
+  it("press on an already-held action is a no-op (frames not reset)", () => {
+    const input = new Input();
+    input.press("right");
+    input.tick(); input.tick();
+    input.press("right");
+    input.tick();
+    expect(input.holdFrames().right).toBe(3);
+  });
+  it("release stops holding the action", () => {
+    const input = new Input();
+    input.press("jump");
+    input.release("jump");
+    expect(input.read().jump).toBe(false);
+  });
+  it("queueFire yields exactly one fire edge", () => {
+    const input = new Input();
+    input.queueFire();
+    expect(input.read().fire).toBe(true);
+    expect(input.read().fire).toBe(false);
+  });
+  it("queueFire twice before one read still yields a single edge", () => {
+    const input = new Input();
+    input.queueFire();
+    input.queueFire();
+    expect(input.read().fire).toBe(true);
+    expect(input.read().fire).toBe(false);
+  });
+  it("press fire is edge-triggered exactly like AltLeft keydown", () => {
+    const input = new Input();
+    input.press("fire");
+    expect(input.read().fire).toBe(true);
+    expect(input.read().fire).toBe(false);
+    const viaKey = new Input();
+    viaKey.keyDown("AltLeft");
+    expect(viaKey.read().fire).toBe(true);
+    expect(viaKey.read().fire).toBe(false);
+  });
+  it("touch release stops an action held by keyboard (shared held set)", () => {
+    const input = new Input();
+    input.keyDown("ArrowLeft");
+    input.release("left");
+    expect(input.read().left).toBe(false);
+  });
+  it("keyboard keyUp stops an action held by touch (shared held set)", () => {
+    const input = new Input();
+    input.press("left");
+    input.keyUp("KeyA");
+    expect(input.read().left).toBe(false);
+  });
+  it("keyboard-held action survives an unrelated touch release", () => {
+    const input = new Input();
+    input.keyDown("ArrowRight");
+    input.release("left");
+    expect(input.read().right).toBe(true);
+  });
 });
