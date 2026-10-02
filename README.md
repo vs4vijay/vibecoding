@@ -121,13 +121,13 @@ providers:
 
 ### Tools used
 
-- rtk-ai - `brew install rtk-ai/tap/rtk`
 - context-mode `bun add -g context-mode`
+- rtk-ai - `brew install rtk-ai/tap/rtk`
 - omniroute - `bun add -g omniroute`
 - omp
 - OpenSpec
-- gnhf - `bun add -g gnhf`
 - gsd - `bunx @opengsd/gsd-core@latest` https://github.com/open-gsd/gsd-core
+- gnhf - `bun add -g gnhf`
 - playwright-cli - `bun add -g playwright-cli`
 - android-cli - https://developer.android.com/tools/agents/android-cli
 
@@ -137,6 +137,8 @@ providers:
 - playwright-cli Skills
 - agent-browser
 - superpowers Skills - https://github.com/obra/superpowers
+- OpenSpec
+- diagram-design
 
 ```bash
 
@@ -167,6 +169,10 @@ bun x skills add heygen-com/hyperframes
 bun x skills add juliusbrussee/caveman@caveman
 claude skill add juliusbrussee/caveman:caveman
 
+npx skills add danyuchn/asd-ste100-skill
+
+
+npx impeccable install
 
 bun x skills@latest add mattpocock/skills --full-depth
 
@@ -372,7 +378,7 @@ single combined workflow (`.github/workflows/games-pages-deploy.yml`).
 | **Laser Snail** | [vs4vijay.github.io/vibecoding/laser-snail](https://vs4vijay.github.io/vibecoding/laser-snail/) | [`laser-snail/`](./laser-snail) | TypeScript, Vite, three.js |
 | **NEON RUSH** | [vs4vijay.github.io/vibecoding/neon-rush](https://vs4vijay.github.io/vibecoding/neon-rush/) | [`neon-rush/`](./neon-rush) | JavaScript ES modules, three.js r170 (vendored, no build step) |
 | **Devil's Highway** | [vs4vijay.github.io/vibecoding/devils-highway](https://vs4vijay.github.io/vibecoding/devils-highway/) | [`devils-highway/`](./devils-highway) | JavaScript ES modules, three.js r172 vendored, no build step (deployed by direct copy) |
-| **Metro Dash** | [vs4vijay.github.io/vibecoding/metro-dash](https://vs4vijay.github.io/vibecoding/metro-dash/) | [`metro-dash/`](./metro-dash) | JavaScript ES modules, three.js r172 (CDN importmap), no build step · optional Elysia leaderboard API |
+| **Metro Dash** | [vs4vijay.github.io/vibecoding/metro-dash](https://vs4vijay.github.io/vibecoding/metro-dash/) | [`metro-dash/`](./metro-dash) | JavaScript ES modules, three.js r172 vendored (importmap, no build step) · optional Elysia leaderboard API · full UI/UX pass |
 | **Midtown Blitz** | [vs4vijay.github.io/vibecoding/midtown-blitz](https://vs4vijay.github.io/vibecoding/midtown-blitz/) | [`midtown-blitz/`](./midtown-blitz) | JavaScript, Vite 6, three.js r171, WebAudio synthesis |
 | **A Wild Bug** | [vs4vijay.github.io/vibecoding/a-wild-bug](https://vs4vijay.github.io/vibecoding/a-wild-bug/) | [`a-wild-bug/`](./a-wild-bug) | TypeScript, Vite 6, three.js, WebAudio synthesis |
 | **Dustline** | local server — `cd dustline && bun run dev` ([quickstart](./dustline#readme)) | [`dustline/`](./dustline) | TypeScript, Vite, three.js · Bun + Hono + WebSocket |

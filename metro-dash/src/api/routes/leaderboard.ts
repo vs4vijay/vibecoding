@@ -24,13 +24,13 @@ export const leaderboardRouter = new Elysia({
           gamesPlayed: players.gamesPlayed,
           totalDistance: players.totalDistance,
           achievementsUnlocked: sql<number>`(
-            SELECT COUNT(*)::int FROM ${playerAchievements}
-            WHERE ${playerAchievements.playerId} = ${players.id}
+            SELECT COUNT(*)::int FROM "player_achievements"
+            WHERE "player_achievements"."player_id" = "players"."id"
           )`,
         })
         .from(players)
         .orderBy(desc(players.highScore))
-        .limit(limit);
+        .limit(limit ?? 10);
 
       return result;
     },
@@ -60,7 +60,7 @@ export const leaderboardRouter = new Elysia({
         })
         .from(players)
         .orderBy(desc(players.totalDistance))
-        .limit(limit);
+        .limit(limit ?? 10);
 
       return result;
     },

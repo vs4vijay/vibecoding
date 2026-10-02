@@ -14,8 +14,9 @@ const app = new Elysia()
     staticPlugin({
       prefix: "/",
       assets: "./dist",
-      ignoreFiles: ["tsconfig.json", "*.map"],
-      cache: "immutable",
+      ignorePatterns: ["tsconfig.json", "*.map"],
+      directive: "immutable",
+      headers: { "Service-Worker-Allowed": "/" },
     }),
   )
 
@@ -32,26 +33,24 @@ const app = new Elysia()
     timestamp: new Date().toISOString(),
   }))
 
-  // PWA manifest (kept in sync with client/manifest.json, which GitHub
-  // Pages serves when the API backend is not deployed)
+  // PWA manifest
   .get("/manifest.json", () => ({
     name: config.appName,
     short_name: "Metro Dash",
     description: "Metro Dash - 3D endless runner",
     start_url: "./",
-    scope: "./",
     display: "fullscreen",
     background_color: "#1a1a2e",
     theme_color: "#16213e",
     icons: [
       {
-        src: "icons/icon-192.png",
+        src: "/icons/icon-192.png",
         sizes: "192x192",
         type: "image/png",
         purpose: "any maskable",
       },
       {
-        src: "icons/icon-512.png",
+        src: "/icons/icon-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any maskable",
@@ -60,12 +59,12 @@ const app = new Elysia()
   }))
 
   // SPA fallback: serve index.html for non-API routes
-  .onError(({ code, error, code: statusCode }) => {
+  .onError(async ({ code, request, path }) => {
     if (code === "NOT_FOUND") {
-      const url = new URL(error.request?.url || "");
-      if (!url.pathname.startsWith("/api/")) {
+      const pathname = path || new URL(request.url).pathname;
+      if (!pathname.startsWith("/api/")) {
         try {
-          const content = Bun.file("./dist/index.html").textSync();
+          const content = await Bun.file("./dist/index.html").text();
           return new Response(content, {
             status: 200,
             headers: { "Content-Type": "text/html" },
@@ -79,7 +78,7 @@ const app = new Elysia()
   })
 
   .onStart(async () => {
-    console.log("\n🏃 Subway Surfers Clone");
+    console.log("\n🚇 Metro Dash");
     console.log("   Server: http://" + config.host + ":" + config.port);
     console.log("   Environment: " + config.nodeEnv);
     const maskedUrl =

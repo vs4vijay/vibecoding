@@ -9,6 +9,9 @@ night. Built with Three.js, Bun, Elysia, and PostgreSQL.
 **Play online:** <https://vs4vijay.github.io/vibecoding/metro-dash/>
 (static deploy; leaderboards need the optional API backend below)
 
+> This is the full late-again build (modular engine + complete UI/UX pass),
+> adopted from `projects/subway-surfers` and rebranded for the games hub.
+
 ## Features
 
 - **3D Endless Runner** - Three.js powered game with lane switching, jumping, and rolling
@@ -16,28 +19,35 @@ night. Built with Three.js, Bun, Elysia, and PostgreSQL.
 - **3 Lanes** - Dodge subway cars, jump hazard barriers, roll under signal gantries
 - **Animated Runner** - Procedural run cycle, jump tuck, roll tumble, lane-change lean, landing dust
 - **Living Atmosphere** - Day → sunset → night sky ramp with lit building windows, billboard clouds
-- **PBR Look** - `MeshStandardMaterial` + IBL, textured ballast track bed, curated building facades
-- **Collectibles** - Coins, magnet power-ups, jetpacks
+- **Touch-reachable pause** - On-screen pause (44×44 target) plus RESUME / RESTART / MENU actions
+- **Safe resume** - A skippable ~1.2 s GET READY countdown on every unpause and tab return
+- **Powerup HUD** - Magnet / ×2 chips with live drain bars (no fake chips for stub effects)
+- **Results that contextualize** - Run TIME, gap-to-best, and a new-best celebration banner
+- **Music & SFX toggles** - Separate persisted audio buses; master mute on top
+- **First-run coaching** - One-time scheme-worded hints for lane/jump/roll, then never again
+- **Scheme-aware hints** - Swipe/tap copy on touch devices, key copy on desktop, never mixed
+- **Accessibility baseline** - Safe-area insets, visible focus, ≥44 px targets, reduced-motion kill
+- **Screen-transition polish** - Token-driven fades that collapse to instant under `?freeze`
 - **Combo System** - Build multipliers with consecutive actions
 - **Player Profiles** - Persistent stats via PostgreSQL + Drizzle ORM (optional; the game falls back to local play)
 - **Achievements** - 16 unlockable achievements (distance, coins, score, combos)
 - **Leaderboard** - Global rankings by high score and total distance
 - **Background Jobs** - Postgres LISTEN/NOTIFY with SKIP LOCKED for async processing
-- **PWA** - Installable as a Progressive Web App with offline caching
-- **Responsive** - Keyboard + touch/swipe controls for mobile
+- **PWA** - Installable, fully offline (vendored Three.js, precached modules)
+- **Deterministic QA** - 450+ headless checks, scripted acceptance walk, byte-identical `?freeze` captures
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| **Game Engine** | Three.js (WebGL, ES modules + importmap, no bundler) |
+| **Game Engine** | Three.js r172, vendored (WebGL, ES modules + importmap, no bundler) |
 | **Backend** | Bun + Elysia (optional leaderboard API) |
 | **Database** | PostgreSQL 17 |
 | **ORM** | Drizzle ORM |
 | **Validation** | Zod |
 | **Jobs** | Postgres LISTEN/NOTIFY + SKIP LOCKED |
-| **PWA** | Service Worker + Cache API |
-| **Icons** | Procedurally generated PNG |
+| **PWA** | Service Worker precache + Cache API |
+| **QA** | Bun smoke suites + Playwright freeze captures |
 
 ## Quick Start
 
@@ -99,8 +109,24 @@ The game also works with no database running — scores are kept locally.
 |--------|----------|--------|
 | Move Left | `←` or `A` | Swipe Left |
 | Move Right | `→` or `D` | Swipe Right |
-| Jump | `↑` or `W` or `Space` | Swipe Up |
-| Roll | `↓` or `S` | Swipe Down |
+| Jump | `↑` or `W` or `Space` | Tap top half |
+| Roll | `↓` or `S` | Tap bottom half |
+| Pause / Resume | `Esc` or `P` | Pause button (bottom-left) |
+| Skip resume countdown | `Esc` / `P` | Tap the countdown |
+| Mute | `M` | Speaker button (bottom-right) |
+
+## QA
+
+```bash
+bun run test:smoke             # wave2..wave6 + ui-ux headless suites (450+ checks)
+bun .qa/ui-ux-acceptance.mjs   # scripted spec-by-spec acceptance walk
+bun .qa/serve.mjs 8899         # static server for browser captures
+bun .qa/shot.mjs "<url>" out.png   # deterministic ?freeze screenshot (needs playwright-core)
+```
+
+`?freeze=1&seed=N[&time=T][&screen=menu|pause|results]` renders settled,
+byte-identical frames of any screen — the determinism guard for CI-style
+comparisons (see `.qa/ui-ux-notes.md`).
 
 ## API Endpoints
 
@@ -118,72 +144,3 @@ The game also works with no database running — scores are kept locally.
 | `GET` | `/api/achievements` | List all achievements |
 | `GET` | `/api/achievements/player/:playerId` | Player's unlocked achievements |
 | `GET` | `/manifest.json` | PWA manifest |
-
-## Database Schema
-
-```
-players          → Player profiles (username, scores, coins)
-runs             → Individual game runs with stats
-achievements     → Achievement definitions (16 total)
-player_achievements → Player-achievement unlocks
-player_powerups  → Persistent power-up inventory
-jobs             → Background job queue (LISTEN/NOTIFY)
-```
-
-## Project Structure
-
-```
-metro-dash/
-├── client/                  # Frontend files (all paths relative — subpath-safe)
-│   ├── index.html           # Game HTML
-│   ├── manifest.json        # PWA manifest (static, for GitHub Pages)
-│   ├── css/style.css        # UI styles
-│   ├── fonts/               # Bundled Bungee woff2 (OFL)
-│   ├── js/
-│   │   ├── game.js          # Three.js game engine (entry)
-│   │   ├── visual/          # Extracted visual systems
-│   │   │   ├── textures.js  #   procedural CanvasTextures
-│   │   │   ├── props.js     #   buildings, trains, barriers, gantries
-│   │   │   ├── character.js #   rigged player + pose mixer + dust
-│   │   │   ├── atmosphere.js#   day/night ramp, sky, clouds
-│   │   │   └── ui-motion.js #   HUD tweens, flashes, transitions
-│   │   ├── pwa-register.js  # Service Worker registration
-│   │   └── sw.js            # Service Worker (network-first, offline cache)
-│   └── icons/               # PWA icons (generated)
-├── src/
-│   ├── config/
-│   │   └── env.ts           # Zod-validated config
-│   ├── db/
-│   │   ├── database.ts      # Drizzle connection
-│   │   ├── schema.ts        # Table definitions
-│   │   ├── seed.ts          # Achievement seeder
-│   │   └── migrations/      # SQL migrations
-│   ├── api/routes/
-│   │   ├── players.ts       # Player CRUD
-│   │   ├── runs.ts          # Run tracking + job queuing
-│   │   ├── leaderboard.ts   # Rankings
-│   │   └── achievements.ts  # Achievement queries
-│   ├── index.ts             # Elysia server
-│   └── worker.ts            # Background job processor
-├── docker-compose.yml       # PostgreSQL container
-├── drizzle.config.ts        # Drizzle Kit config
-├── .env.example             # Environment template
-└── package.json
-```
-
-## Development Scripts
-
-```bash
-bun run dev              # Start server with watch mode
-bun run start            # Start server (production)
-bun run worker           # Run background job worker
-bun run build            # Copy client files to dist/
-bun drizzle-kit generate # Generate migration SQL
-bun drizzle-kit push     # Push schema to database
-bun drizzle-kit studio   # Open Drizzle Studio UI
-bun src/db/seed.ts       # Seed achievements
-```
-
-## License
-
-MIT

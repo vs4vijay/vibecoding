@@ -83,8 +83,8 @@ export const runsRouter = new Elysia({ prefix: "/api/runs" })
         .from(runs)
         .where(eq(runs.playerId, params.playerId))
         .orderBy(desc(runs.playedAt))
-        .limit(limit)
-        .offset(offset);
+        .limit(limit ?? 20)
+        .offset(offset ?? 0);
 
       return result;
     },

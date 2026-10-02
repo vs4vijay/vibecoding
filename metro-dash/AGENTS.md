@@ -3,51 +3,64 @@
 ## Commands
 
 ```bash
-bun run build   # stage client/ → dist/ (pure copy, no bundler)
-bun run dev     # Elysia server, serves dist/ + optional leaderboard API (PORT in .env, default 37045)
-bun install     # deps; CI installs with --frozen-lockfile
+bun run build       # stage client/ → dist/ (pure copy, no bundler)
+bun run dev         # Elysia server, serves dist/ + leaderboard API (PORT in .env, default 37045)
+bun install         # deps; CI installs with --frozen-lockfile
+bun run test:smoke  # headless QA: .qa/wave2..wave6 + .qa/ui-ux-smoke.mjs (bun only, no browser)
+bun .qa/ui-ux-acceptance.mjs   # spec-by-spec acceptance walk (22 scenarios)
+bun .qa/serve.mjs 8899         # static server for browser captures (sends Service-Worker-Allowed)
 ```
 
-Live browser verification: build, then drive the game at `http://localhost:37045`
-with `playwright-cli` (`open --browser chromium` — no Chrome channel installed).
-Console must be clean; the only ignorable error is `POST /api/players/*` 500
-when Postgres is down — the client catches it and plays locally.
+Browser captures: `bun .qa/shot.mjs "<url>" out.png` (playwright-core; main-agent
+tool — sub-agents work headless). Frozen screens:
+`?freeze=1&seed=N[&time=T][&screen=menu|pause|results]`; pairs must stay
+byte-identical (see `.qa/ui-ux-notes.md`).
+
+## Provenance
+
+Adopted from `projects/subway-surfers` (game name there: "Late Again") —
+modular engine (`client/js/src/**`, ~30 ES modules) + the full ui-ux-pass
+OpenSpec change (recorded in `openspec/changes/ui-ux-pass/`). Rebrand surface:
+title/meta, manifest, package name, SW cache name, server banner. The
+`late_again_*` localStorage keys are shared with the upstream build on purpose
+(invisible to players; changing them would wipe saves for no benefit).
 
 ## Invariants
 
 - **Client paths are RELATIVE** (`css/style.css`, `js/game.js`, `sw.js`,
-  `../fonts/…` in CSS, relative SW cache entries). The game is deployed to
-  GitHub Pages under `/vibecoding/metro-dash/`; absolute `/…` paths break there.
-  Same convention as `neon-rush` (no bundler, subpath-safe by design).
+  `"./js/src/…"` SW precache entries, `./vendor/three/…` importmap). The game
+  deploys to GitHub Pages under `/vibecoding/metro-dash/`; absolute `/…`
+  paths break there. Same convention as `neon-rush` (no bundler,
+  subpath-safe by design).
 - **Port 37045 = METRO DASH leetspeak** (M**3**T**7**R**0** D**4**5**H).
   Configured in `.env` / `.env.example` / `src/config/env.ts` default.
-- **Service worker**: lives at `client/sw.js` (repo-root scope), network-first
-  for same-origin GETs, cache-first only for the cross-origin three.js CDN.
-  Cache name **must be bumped whenever any client asset changes content**
-  (`metro-dash-v<N>`), otherwise installs go stale.
-- **Collision semantics are gameplay**: obstacle hitboxes (train group bounds,
-  barrier group, gantry beam at y>2.5 with the roll-under exception) and the
-  player rig's AABB (standing top ≈2.45, roll ≤1.2) were verified equivalent to
-  the original box implementation. Changing visuals must not change bounds.
-- **Lane → world mapping**: camera looks down +z from behind the player, so
-  world +x renders on screen-left; lane +1 (ArrowRight/swipe right) maps to
-  world −x via `targetX = -targetLane * LANE_WIDTH`. Do not "fix" the sign.
-- **Atmosphere is a pure function of distance** (`visual/atmosphere.js`,
-  day→sunset 0–1500m, sunset→night 1500–3000m, night held; thresholds are the
-  `RAMP` constants). Same distance must always render the same sky.
-- **No new network origins**: same-origin + the pinned jsdelivr three.js 0.172
-  importmap only. Fonts are bundled locally (`client/fonts/`, OFL).
+- **Service worker**: `client/sw.js` (game root, so the relative `register("sw.js")` scope covers the whole game) precaches every client asset (relative
+  paths), cache-first with an activiation-time old-cache sweep. Cache name
+  **must be bumped whenever any client asset changes content**
+  (`metro-dash-v<N>`, currently v6), or installed PWAs go stale.
+- **Three.js is vendored** (`client/vendor/three/`): the site must keep ZERO
+  external network origins (no CDNs, no webfonts — system fonts only). The
+  ui-ux smoke asserts this.
+- **Lane → screen mapping**: the chase rig runs toward +Z looking +Z, so in
+  right-handed Three.js screen-right = world −X. Input semantics are
+  screen-space: "right" → lane −1, "left" → lane +1 (`run.js _applyAction`).
+  wave3's direction check pins this — do not "fix" the sign.
+- **`?freeze` determinism**: every captured frame must be byte-identical per
+  seed. All animation needs a `.qa-freeze`/reduced-motion kill path; HUD
+  writes are cached-DOM, transform/opacity-only; the grace countdown and
+  shown results duration are pinned under freeze. If a new capture pair
+  diffs, fix the code, not the test.
+- **Collision semantics are gameplay**: hitbox/AABB code in `game/run.js` +
+  `entities/` is tuned and pinned by the wave3/wave4 sim smokes. Changing
+  bounds without rerunning `bun run test:smoke` is a gameplay change.
 
 ## Gotchas
 
-- The Elysia static plugin caches file Content-Length at startup: after
-  editing `client/index.html`, a server restart is required or `GET /` serves
-  the file truncated to the old length.
-- After client edits: `bun run build`, then force-fresh load (SW v5 is
-  network-first for same-origin, so a plain reload suffices once v5 controls
-  the page).
-- Playwright screenshots have multi-second latency — use a page-side rAF
-  capture hook (canvas `toDataURL` inside the game's rAF tick) for
-  frame-exact evidence.
-- `bun.lock` keeps the old root package name (`subway-surfers`) after the
-  rename; `bun install --frozen-lockfile` still passes — leave it.
+- The Elysia static plugin caches file metadata at startup: after editing
+  `client/`, restart `bun run dev` or rebuild (`bun run build`).
+- After client edits: `bun run build`; the SW is cache-first, so a plain
+  reload serves the old cache until CACHE_NAME is bumped — bump it whenever
+  you change any client file.
+- Playwright screenshots have multi-second latency — `?freeze` +
+  `window.__QA.screenshotReady` (already wired in `shot.mjs`) is the
+  deterministic path.

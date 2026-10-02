@@ -11,10 +11,12 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "build:client": "mkdir -p dist && cp -r client/* dist/",
+    "build:client": "rm -rf dist && mkdir -p dist && cp -R client/. dist/",
     "build": "bun run build:client",
     "lint": "eslint src/",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:smoke": "bun .qa/wave2-smoke.mjs && bun .qa/wave3-smoke.mjs && bun .qa/wave4-smoke.mjs && bun .qa/wave5-smoke.mjs && bun .qa/wave6-smoke.mjs && bun .qa/ui-ux-smoke.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@elysiajs/static": "^1.4.10",
@@ -32,6 +34,7 @@
     "@types/pg": "^8.11.10",
     "@types/three": "^0.172.0",
     "drizzle-kit": "^0.30.4",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "playwright-core": "^1.63.0"
   }
 }

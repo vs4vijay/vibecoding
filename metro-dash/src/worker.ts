@@ -146,7 +146,8 @@ async function fetchNextJob(): Promise<
     RETURNING *
   `);
 
-  return result.length > 0 ? (result[0] as typeof jobs.$inferSelect) : null;
+  const rows = (result as unknown as { rows: unknown[] }).rows;
+  return rows.length > 0 ? (rows[0] as typeof jobs.$inferSelect) : null;
 }
 
 async function completeJob(jobId: string): Promise<void> {

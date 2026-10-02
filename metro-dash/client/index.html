@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#1a1a2e" />
+    <meta name="theme-color" content="#101728" />
     <meta name="description" content="Metro Dash - 3D Endless Runner" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -21,21 +21,60 @@
     <!-- HUD Overlay -->
     <div id="hud" class="hidden">
       <div id="hud-top">
-        <div id="score-display">
+        <div id="score-display" class="hud-chip hud-chip-score">
           <span class="hud-label">SCORE</span>
           <span id="score-value" class="hud-value">0</span>
         </div>
-        <div id="coins-display">
-          <span class="hud-label"><svg class="icon icon-coin" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M8 .5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Zm0 2.7a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6Z"/><circle cx="8" cy="8" r="2.6"/></svg></span>
+        <div id="coins-display" class="hud-chip hud-chip-coins">
+          <svg class="ico-coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#f7c531"/><circle cx="12" cy="12" r="6.2" fill="none" stroke="#b8860b" stroke-width="1.6"/><path fill="#b8860b" d="M11 8h2v8h-2z"/></svg>
           <span id="coins-value" class="hud-value">0</span>
         </div>
       </div>
       <div id="multiplier-display" class="hidden">
-        <span class="hud-label">x<span id="multiplier-value">1</span></span>
+        <span class="mult-badge">&times;<span id="multiplier-value">1</span></span>
       </div>
       <div id="combo-display" class="hidden">
-        <span id="combo-value">0</span> COMBO!
+        <span class="combo-pill">
+          <svg class="ico-flame" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.2 2s.9 2.5.9 4.3c0 1.5-1 2.7-2.4 2.7-1.4 0-2.3-1.2-2.3-1.2C7 9.6 6 11.8 6 13.9 6 17.9 8.7 21 12 21s6-3.1 6-7.1C18 9.2 15.2 5.2 12.2 2z"/></svg>
+          <span id="combo-value">0</span><span class="combo-suffix">COIN STREAK</span>
+        </span>
       </div>
+      <!-- Task 4.1: active-powerup status chips. Exactly TWO pre-created
+           chips — magnet + x2 — because those are the only finite-duration
+           effects the sim actually runs. D5: jetpack is a data-only stub
+           with no real duration, so it intentionally gets NO chip (one
+           would lie); its collect feedback is the world VFX ring + audio
+           sting. Visibility is the .hidden class (settled under ?freeze);
+           main.js drives the drain bars via transform scaleX per frame. -->
+      <div id="powerup-chips" aria-hidden="true">
+        <div id="chip-magnet" class="pu-chip hidden" data-pu="magnet">
+          <svg class="pu-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h4v8a3 3 0 0 0 6 0V3h4v8a7 7 0 0 1-14 0V3z"/><path fill="currentColor" opacity=".45" d="M5 3h4v3H5zM15 3h4v3h-4z"/></svg>
+          <span class="pu-bar"><span class="pu-fill"></span></span>
+        </div>
+        <div id="chip-x2" class="pu-chip hidden" data-pu="x2">
+          <span class="pu-badge">&times;2</span>
+          <span class="pu-bar"><span class="pu-fill"></span></span>
+        </div>
+      </div>
+      <!-- data-input-exclude: EVERY interactive HUD control carries this
+           marker so InputManager ignores taps/swipes born on it (design D2)
+           instead of turning them into jump/roll/lane actions. -->
+      <button id="mute-btn" type="button" data-input-exclude aria-label="Toggle sound" aria-pressed="false">
+        <svg class="ico-sound-on" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.5 9.3v5.4h3.6l5.1 4V5.3l-5.1 4H3.5z"/><path fill="currentColor" d="M15.4 8.1a5.5 5.5 0 0 1 0 7.8l-1.3-1.3a3.7 3.7 0 0 0 0-5.2l1.3-1.3z"/><path fill="currentColor" d="M18 5.5a9.1 9.1 0 0 1 0 13l-1.3-1.3a7.3 7.3 0 0 0 0-10.4L18 5.5z"/></svg>
+        <svg class="ico-sound-off" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.5 9.3v5.4h3.6l5.1 4V5.3l-5.1 4H3.5z"/><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M15.4 9.4l5.2 5.2M20.6 9.4l-5.2 5.2"/></svg>
+      </button>
+      <!-- Bottom-LEFT corner counterpart of #mute-btn (D2): same glyph style
+           as the pause overlay icon (two rounded bars). -->
+      <button id="pause-btn" type="button" data-input-exclude aria-label="Pause run">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="3.6" height="14" rx="1.4" fill="currentColor"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.4" fill="currentColor"/></svg>
+      </button>
+      <!-- D8 first-run teaching toast (task 7.2): bottom-center chip above
+           the corner buttons. Inside #hud so ?hud=0 hides it with the rest
+           of the run UI (captures stay clean). Non-interactive by design —
+           pointer-events: none, so no data-input-exclude is needed. One
+           element, textContent swapped by main.js showToast(); hidden by a
+           JS timer (never armed under ?freeze, keeping captures settled). -->
+      <div id="hint-toast" class="hidden" aria-live="polite"></div>
     </div>
 
     <!-- Menu Screen -->
@@ -45,76 +84,208 @@
           <span class="title-sub">METRO</span>
           <span class="title-main">DASH</span>
         </h1>
-        <div id="username-form">
-          <input
-            type="text"
-            id="username-input"
-            placeholder="Enter your name"
-            maxlength="20"
-            autocomplete="username"
-          />
-          <button id="play-btn" class="btn btn-primary">PLAY</button>
-        </div>
-        <div id="menu-stats" class="hidden">
-          <div class="stat-row">
-            <span><svg class="icon icon-trophy" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6 2h12v7a6 6 0 0 1-12 0V2Z"/><path fill-rule="evenodd" d="M4 3.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/><path fill-rule="evenodd" d="M20 3.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/><rect x="10.4" y="14" width="3.2" height="5"/><rect x="6.5" y="18" width="11" height="3" rx="1"/></svg> High Score: <strong id="menu-high-score">0</strong></span>
+        <p class="menu-tagline">RUN &middot; DODGE &middot; SPRINT</p>
+
+        <div class="menu-card">
+          <div id="username-form">
+            <input
+              type="text"
+              id="username-input"
+              placeholder="Enter your name"
+              maxlength="20"
+              autocomplete="username"
+              spellcheck="false"
+            />
+            <button id="play-btn" class="btn btn-primary" type="button">PLAY</button>
           </div>
-          <div class="stat-row">
-            <span><svg class="icon icon-coin" viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M8 .5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Zm0 2.7a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6Z"/><circle cx="8" cy="8" r="2.6"/></svg> Coins: <strong id="menu-coins">0</strong></span>
+
+          <div id="menu-stats" class="hidden">
+            <div class="stat-chip">
+              <svg class="ico-chip ico-gold" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h14v2h3v3c0 2.8-2 5-4.6 5.4A7 7 0 0 1 13 17v2h4v2H7v-2h4v-2a7 7 0 0 1-4.4-3.6C4 13 2 10.8 2 8V5h3V3zm-1 4v1c0 1.6 1 3 2.4 3.5A9 9 0 0 1 6 8V7H4zm16 0h-2v1a9 9 0 0 1-.4 3.5C19 11 20 9.6 20 8V7z"/></svg>
+              <div class="chip-copy"><span class="chip-label">BEST</span><strong id="menu-high-score">0</strong></div>
+            </div>
+            <div class="stat-chip">
+              <svg class="ico-chip ico-coin-gold" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#f7c531"/><circle cx="12" cy="12" r="6.2" fill="none" stroke="#b8860b" stroke-width="1.6"/><path fill="#b8860b" d="M11 8h2v8h-2z"/></svg>
+              <div class="chip-copy"><span class="chip-label">COINS</span><strong id="menu-coins">0</strong></div>
+            </div>
+            <div class="stat-chip">
+              <svg class="ico-chip ico-teal" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 5.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM9.8 8.9l-3.3.8.5 1.9 3.9-1 1 1.8-2.4 2.9c-.5.6-.6 1.4-.2 2.1l2.4 4.3 1.7-1-2.2-3.9 2.7-2.6 1.6 3.1c.3.7 1 1.1 1.8 1l4-.5-.3-2-3.5.4-2.3-4.4a2 2 0 0 0-2.7-.9l-2.7 1.2-1.2-2.2z"/></svg>
+              <div class="chip-copy"><span class="chip-label">RUNS</span><strong id="menu-games">0</strong></div>
+            </div>
           </div>
-          <div class="stat-row">
-            <span><svg class="icon icon-flag" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5 2h2v20H5V2Zm4 2h10l-3 4.5L19 13H9V4Z"/></svg> Runs: <strong id="menu-games">0</strong></span>
+
+          <div id="leaderboard-panel" class="hidden">
+            <div class="lb-header">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h14v2h3v3c0 2.8-2 5-4.6 5.4A7 7 0 0 1 13 17v2h4v2H7v-2h4v-2a7 7 0 0 1-4.4-3.6C4 13 2 10.8 2 8V5h3V3zm-1 4v1c0 1.6 1 3 2.4 3.5A9 9 0 0 1 6 8V7H4zm16 0h-2v1a9 9 0 0 1-.4 3.5C19 11 20 9.6 20 8V7z"/></svg>
+              TOP RUNNERS
+            </div>
+            <ol id="leaderboard-list"></ol>
+          </div>
+
+          <!-- D6 audio settings: two independent toggles (music / sfx).
+               aria-pressed = the feature is ON; main.js applyMuteUi() keeps
+               both states + labels in sync from localStorage. -->
+          <div class="settings-row">
+            <button id="music-toggle" class="settings-btn" type="button" aria-pressed="true">
+              <svg class="ico-music-on" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3v9.28a4.39 4.39 0 0 0-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg>
+              <svg class="ico-music-off" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3v9.28a4.39 4.39 0 0 0-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M19.6 4.4 4.4 19.6"/></svg>
+              <span id="music-toggle-label">MUSIC ON</span>
+            </button>
+            <button id="sfx-toggle" class="settings-btn" type="button" aria-pressed="true">
+              <svg class="ico-sound-on" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.5 9.3v5.4h3.6l5.1 4V5.3l-5.1 4H3.5z"/><path fill="currentColor" d="M15.4 8.1a5.5 5.5 0 0 1 0 7.8l-1.3-1.3a3.7 3.7 0 0 0 0-5.2l1.3-1.3z"/><path fill="currentColor" d="M18 5.5a9.1 9.1 0 0 1 0 13l-1.3-1.3a7.3 7.3 0 0 0 0-10.4L18 5.5z"/></svg>
+              <svg class="ico-sound-off" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.5 9.3v5.4h3.6l5.1 4V5.3l-5.1 4H3.5z"/><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M15.4 9.4l5.2 5.2M20.6 9.4l-5.2 5.2"/></svg>
+              <span id="sfx-toggle-label">SFX ON</span>
+            </button>
+          </div>
+
+          <!-- Task 7.3: how-to-play review (D9 menu order: settings row,
+               then how-to-play row). Opens #howto-panel — a non-blocking
+               overlay; it never starts a run and never touches the state
+               machine. aria-expanded is kept in sync by main.js. -->
+          <div class="settings-row howto-row">
+            <button id="howto-btn" class="settings-btn" type="button" aria-haspopup="dialog" aria-expanded="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7h3a4 4 0 1 1 4 4c-.9 0-1.7.6-1.7 1.5V17h3v-.7A7 7 0 0 0 12 2z"/><circle cx="11.8" cy="20.4" r="1.8" fill="currentColor"/></svg>
+              <span id="howto-btn-label">HOW TO PLAY</span>
+            </button>
           </div>
         </div>
-        <div class="controls-hint">
-          <p>← → or A/D to switch lanes</p>
-          <p>↑ or W or tap top to jump</p>
-          <p>↓ or S or tap bottom to roll</p>
-        </div>
+      </div>
+
+      <!-- Hint text is empty here on purpose: main.js applyHints() fills
+           every slot with scheme-aware copy (touch OR keys, never mixed). -->
+      <div class="swipe-hint" aria-hidden="true">
+        <span class="swipe-arrows">
+          <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+          <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
+        </span>
+        <span class="swipe-text"></span>
       </div>
     </div>
 
     <!-- Game Over Screen -->
     <div id="gameover-screen" class="hidden">
-      <div class="menu-container">
-        <h2 class="gameover-title">GAME OVER</h2>
-        <div class="gameover-stats">
-          <div class="stat-card">
-            <span class="stat-label">SCORE</span>
+      <div class="results-wrap">
+        <div class="results-panel">
+          <h2 class="gameover-title">GAME OVER</h2>
+          <div id="new-high-score" class="hidden">
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h14v2h3v3c0 2.8-2 5-4.6 5.4A7 7 0 0 1 13 17v2h4v2H7v-2h4v-2a7 7 0 0 1-4.4-3.6C4 13 2 10.8 2 8V5h3V3zm-1 4v1c0 1.6 1 3 2.4 3.5A9 9 0 0 1 6 8V7H4zm16 0h-2v1a9 9 0 0 1-.4 3.5C19 11 20 9.6 20 8V7z"/></svg>
+            NEW HIGH SCORE
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h14v2h3v3c0 2.8-2 5-4.6 5.4A7 7 0 0 1 13 17v2h4v2H7v-2h4v-2a7 7 0 0 1-4.4-3.6C4 13 2 10.8 2 8V5h3V3zm-1 4v1c0 1.6 1 3 2.4 3.5A9 9 0 0 1 6 8V7H4zm16 0h-2v1a9 9 0 0 1-.4 3.5C19 11 20 9.6 20 8V7z"/></svg>
+            <span class="burst" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></span>
+          </div>
+
+          <div class="score-hero">
+            <span class="hud-label">SCORE</span>
             <span class="stat-value" id="go-score">0</span>
           </div>
-          <div class="stat-card">
-            <span class="stat-label">DISTANCE</span>
-            <span class="stat-value" id="go-distance">0m</span>
+
+          <p id="go-gap" class="hidden"></p>
+
+          <div class="gameover-stats">
+            <div class="stat-row">
+              <svg class="ico-row" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 2h2v20H6V2zm3 2h10.5l-2.6 3.7 2.6 3.7H9V4z"/></svg>
+              <span class="row-label">DISTANCE</span>
+              <strong id="go-distance" class="row-value">0m</strong>
+            </div>
+            <div class="stat-row">
+              <svg class="ico-row" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#f7c531"/><circle cx="12" cy="12" r="6.2" fill="none" stroke="#b8860b" stroke-width="1.6"/><path fill="#b8860b" d="M11 8h2v8h-2z"/></svg>
+              <span class="row-label">COINS</span>
+              <strong id="go-coins" class="row-value">0</strong>
+            </div>
+            <div class="stat-row">
+              <svg class="ico-row" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 7.2V12l3.4 2"/></svg>
+              <span class="row-label">TIME</span>
+              <strong id="go-duration" class="row-value">0:00</strong>
+            </div>
+            <div class="stat-row">
+              <svg class="ico-row ico-gold" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h14v2h3v3c0 2.8-2 5-4.6 5.4A7 7 0 0 1 13 17v2h4v2H7v-2h4v-2a7 7 0 0 1-4.4-3.6C4 13 2 10.8 2 8V5h3V3zm-1 4v1c0 1.6 1 3 2.4 3.5A9 9 0 0 1 6 8V7H4zm16 0h-2v1a9 9 0 0 1-.4 3.5C19 11 20 9.6 20 8V7z"/></svg>
+              <span class="row-label">BEST</span>
+              <strong id="go-best" class="row-value">0</strong>
+            </div>
           </div>
-          <div class="stat-card">
-            <span class="stat-label">COINS</span>
-            <span class="stat-value" id="go-coins">0</span>
+
+          <div class="gameover-buttons">
+            <button id="retry-btn" class="btn btn-primary" type="button">RETRY</button>
+            <button id="menu-btn" class="btn btn-secondary" type="button">MENU</button>
           </div>
+
+          <p id="results-hint" class="results-hint" aria-hidden="true"></p>
         </div>
-        <div id="new-high-score" class="hidden">
-          <span><svg class="icon icon-trophy" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6 2h12v7a6 6 0 0 1-12 0V2Z"/><path fill-rule="evenodd" d="M4 3.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/><path fill-rule="evenodd" d="M20 3.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/><rect x="10.4" y="14" width="3.2" height="5"/><rect x="6.5" y="18" width="11" height="3" rx="1"/></svg> NEW HIGH SCORE!</span>
+      </div>
+    </div>
+
+    <!-- Pause Overlay -->
+    <div id="pause-overlay" class="hidden">
+      <div class="pause-panel">
+        <span class="pause-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.4" fill="currentColor"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.4" fill="currentColor"/></svg>
+        </span>
+        <h2 class="pause-title">PAUSED</h2>
+        <p class="pause-hint"></p>
+        <!-- D3: three-action panel. DOM order RESUME -> RESTART -> MENU is
+             also the keyboard-focus order; .btn floors every target at 44px. -->
+        <div class="pause-actions">
+          <button id="resume-btn" class="btn btn-primary" type="button">RESUME</button>
+          <button id="pause-restart-btn" class="btn btn-secondary" type="button">RESTART</button>
+          <button id="pause-menu-btn" class="btn btn-secondary" type="button">MENU</button>
         </div>
-        <div class="gameover-buttons">
-          <button id="retry-btn" class="btn btn-primary">RETRY</button>
-          <button id="menu-btn" class="btn btn-secondary">MENU</button>
+      </div>
+    </div>
+
+    <!-- Task 7.3: how-to-play review overlay. A non-blocking sibling of
+         #pause-overlay: it floats over the MENU without touching the state
+         machine (state stays MENU, no run starts) and closing restores the
+         menu exactly as it was. BOTH schemes' controls render from the same
+         COACH_COPY map the first-run coach uses (applyHowto fills the two
+         lists, textContent-only); CSS reorders + emphasizes the section
+         matching the live data-scheme. role="dialog" + aria-modal="false":
+         informational overlay, not a focus-blocking modal. -->
+    <div id="howto-panel" class="hidden" role="dialog" aria-modal="false" aria-label="How to play">
+      <div class="howto-card">
+        <h2 class="howto-title">HOW TO PLAY</h2>
+        <div id="howto-touch-section" class="howto-scheme">
+          <h3 class="howto-scheme-title">TOUCH</h3>
+          <ul id="howto-touch-list" class="howto-list"></ul>
         </div>
+        <div id="howto-keys-section" class="howto-scheme">
+          <h3 class="howto-scheme-title">KEYBOARD</h3>
+          <ul id="howto-keys-list" class="howto-list"></ul>
+        </div>
+        <button id="howto-close-btn" class="btn btn-secondary" type="button">CLOSE</button>
+      </div>
+    </div>
+
+    <!-- D4 safe-resume grace (task 3.3): shown between un-pausing a live run
+         and the simulation stepping again. Full-screen tap target that skips
+         the countdown; data-input-exclude (D2) keeps that tap from also
+         registering as a gameplay gesture. #grace-bar is driven per frame by
+         main.js style writes (transform: scaleX) — no CSS animation. -->
+    <div id="resume-grace" class="hidden" data-input-exclude>
+      <div class="grace-box">
+        <span id="grace-numeral">1</span>
+        <div class="grace-track" aria-hidden="true"><div id="grace-bar"></div></div>
+        <p class="grace-label">GET READY</p>
       </div>
     </div>
 
     <!-- Loading Screen -->
     <div id="loading-screen">
       <div class="loader">
-        <div class="spinner"></div>
-        <p>Loading...</p>
+        <div class="coin-spinner">
+          <div class="coin-face">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#f7c531"/><circle cx="12" cy="12" r="6.2" fill="none" stroke="#b8860b" stroke-width="1.6"/><path fill="#b8860b" d="M12 6.8l1.5 3.1 3.4.4-2.5 2.3.7 3.4-3.1-1.8-3.1 1.8.7-3.4-2.5-2.3 3.4-.4L12 6.8z"/></svg>
+          </div>
+        </div>
+        <div class="loader-shadow"></div>
+        <p>LOADING THE TRACKS&hellip;</p>
       </div>
     </div>
 
     <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.172.0/examples/jsm/"
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/addons/"
       }
     }
     </script>

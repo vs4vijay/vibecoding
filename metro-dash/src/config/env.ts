@@ -25,7 +25,7 @@ const envSchema = z
       .string()
       .default("http://localhost:5173")
       .transform((val) => val.split(",").map((o) => o.trim())),
-    APP_NAME: z.string().default("Subway Surfers Clone"),
+    APP_NAME: z.string().default("Metro Dash"),
     WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(1000),
     JWT_SECRET: z.string().min(16, "JWT_SECRET must be at least 16 characters"),
   })

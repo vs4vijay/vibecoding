@@ -149,7 +149,7 @@ jobs:
 
       - name: Build metro-dash
         working-directory: metro-dash
-        # no bundler: ES modules + importmap (three.js from CDN) — `build` is a
+        # no bundler: ES modules + importmap (three.js vendored in client/vendor) — `build` is a
         # pure staging copy (client/ → dist/), subpath-safe via relative paths.
         run: |
           bun install --frozen-lockfile

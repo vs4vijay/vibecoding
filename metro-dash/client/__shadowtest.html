@@ -1,0 +1,30 @@
+<!DOCTYPE html><html><body style="margin:0"><canvas id="c"></canvas>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("c"), antialias: true });
+renderer.setSize(800, 500);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xbfd8ec);
+const camera = new THREE.PerspectiveCamera(55, 1.6, 0.1, 100);
+camera.position.set(0, 4, 8); camera.lookAt(0, 0, 0);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x8899aa, roughness: 0.9 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const cube = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), new THREE.MeshStandardMaterial({ color: 0xdd5533, roughness: 0.6 }));
+cube.position.y = 0.75; cube.castShadow = true; scene.add(cube);
+const wall = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3, 10), new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.85 }));
+wall.position.set(-4, 1.5, -2); wall.castShadow = true; scene.add(wall);
+const sun = new THREE.DirectionalLight(0xfff1dc, 3.5);
+sun.position.set(8, 10, -6); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 50;
+sun.shadow.camera.left = -15; sun.shadow.camera.right = 15;
+sun.shadow.camera.top = 15; sun.shadow.camera.bottom = -15;
+scene.add(sun); scene.add(sun.target);
+scene.add(new THREE.HemisphereLight(0x9fc3ea, 0x8a7a66, 0.42));
+function frame() { renderer.render(scene, camera); requestAnimationFrame(frame); window.__frames = (window.__frames || 0) + 1; }
+frame();
+</script></body></html>

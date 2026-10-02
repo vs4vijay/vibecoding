@@ -1,12 +1,65 @@
-/* === Fonts === */
-/* Bungee — SIL Open Font License 1.1, (c) The Bungee Project Authors
-   (https://github.com/djrrb/Bungee), subset to Basic Latin + Latin-1 Supplement. */
-@font-face {
-  font-family: "Bungee";
-  src: url("../fonts/Bungee-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+/* ============================================================
+   LATE AGAIN — WAVE 6 UI SYSTEM
+   Premium mobile-game HUD + menus. System fonts + inline SVG +
+   CSS only (no external assets). All animation via transform /
+   opacity (no layout thrash). Under ?freeze the <html> element
+   gets .qa-freeze which disables every animation/transition so
+   warmup frames stay deterministic.
+   ============================================================ */
+
+/* === Tokens === */
+:root {
+  --navy-0: #0b101c;
+  --navy-1: #101728;
+  --navy-2: #16203a;
+  --glass-hi: rgba(255, 255, 255, 0.16);
+  --glass-line: rgba(255, 255, 255, 0.14);
+  --glass-lo: rgba(255, 255, 255, 0.06);
+
+  --orange-1: #ffc247;
+  --orange-2: #ff7a1a;
+  --orange-3: #ef5f10;
+  --ink-on-accent: #2a1503;
+
+  --gold-1: #ffe9a8;
+  --gold-2: #f7c531;
+  --gold-3: #c98f14;
+
+  --teal-1: #35e0c8;
+  --danger-1: #ff5d6c;
+
+  --text-dim: rgba(255, 255, 255, 0.62);
+  --text-faint: rgba(255, 255, 255, 0.4);
+
+  /* Bold condensed-feel system stack (no webfonts). */
+  --font-display: "Arial Narrow", "Liberation Sans Narrow",
+    "Helvetica Neue Condensed", "Roboto Condensed", "Helvetica Neue", Arial,
+    system-ui, sans-serif;
+  --font-body: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+
+  --shadow-text: 0 1px 0 rgba(0, 0, 0, 0.4), 0 2px 10px rgba(0, 0, 0, 0.5);
+  --shadow-chip: 0 8px 22px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Motion: dur-1 = one short beat (hover/press/toggle), dur-2 = one long
+     beat (screen fades). */
+  --dur-1: 150ms;
+  --dur-2: 320ms;
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* Spacing: 4px rhythm. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Radius: inner rows / chips / panels / pills + buttons. */
+  --radius-s: 11px;
+  --radius-m: 14px;
+  --radius-l: 22px;
+  --radius-pill: 999px;
 }
 
 /* === Reset & Base === */
@@ -23,8 +76,8 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-  background: #1a1a2e;
+  font-family: var(--font-body);
+  background: var(--navy-0);
   color: #fff;
   user-select: none;
   -webkit-user-select: none;
@@ -45,7 +98,37 @@ body {
   display: none !important;
 }
 
-/* === HUD === */
+/* Keyboard focus — one global, clearly visible indicator: 2px accent
+   outline + offset. :focus-visible keeps pointer clicks clean; gold reads
+   on dark navy surfaces and stays distinct on light accent fills. */
+button:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--gold-2);
+  outline-offset: 2px;
+}
+
+/* Inline SVG icons */
+.ico {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.12em;
+  display: inline-block;
+}
+
+/* Shared big text treatment */
+.hud-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   HUD (in-game)
+   ============================================================ */
 #hud {
   position: fixed;
   top: 0;
@@ -53,7 +136,12 @@ body {
   right: 0;
   pointer-events: none;
   z-index: 10;
-  padding: 16px 20px;
+  /* Notch / home-indicator aware: in an installed PWA the device safe
+     areas raise the original paddings (env() falls back to 0 elsewhere). */
+  padding: max(14px, env(safe-area-inset-top, 0px))
+    max(18px, env(safe-area-inset-right, 0px))
+    max(14px, env(safe-area-inset-bottom, 0px))
+    max(18px, env(safe-area-inset-left, 0px));
 }
 
 #hud-top {
@@ -62,92 +150,405 @@ body {
   align-items: flex-start;
 }
 
-.hud-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: rgba(255, 255, 255, 0.6);
-  text-transform: uppercase;
-  display: block;
+/* Glass chip — saturated, never muddy */
+.hud-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-m);
+  background: linear-gradient(
+    180deg,
+    rgba(14, 20, 34, 0.78) 0%,
+    rgba(14, 20, 34, 0.4) 100%
+  );
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--shadow-chip);
+  backdrop-filter: blur(3px) saturate(1.55);
+  -webkit-backdrop-filter: blur(3px) saturate(1.55);
+}
+
+.hud-chip-score {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 128px;
 }
 
 .hud-value {
-  font-family: "Bungee", "Segoe UI", system-ui, -apple-system, sans-serif;
-  font-size: 28px;
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  font-size: 30px;
+  line-height: 1;
   font-weight: 900;
   color: #fff;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.5px;
+  text-shadow: var(--shadow-text);
   display: block;
   font-variant-numeric: tabular-nums;
 }
 
-#score-display {
-  text-align: left;
+/* Coin counter */
+.hud-chip-coins {
+  padding: var(--space-2) var(--space-4);
 }
 
-#coins-display {
-  text-align: right;
+.ico-coin {
+  width: 22px;
+  height: 22px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
 }
 
-#coins-display .hud-label {
-  font-size: 16px;
+.hud-chip-coins .hud-value {
+  color: #ffe9b8;
+  font-size: 26px;
 }
 
+/* Multiplier badge — POPS on change (class .pop added by JS) */
 #multiplier-display {
   position: fixed;
-  top: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 36px;
-  font-weight: 900;
-  color: #ffd700;
-  text-shadow: 0 2px 12px rgba(255, 215, 0, 0.5);
-  animation: pulse 0.5s ease-in-out infinite alternate;
+  top: 96px;
+  left: 18px;
+  transform-origin: left center;
 }
 
+.mult-badge {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 5px 14px 6px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, var(--orange-1), var(--orange-2) 62%, var(--orange-3));
+  color: var(--ink-on-accent);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 21px;
+  letter-spacing: 1px;
+  box-shadow: 0 6px 18px rgba(255, 122, 26, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+#multiplier-display.pop {
+  animation: hud-pop 0.42s var(--ease-spring) both;
+}
+
+@keyframes hud-pop {
+  0% {
+    transform: scale(1.75);
+    opacity: 0.55;
+  }
+  55% {
+    transform: scale(0.92);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Combo popup — center-top, springy entrance */
 #combo-display {
   position: fixed;
-  top: 130px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 24px;
-  font-weight: 900;
-  color: #ff6b35;
-  text-shadow: 0 2px 8px rgba(255, 107, 53, 0.5);
+  top: 16px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
 }
 
-@keyframes pulse {
+.combo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 18px 8px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, rgba(20, 12, 6, 0.72), rgba(20, 12, 6, 0.45));
+  border: 1px solid rgba(255, 170, 60, 0.4);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), 0 0 18px rgba(255, 140, 40, 0.22);
+  color: #ffb35c;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 19px;
+  letter-spacing: 1.5px;
+  text-shadow: var(--shadow-text);
+}
+
+.combo-pill .ico-flame {
+  width: 17px;
+  height: 17px;
+  color: var(--orange-1);
+}
+
+.combo-suffix {
+  font-size: 13px;
+  letter-spacing: 2.5px;
+  color: rgba(255, 224, 178, 0.85);
+}
+
+#combo-display.pop {
+  animation: combo-spring 0.5s var(--ease-spring) both;
+}
+
+@keyframes combo-spring {
+  0% {
+    transform: scale(0.45) translateY(-16px);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1) translateY(2px);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Active-powerup chips (task 4.1) — fixed column on the LEFT edge, BELOW
+   #multiplier-display (top 96px + ~34px tall), so when x2 runs the chip
+   reads as the next row of the same stack and nothing ever overlaps. The
+   drain bar mirrors #grace-bar: main.js writes transform: scaleX each
+   frame — transform-only, no layout, no CSS animation, so ?freeze captures
+   see a settled bar. [data-low] is an opacity pulse = decoration only (the
+   shrinking bar is the honest signal; kills cleanly under .qa-freeze /
+   reduced-motion). Visibility is ONLY the .hidden class. */
+#powerup-chips {
+  position: fixed;
+  top: 140px;
+  left: max(18px, env(safe-area-inset-left, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.pu-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-m);
+  background: linear-gradient(
+    180deg,
+    rgba(14, 20, 34, 0.78) 0%,
+    rgba(14, 20, 34, 0.4) 100%
+  );
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--shadow-chip);
+  backdrop-filter: blur(3px) saturate(1.55);
+  -webkit-backdrop-filter: blur(3px) saturate(1.55);
+  transform-origin: left center;
+}
+
+.pu-chip .pu-ico {
+  width: 18px;
+  height: 18px;
+  color: var(--teal-1);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+}
+
+.pu-badge {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  color: var(--ink-on-accent);
+  background: linear-gradient(180deg, var(--orange-1), var(--orange-2));
+  border-radius: var(--radius-s);
+  padding: 1px 6px 2px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.pu-bar {
+  display: block;
+  width: 56px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.pu-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+#chip-magnet .pu-fill {
+  background: linear-gradient(90deg, var(--teal-1), #1fb89f);
+}
+
+#chip-x2 .pu-fill {
+  background: linear-gradient(90deg, var(--orange-1), var(--orange-2));
+}
+
+/* Collect pop (popBadge re-adds .pop; reuses the shared hud-pop beat) and
+   the decoration-only low-time pulse. Neither carries visibility — a chip
+   is visible iff its .hidden class is absent. */
+.pu-chip.pop {
+  animation: hud-pop 0.42s var(--ease-spring) both;
+}
+
+.pu-chip[data-low] {
+  animation: pu-low 0.9s ease-in-out infinite;
+}
+
+@keyframes pu-low {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Any button parked in #hud (mute + pause): guaranteed 44px touch target,
+   live pointer events (the container itself is click-through), shared token
+   motion. */
+#hud button {
+  min-width: 44px;
+  min-height: 44px;
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+  font: inherit;
+  transition: transform var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
+}
+
+/* Mute button (bottom-right, inside #hud so ?hud=0 hides it). Offsets use
+   max(<floor>, env(...)); the pause button below mirrors the pattern with
+   the LEFT inset. */
+#mute-btn {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right, 0px));
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-line);
+  background: linear-gradient(180deg, rgba(14, 20, 34, 0.72), rgba(14, 20, 34, 0.4));
+  color: rgba(255, 255, 255, 0.85);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-chip);
+  backdrop-filter: blur(3px) saturate(1.5);
+  -webkit-backdrop-filter: blur(3px) saturate(1.5);
+}
+
+/* HUD pause button (D2) — bottom-LEFT corner, symmetric with mute. Same
+   glass circle + safe-area max() offsets on the left/bottom insets. */
+#pause-btn {
+  position: fixed;
+  left: max(18px, env(safe-area-inset-left, 0px));
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-line);
+  background: linear-gradient(180deg, rgba(14, 20, 34, 0.72), rgba(14, 20, 34, 0.4));
+  color: rgba(255, 255, 255, 0.85);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-chip);
+  backdrop-filter: blur(3px) saturate(1.5);
+  -webkit-backdrop-filter: blur(3px) saturate(1.5);
+}
+
+#mute-btn:hover,
+#pause-btn:hover {
+  transform: scale(1.08);
+  color: #fff;
+}
+
+#mute-btn:active,
+#pause-btn:active {
+  transform: scale(0.94);
+}
+
+#mute-btn svg,
+#pause-btn svg {
+  width: 21px;
+  height: 21px;
+}
+
+#mute-btn .ico-sound-off {
+  display: none;
+}
+
+#mute-btn.muted .ico-sound-on {
+  display: none;
+}
+
+#mute-btn.muted .ico-sound-off {
+  display: block;
+}
+
+#mute-btn.muted {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ============================================================
+   HINT TOAST (D8, task 7.2) — first-run teaching chip. Bottom-center,
+   above the corner buttons (they occupy 18-62px; the toast starts at
+   90px). Inside #hud so ?hud=0 hides it with the run UI. Strictly
+   non-interactive (pointer-events: none), single element: main.js swaps
+   textContent and arms ONE auto-dismiss timer (never under ?freeze —
+   the toast renders settled there, entrance animation killed by
+   .qa-freeze, so captures stay byte-identical).
+   ============================================================ */
+#hint-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(max(18px, env(safe-area-inset-bottom, 0px)) + 72px);
+  transform: translateX(-50%);
+  z-index: 12; /* above the HUD chips' row, below every overlay */
+  max-width: 92vw;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, rgba(14, 20, 34, 0.78), rgba(14, 20, 34, 0.5));
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--shadow-chip);
+  backdrop-filter: blur(3px) saturate(1.5);
+  -webkit-backdrop-filter: blur(3px) saturate(1.5);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--gold-1);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  /* Entrance only (slide-up + fade). Starts FROM the offset and ends AT
+     identity — with animations killed the chip simply renders settled. */
+  animation: toast-in var(--dur-2) var(--ease-out) both;
+}
+
+@keyframes toast-in {
   from {
-    transform: translateX(-50%) scale(1);
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
   }
   to {
-    transform: translateX(-50%) scale(1.1);
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
   }
 }
 
-/* === Inline Icons === */
-/* Indicator icons (coin/trophy/flag) are inline SVG, hand-authored in
-   index.html. fill="currentColor" lets each context pick the color. */
-.icon {
-  display: inline-block;
-  vertical-align: -0.15em;
-  fill: currentColor;
-}
-
-.icon-coin {
-  color: #ffd700;
-}
-
-#coins-display .icon {
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
-}
-
-.stat-row .icon,
-#new-high-score .icon {
-  margin-right: 2px;
-}
-
-/* === Menu Screen === */
+/* ============================================================
+   MENU — live 3D world stays visible: light vignette only
+   (dim <= rgba(15,20,35,0.45), blur <= 3px per QA constraint)
+   ============================================================ */
 #menu-screen,
 #gameover-screen {
   position: fixed;
@@ -156,335 +557,1208 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 20;
-  background: linear-gradient(
-    135deg,
-    rgba(26, 26, 46, 0.95) 0%,
-    rgba(22, 33, 62, 0.95) 50%,
-    rgba(26, 26, 46, 0.95) 100%
+  overflow: hidden;
+  /* Keeps the centered panels clear of notches / home indicators when the
+     screen content could otherwise reach the physical edges (landscape). */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+
+#menu-screen {
+  /* Light vignette — edges only, the runner + corridor stay clear */
+  background: radial-gradient(
+    125% 95% at 50% 42%,
+    rgba(15, 20, 35, 0) 40%,
+    rgba(15, 20, 35, 0.2) 68%,
+    rgba(15, 20, 35, 0.45) 100%
   );
-  backdrop-filter: blur(10px);
 }
 
 .menu-container {
   text-align: center;
-  max-width: 400px;
-  width: 90%;
-  padding: 32px;
+  max-width: 460px;
+  width: 92%;
+  padding: max(var(--space-3), env(safe-area-inset-top, 0px))
+    max(var(--space-3), env(safe-area-inset-right, 0px))
+    max(var(--space-3), env(safe-area-inset-bottom, 0px))
+    max(var(--space-3), env(safe-area-inset-left, 0px));
+  /* Entrance motion is the shared .screen-enter class, re-triggered by
+     main.js each time the menu is shown (task 3.4). */
 }
 
+/* Title treatment — stacked, chunky, gradient, skewed for energy */
 .game-title {
-  font-family: "Bungee", "Segoe UI", system-ui, -apple-system, sans-serif;
-  font-size: 48px;
-  font-weight: 900;
-  line-height: 1;
-  margin-bottom: 32px;
-  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  line-height: 0.92;
+  margin-bottom: 10px;
+  transform: rotate(-2deg) skewX(-6deg);
+  animation: title-float 3.2s ease-in-out infinite alternate;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.35))
+    drop-shadow(0 12px 24px rgba(0, 0, 0, 0.5))
+    drop-shadow(0 0 30px rgba(255, 160, 40, 0.22));
+}
+
+@keyframes title-float {
+  from {
+    transform: rotate(-2deg) skewX(-6deg) translateY(0);
+  }
+  to {
+    transform: rotate(-2deg) skewX(-6deg) translateY(-5px);
+  }
 }
 
 .title-sub {
-  color: #ffd700;
   display: block;
-  font-size: 24px;
-  letter-spacing: 8px;
+  font-size: clamp(20px, 3.6vw, 30px);
+  font-weight: 900;
+  letter-spacing: 0.44em;
+  text-indent: 0.44em; /* optically recenter the tracked text */
+  color: var(--gold-2);
+  text-shadow: 0 2px 0 rgba(90, 50, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.55);
 }
 
 .title-main {
-  color: #fff;
   display: block;
-  font-size: 56px;
-  letter-spacing: 4px;
-  background: linear-gradient(180deg, #fff 0%, #ccc 100%);
+  font-size: clamp(54px, 9.4vw, 92px);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  background: linear-gradient(180deg, #ffffff 8%, var(--gold-1) 46%, var(--orange-2) 96%);
   -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
   background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
-/* === Username Form === */
+.menu-tagline {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 5px;
+  color: #ffffff;
+  text-shadow:
+    0 0 8px rgba(10, 16, 30, 0.95),
+    0 1px 3px rgba(10, 16, 30, 0.95),
+    0 -1px 3px rgba(10, 16, 30, 0.9);
+  background: rgba(15, 20, 35, 0.38);
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+  margin-bottom: 22px;
+}
+
+/* Interactive cluster — compact glass card, world shows around it */
+.menu-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border-radius: var(--radius-l);
+  background: linear-gradient(180deg, rgba(13, 18, 30, 0.55), rgba(13, 18, 30, 0.32));
+  border: 1px solid var(--glass-line);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(3px) saturate(1.45);
+  -webkit-backdrop-filter: blur(3px) saturate(1.45);
+}
+
+/* Username pill + PLAY */
 #username-form {
   display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
 }
 
 #username-input {
-  flex: 1;
-  padding: 12px 16px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  width: 100%;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--glass-line);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
   color: #fff;
+  font-family: var(--font-display);
   font-size: 16px;
-  outline: none;
-  transition: border-color 0.2s;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-align: center;
+  transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out),
+    background var(--dur-1) var(--ease-out);
 }
 
 #username-input:focus {
-  border-color: rgba(255, 215, 0, 0.5);
+  border-color: rgba(255, 197, 49, 0.75);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(247, 197, 49, 0.18);
 }
 
 #username-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-/* === Buttons === */
-.btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
+  color: var(--text-faint);
   letter-spacing: 1px;
 }
 
+/* Buttons */
+.btn {
+  padding: var(--space-3) var(--space-6);
+  border: none;
+  border-radius: var(--radius-pill);
+  /* Touch-target floor: generous padding keeps most labels over 44px, but
+     the floor must hold for every label (e.g. compact MENU / RESUME). */
+  min-height: 44px;
+  min-width: 44px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 2.5px;
+  cursor: pointer;
+  transition: filter var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out),
+    scale var(--dur-1) var(--ease-out);
+}
+
 .btn-primary {
-  background: linear-gradient(135deg, #ffd700, #ff6b35);
-  color: #1a1a2e;
+  background: linear-gradient(180deg, var(--orange-1) 0%, var(--orange-2) 58%, var(--orange-3) 100%);
+  color: var(--ink-on-accent);
+  box-shadow: 0 10px 26px rgba(255, 122, 26, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(255, 215, 0, 0.4);
+  filter: brightness(1.08) saturate(1.05);
+  box-shadow: 0 14px 34px rgba(255, 122, 26, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+  scale: 1.03;
 }
 
 .btn-primary:active {
-  transform: translateY(0);
+  scale: 0.96;
+  filter: brightness(0.98);
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-line);
+  color: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
+  scale: 1.02;
 }
 
-/* === Menu Stats === */
+.btn-secondary:active {
+  scale: 0.97;
+}
+
+/* Floating PLAY */
+#play-btn {
+  font-size: 25px;
+  padding: var(--space-4) var(--space-6);
+  animation: play-float 2.6s ease-in-out infinite alternate;
+}
+
+@keyframes play-float {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-4px);
+  }
+}
+
+/* Menu stats — compact SVG-icon chips */
 #menu-stats {
-  margin-bottom: 24px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.stat-row {
-  padding: 6px 0;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.stat-row strong {
-  color: #ffd700;
-}
-
-/* === Controls Hint === */
-.controls-hint {
-  margin-top: 24px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
-  line-height: 1.8;
-}
-
-/* === Game Over === */
-.gameover-title {
-  font-family: "Bungee", "Segoe UI", system-ui, -apple-system, sans-serif;
-  font-size: 40px;
-  font-weight: 900;
-  color: #ff4757;
-  margin-bottom: 24px;
-  text-shadow: 0 4px 20px rgba(255, 71, 87, 0.3);
-}
-
-.gameover-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.stat-card {
-  padding: 16px 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
+.stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px 13px;
+  border-radius: var(--radius-m);
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.stat-label {
-  font-size: 10px;
+.ico-chip {
+  width: 17px;
+  height: 17px;
+}
+
+.ico-gold {
+  color: var(--gold-2);
+}
+
+.ico-coin-gold {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.ico-teal {
+  color: var(--teal-1);
+}
+
+.chip-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.05;
+}
+
+.chip-label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  color: var(--text-faint);
+}
+
+.stat-chip strong {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 900;
+  color: #ffe9b8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Leaderboard (TOP RUNNERS) — only appears when the API responds */
+#leaderboard-panel {
+  padding: 12px 14px 10px;
+  border-radius: var(--radius-m);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: left;
+}
+
+.lb-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: var(--gold-2);
+  margin-bottom: var(--space-2);
+}
+
+.lb-header .ico {
+  color: var(--gold-2);
+}
+
+#leaderboard-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+#leaderboard-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 4px;
+  font-size: 13px;
+}
+
+.lb-rank {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.75);
+  flex: none;
+}
+
+#leaderboard-list li:first-child .lb-rank {
+  background: linear-gradient(180deg, var(--gold-1), var(--gold-3));
+  color: #3a2602;
+}
+
+#leaderboard-list li:nth-child(2) .lb-rank {
+  background: linear-gradient(180deg, #e8edf4, #9aa6b8);
+  color: #232a36;
+}
+
+#leaderboard-list li:nth-child(3) .lb-rank {
+  background: linear-gradient(180deg, #e2a06e, #a4643a);
+  color: #33190a;
+}
+
+.lb-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.lb-score {
+  font-family: var(--font-display);
+  font-weight: 900;
+  color: #ffe9b8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Settings row (D6: music + sfx toggles) */
+.settings-row {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--glass-line);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  /* 44px touch-target floor (a small text pill alone is ~30px tall). */
+  min-height: 44px;
+  min-width: 44px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2.5px;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out),
+    scale var(--dur-1) var(--ease-out);
+}
+
+.settings-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  scale: 1.03;
+}
+
+.settings-btn:active {
+  scale: 0.96;
+}
+
+.settings-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* D6 off state rides the accessibility state itself: aria-pressed="false"
+   means the feature is OFF (pressed = on), so the slashed glyph + dimmed
+   text need no extra class to stay in sync with what screen readers say. */
+.settings-btn .ico-music-off,
+.settings-btn .ico-sound-off {
+  display: none;
+}
+
+.settings-btn[aria-pressed="false"] .ico-music-on,
+.settings-btn[aria-pressed="false"] .ico-sound-on {
+  display: none;
+}
+
+.settings-btn[aria-pressed="false"] .ico-music-off,
+.settings-btn[aria-pressed="false"] .ico-sound-off {
+  display: block;
+}
+
+.settings-btn[aria-pressed="false"] {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* How-to-play row (task 7.3): its own row under the settings row, same
+   pill language. The buttons share the .settings-btn 44px floor. */
+.howto-row {
+  margin-top: var(--space-2);
+}
+
+/* ============================================================
+   HOW-TO-PLAY OVERLAY (task 7.3) — a non-blocking review panel over the
+   MENU (state machine untouched). Same panel language as .pause-panel.
+   Both schemes are listed; the section matching the live <html
+   data-scheme> is reordered first and emphasized via .howto-active
+   (main.js keeps it in sync from applyHints/applyHowto).
+   ============================================================ */
+#howto-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 26; /* above #menu-screen (20), below grace (28) + pause (30) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: radial-gradient(
+    130% 100% at 50% 45%,
+    rgba(15, 20, 35, 0.2) 30%,
+    rgba(15, 20, 35, 0.45) 100%
+  );
+}
+
+.howto-card {
+  text-align: center;
+  width: min(88vw, 360px);
+  max-height: 86vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border-radius: var(--radius-l);
+  /* Near-opaque: the live menu (stat chips, settings rows) sits directly
+     behind this panel — full-strength glass reads as visual noise here. */
+  background: linear-gradient(180deg, rgba(15, 21, 36, 0.97), rgba(11, 16, 28, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.howto-title {
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-shadow: var(--shadow-text);
+}
+
+.howto-scheme {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-m);
+  border: 1px solid var(--glass-line);
+  background: rgba(255, 255, 255, 0.04);
+  opacity: 0.62;
+  /* Live scheme first (touch default); data-scheme flips the order. */
+  order: 2;
+}
+
+#howto-touch-section {
+  order: 0;
+}
+
+html[data-scheme="keys"] #howto-touch-section {
+  order: 2;
+}
+
+html[data-scheme="keys"] #howto-keys-section {
+  order: 0;
+}
+
+/* CLOSE lives after both scheme sections (sections use order 0/2). */
+#howto-close-btn {
+  order: 3;
+}
+
+.howto-scheme.howto-active {
+  opacity: 1;
+  border-color: rgba(255, 198, 71, 0.55);
+  background: rgba(255, 194, 71, 0.08);
+}
+
+.howto-scheme-title {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: var(--text-dim);
+}
+
+.howto-active .howto-scheme-title {
+  color: var(--orange-1);
+}
+
+.howto-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.howto-list li {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.howto-active .howto-list li {
+  color: #fff;
+}
+
+/* Swipe hint ribbon — animated, bottom of the menu */
+.swipe-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, rgba(13, 18, 30, 0.6), rgba(13, 18, 30, 0.38));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(3px) saturate(1.4);
+  -webkit-backdrop-filter: blur(3px) saturate(1.4);
+  white-space: nowrap;
+  max-width: 94vw;
+}
+
+.swipe-arrows {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--orange-1);
+  animation: swipe-nudge 1.5s ease-in-out infinite;
+}
+
+.swipe-arrows svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Keyboard scheme: the swipe glyphs would promise touch input — hide them
+   (data-scheme is set at boot by core/scheme.js); the hint wording in
+   .swipe-text stands alone either way. */
+html[data-scheme="keys"] .swipe-arrows {
+  display: none;
+}
+
+@keyframes swipe-nudge {
+  0%,
+  100% {
+    transform: translateX(-4px);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translateX(4px);
+    opacity: 1;
+  }
+}
+
+.swipe-text {
+  font-family: var(--font-display);
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 2px;
-  color: rgba(255, 255, 255, 0.5);
-  display: block;
-  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================================
+   GAME OVER — premium results panel
+   (overlay dim stays within the QA caps; the panel carries
+   the opacity so the world still reads behind)
+   ============================================================ */
+#gameover-screen {
+  z-index: 24;
+  background: radial-gradient(
+    130% 100% at 50% 45%,
+    rgba(15, 20, 35, 0.18) 30%,
+    rgba(15, 20, 35, 0.45) 100%
+  );
+}
+
+.results-panel {
+  text-align: center;
+  width: min(92vw, 400px);
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  border-radius: var(--radius-l);
+  background: linear-gradient(180deg, rgba(15, 21, 36, 0.88), rgba(11, 16, 28, 0.78));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(3px) saturate(1.4);
+  -webkit-backdrop-filter: blur(3px) saturate(1.4);
+}
+
+.gameover-title {
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  font-size: clamp(32px, 5vw, 42px);
+  font-weight: 900;
+  letter-spacing: 2px;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4), 0 6px 22px rgba(255, 93, 108, 0.35);
+  margin-bottom: 14px;
+}
+
+/* NEW HIGH SCORE — full-width gold banner (Task 5.2) + transform-only
+   sheen sweep. The .burst sparkles inside are pure CSS decoration: their
+   STATIC styles are the settled look (tiny pale-gold edge dots), and the
+   one-shot .pop keyframe only ever animates transform/opacity — so under
+   .qa-freeze / reduced motion (animations killed or zeroed) the banner
+   renders intentional and settled either way. */
+#new-high-score {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  width: 100%;
+  border-radius: var(--radius-m);
+  background: linear-gradient(100deg, var(--gold-2) 0%, var(--orange-1) 50%, var(--gold-2) 100%);
+  color: #3a2502;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 17px;
+  letter-spacing: 2.5px;
+  box-shadow: 0 8px 24px rgba(247, 197, 49, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  animation: banner-pulse 0.9s ease-in-out infinite alternate;
+}
+
+/* Burst sparkles — 6 dots parked at the banner edges. Static = subtle
+   visible sparkle studs; the .pop animation (re-added by showGameOver on
+   every new best) pops each outward along its --bx/--by vector and fades
+   it out (fill both, so the animated final state is "burst spent"). */
+.burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.burst span {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold-1);
+  opacity: 0.85;
+  box-shadow: 0 0 6px rgba(255, 244, 214, 0.9);
+}
+
+.burst span:nth-child(1) { left: 6%; top: 20%; --bx: -14px; --by: -10px; }
+.burst span:nth-child(2) { left: 22%; top: 72%; --bx: -8px; --by: 10px; width: 4px; height: 4px; }
+.burst span:nth-child(3) { left: 44%; top: 16%; --bx: 6px; --by: -12px; }
+.burst span:nth-child(4) { left: 63%; top: 76%; --bx: 10px; --by: 9px; width: 4px; height: 4px; }
+.burst span:nth-child(5) { left: 81%; top: 22%; --bx: 14px; --by: -8px; }
+.burst span:nth-child(6) { left: 92%; top: 68%; --bx: 12px; --by: 12px; }
+
+#new-high-score.pop .burst span {
+  animation: burst-pop 0.7s var(--ease-out) both;
+}
+
+#new-high-score.pop .burst span:nth-child(2) { animation-delay: 60ms; }
+#new-high-score.pop .burst span:nth-child(3) { animation-delay: 120ms; }
+#new-high-score.pop .burst span:nth-child(4) { animation-delay: 40ms; }
+#new-high-score.pop .burst span:nth-child(5) { animation-delay: 100ms; }
+#new-high-score.pop .burst span:nth-child(6) { animation-delay: 150ms; }
+
+@keyframes burst-pop {
+  0% {
+    transform: translate(0, 0) scale(0.4);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--bx, 0), var(--by, 0)) scale(1.2);
+    opacity: 0;
+  }
+}
+
+#new-high-score::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-135%) skewX(-18deg);
+  background: linear-gradient(
+    100deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 75%
+  );
+  animation: banner-sheen 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes banner-sheen {
+  0% {
+    transform: translateX(-135%) skewX(-18deg);
+  }
+  55%,
+  100% {
+    transform: translateX(135%) skewX(-18deg);
+  }
+}
+
+@keyframes banner-pulse {
+  from {
+    scale: 1;
+  }
+  to {
+    scale: 1.035;
+  }
+}
+
+/* Big score + count-up target */
+.score-hero {
+  margin-bottom: var(--space-4);
+}
+
+.score-hero .hud-label {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* Task 5.1: gap-to-best line (losing runs against a real best only).
+   Scheme-neutral copy written by showGameOver(); hidden otherwise — when
+   .hidden removes it the layout matches the pre-gap results card. */
+#go-gap {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
 }
 
 .stat-value {
-  font-family: "Bungee", "Segoe UI", system-ui, -apple-system, sans-serif;
-  font-size: 24px;
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  display: block;
+  font-size: 52px;
+  line-height: 1.05;
   font-weight: 900;
   color: #fff;
-  display: block;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 8px 26px rgba(255, 170, 60, 0.28);
 }
 
-#new-high-score {
-  margin-bottom: 24px;
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #ffd700, #ff6b35);
-  border-radius: 12px;
-  color: #1a1a2e;
+/* Stats rows with SVG icons */
+.gameover-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: var(--space-5);
+  padding: var(--space-1);
+  border-radius: var(--radius-m);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-s);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.ico-row {
+  width: 17px;
+  height: 17px;
+  color: rgba(255, 255, 255, 0.65);
+  flex: none;
+}
+
+.row-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  color: var(--text-dim);
+}
+
+.row-value {
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-size: 19px;
   font-weight: 900;
-  font-size: 16px;
-  animation: pulse 0.5s ease-in-out infinite alternate;
+  color: #ffe9b8;
+  font-variant-numeric: tabular-nums;
 }
 
 .gameover-buttons {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   justify-content: center;
 }
 
-/* === Loading === */
+.gameover-buttons .btn-primary {
+  flex: 1.4;
+  font-size: 19px;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+}
+
+.gameover-buttons .btn-secondary {
+  flex: 1;
+}
+
+/* Scheme-aware results hint (filled by main.js applyHints()) — same
+   treatment as the pause overlay hint so every screen reads as one system. */
+.results-hint {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  margin-top: var(--space-3);
+}
+
+/* ============================================================
+   PAUSE OVERLAY
+   ============================================================ */
+#pause-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: radial-gradient(
+    130% 100% at 50% 45%,
+    rgba(15, 20, 35, 0.2) 30%,
+    rgba(15, 20, 35, 0.45) 100%
+  );
+}
+
+.pause-panel {
+  text-align: center;
+  width: min(88vw, 320px);
+  padding: var(--space-6);
+  border-radius: var(--radius-l);
+  background: linear-gradient(180deg, rgba(15, 21, 36, 0.9), rgba(11, 16, 28, 0.8));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  /* Entrance motion is the shared .screen-enter class (task 3.4). */
+}
+
+.pause-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-m);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-line);
+  color: #fff;
+  margin-bottom: 10px;
+}
+
+.pause-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.pause-title {
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  margin-bottom: 6px;
+  text-shadow: var(--shadow-text);
+}
+
+.pause-hint {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  margin-bottom: 18px;
+}
+
+/* D3: RESUME / RESTART / MENU — full-width stacked targets under the hint;
+   .btn floors each at 44px, DOM order = keyboard-focus order. */
+.pause-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pause-actions .btn {
+  width: 100%;
+}
+
+/* ============================================================
+   RESUME GRACE (D4, task 3.3) — real-time countdown between
+   un-pausing a live run and the sim stepping again. NOT part of
+   #hud: main.js toggles its hidden class directly. The bar is
+   driven by per-frame JS style writes (transform: scaleX), so no
+   CSS animation/transition is involved and the countdown state is
+   always exact (and moot under ?freeze, which never arms it).
+   ============================================================ */
+#resume-grace {
+  position: fixed;
+  inset: 0;
+  z-index: 28; /* above HUD (10) + screens (20/24), below pause (30) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Explicit tap target: a pointerdown anywhere on the overlay skips
+     the countdown (data-input-exclude keeps it out of the sim input). */
+  pointer-events: auto;
+  cursor: pointer;
+  /* Same QA-capped dim family as the pause overlay (blur-free). */
+  background: radial-gradient(
+    130% 100% at 50% 45%,
+    rgba(15, 20, 35, 0.2) 30%,
+    rgba(15, 20, 35, 0.45) 100%
+  );
+}
+
+.grace-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  border-radius: var(--radius-l);
+  background: linear-gradient(180deg, rgba(15, 21, 36, 0.9), rgba(11, 16, 28, 0.8));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+#grace-numeral {
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  font-size: 72px;
+  line-height: 1;
+  font-weight: 900;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--shadow-text);
+}
+
+.grace-track {
+  width: min(56vw, 200px);
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+/* The countdown bar: main.js writes transform: scaleX(remaining) each
+   frame — transform-only, no layout, no CSS animation. */
+#grace-bar {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--orange-1), var(--orange-2));
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+.grace-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--text-dim);
+}
+
+/* ============================================================
+   SCREEN TRANSITIONS (D9, task 3.4) — one shared entrance for the
+   menu container, results panel and pause panel. main.js re-adds
+   the class on every show (remove -> reflow -> add, the popBadge
+   trick). Transform/opacity only, starting FROM the offset and
+   ending AT identity: with animations disabled (reduced motion or
+   .qa-freeze) the element simply renders settled — there is no
+   persistent opacity:0 base style to go stale.
+   ============================================================ */
+.screen-enter {
+  animation: screen-enter var(--dur-2) var(--ease-out) both;
+}
+
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================
+   LOADING — coin-themed spinner
+   ============================================================ */
 #loading-screen {
   position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1a1a2e;
+  background: radial-gradient(120% 100% at 50% 0%, #1a2340 0%, #0d1322 58%, #090d18 100%);
   z-index: 100;
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+
+#loading-screen.fading {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .loader {
   text-align: center;
 }
 
-.spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #ffd700;
+.coin-spinner {
+  width: 72px;
+  height: 72px;
+  perspective: 340px;
+  margin: 0 auto;
+}
+
+.coin-face {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 30%, var(--gold-1) 0%, var(--gold-2) 46%, #cf8f14 76%, #a86f0d 100%);
+  box-shadow: inset 0 0 0 5px rgba(255, 255, 255, 0.3), inset 0 0 0 8px rgba(146, 94, 10, 0.55),
+    0 8px 22px rgba(0, 0, 0, 0.5), 0 0 34px rgba(247, 197, 49, 0.25);
+  animation: coin-flip 1.05s linear infinite;
 }
 
-@keyframes spin {
+.coin-face svg {
+  width: 32px;
+  height: 32px;
+}
+
+@keyframes coin-flip {
+  from {
+    transform: rotateY(0deg);
+  }
   to {
-    transform: rotate(360deg);
+    transform: rotateY(360deg);
   }
 }
 
-/* === UI Motion (visual-overhaul 7.3) === */
-/* Screen fades: menu/hud/gameover crossfade instead of instant display
-   toggling (elements opt in via the .screen class, applied by ui-motion.js).
-   Visibility flips only AFTER the fade-out completes, so a faded screen can
-   never intercept clicks; on show it restores immediately so the fade-in is
-   visible. Opacity/visibility only — no layout animation. */
-.screen {
-  transition: opacity 0.3s ease;
+.loader-shadow {
+  width: 54px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  filter: blur(3px);
+  margin: 12px auto 14px;
+  animation: loader-shadow-pulse 1.05s ease-in-out infinite;
 }
 
-.screen.screen-hidden {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
-}
-
-/* Play vignette: edge darkening while playing (created by ui-motion.js).
-   Sits under the HUD (z 10) and the screens (z 20); the gradient keeps the
-   center clear so HUD text stays legible. */
-#play-vignette {
-  position: fixed;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse at center,
-    transparent 42%,
-    rgba(0, 0, 0, 0.38) 100%
-  );
-}
-
-/* Damage flash: full-screen red spike on crash (created by ui-motion.js).
-   Above the screens (z 30) so the tint stays visible while the mostly
-   opaque game-over backdrop fades in; fades out in 0.35s. */
-#damage-flash {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  pointer-events: none;
-  visibility: hidden;
-  opacity: 0;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(255, 64, 64, 0.32) 0%,
-    rgba(220, 24, 24, 0.6) 100%
-  );
-}
-
-#damage-flash.flash-active {
-  visibility: visible;
-  animation: damage-flash 0.35s ease-out forwards;
-}
-
-@keyframes damage-flash {
-  0% {
-    opacity: 0.55;
-  }
+@keyframes loader-shadow-pulse {
+  0%,
   100% {
-    opacity: 0;
+    transform: scaleX(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scaleX(0.55);
+    opacity: 0.5;
   }
 }
 
-/* Combo punch: scale pop on each combo/multiplier increase (re-triggered by
-   ui-motion.js). Keyframes keep the translateX(-50%) centering from the
-   base rules. */
-@keyframes combo-punch {
-  0% {
-    transform: translateX(-50%) scale(1);
-  }
-  35% {
-    transform: translateX(-50%) scale(1.25);
-  }
-  100% {
-    transform: translateX(-50%) scale(1);
-  }
-}
-
-/* ID-qualified so the punch overrides #multiplier-display's infinite pulse
-   while applied. */
-#combo-display.punch,
-#multiplier-display.punch {
-  animation: combo-punch 0.2s ease-out;
+.loader p {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--text-dim);
 }
 
 /* === Responsive === */
 @media (max-width: 480px) {
-  .game-title {
-    font-size: 36px;
-  }
-
   .title-sub {
-    font-size: 18px;
+    font-size: 17px;
   }
 
   .title-main {
-    font-size: 42px;
+    font-size: 46px;
   }
 
   .hud-value {
-    font-size: 22px;
+    font-size: 24px;
   }
 
-  .gameover-stats {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+  .hud-chip-score {
+    min-width: 106px;
   }
 
   .stat-value {
-    font-size: 20px;
+    font-size: 40px;
   }
+
+  .swipe-text {
+    letter-spacing: 1.2px;
+  }
+
+  #combo-display {
+    top: 12px;
+  }
+}
+
+@media (max-height: 460px) {
+  .menu-card {
+    gap: 10px;
+    padding: var(--space-3) var(--space-4) var(--space-3);
+  }
+
+  .game-title {
+    margin-bottom: 6px;
+  }
+
+  .menu-tagline {
+    margin-bottom: 12px;
+  }
+
+  #play-btn {
+    font-size: 21px;
+    padding: var(--space-3) var(--space-5) var(--space-3);
+  }
+}
+
+/* Reduced-motion users: GLOBAL kill, not a subset. Animations stop and
+   transitions collapse to ~0, so state changes still render — instantly,
+   never absent; no information depends on motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Deterministic captures: every animation/transition hard-off. Kept LAST
+   and !important so .qa-freeze outranks normal rules AND the global
+   reduced-motion block above (it also wins on specificity) — ?freeze
+   frames stay byte-identical regardless of user preferences. */
+.qa-freeze *,
+.qa-freeze *::before,
+.qa-freeze *::after {
+  animation: none !important;
+  transition: none !important;
 }
