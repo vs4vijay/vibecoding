@@ -126,7 +126,9 @@ official reference screenshots · code committed with a descriptive message.
   importmap architecture). `.github/workflows/games-pages-deploy.yml` does NOT
   build it — the "Stage site" step copies the public surface verbatim
   (index.html, styles.css, sw.js, manifest.webmanifest, serve.mjs, js/, vendor/,
-  icons/) like games-hub. Never add a Vite/bun build step for it.
+  icons/, qa/hooks.js — the one qa/ exception: js/main.js imports it
+  dynamically under ?qa=1 only, so the QA contract works on the deployed site)
+  like games-hub. Never add a Vite/bun build step for it.
 - Everything user-served must stay relative (`./js/...`, `./vendor/...`,
   `./sw.js`) — the game mounts under a subpath, not a bare root.
 - The internal codename `endless` is INTENTIONAL and stays: localStorage keys

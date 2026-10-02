@@ -23,14 +23,51 @@ import { MenuUI } from "./ui/menu.js";
 import { PauseUI } from "./ui/pause.js";
 import { GameoverUI } from "./ui/gameover.js";
 import { HudUI } from "./ui/hud.js";
-import { initQaHooks, markFrameRendered, resolveReady } from "../qa/hooks.js";
 
 const State = { LOADING: "loading", MENU: "menu", GAME: "game", GAMEOVER: "gameover" };
 const MODES = ["run", "drive", "ride"];
 const nextFrame = () => new Promise((r) => requestAnimationFrame(r));
 
+// QA driver (qa/hooks.js) is dev tooling: it must never sit on the shipped
+// module graph, so it is imported dynamically only when the page asks for QA
+// (?qa present — the contract's own trigger) and every other boot runs on
+// these inert stubs without fetching it. (A static import here once 404'd on
+// a host without qa/ and tore the whole graph down before boot() could run.)
+const QA_INERT = {
+  initQaHooks: () => ({
+    qa: false,
+    seed: null,
+    time: 0,
+    timeOfDay: "dusk",
+    scene: "menu",
+    mode: "drive",
+    cam: null,
+    staged: null,
+    freeze: false,
+    gameplay: false,
+    quality: null,
+  }),
+  markFrameRendered: () => true, // no capture gate outside QA: warm immediately
+  resolveReady: () => false, // screenshotReady is a QA-only surface
+};
+let { initQaHooks, markFrameRendered, resolveReady } = QA_INERT;
+
+async function loadQaDriver() {
+  if (!new URLSearchParams(window.location.search).has("qa")) return;
+  try {
+    const hooks = await import("../qa/hooks.js");
+    initQaHooks = hooks.initQaHooks;
+    markFrameRendered = hooks.markFrameRendered;
+    resolveReady = hooks.resolveReady;
+  } catch {
+    /* hooks.js unavailable under ?qa= (host without qa/): inert driver keeps
+       the shell playable; __QA surfaces simply never appear */
+  }
+}
+
 export async function boot() {
   // ---- QA params, save, seed, tier --------------------------------------
+  await loadQaDriver();
   const qa = initQaHooks();
   const params = new URLSearchParams(window.location.search);
   const save = loadSave();
@@ -43,7 +80,7 @@ export async function boot() {
   let preset = getQualityPreset(tier);
 
   const seed = initRunSeed(params);
-  window.__QA.seed = String(seed);
+  if (window.__QA) window.__QA.seed = String(seed);
 
   const loadFill = document.getElementById("load-fill");
   const setProgress = (frac) => {
@@ -67,7 +104,7 @@ export async function boot() {
   // shadows, cheap texture sets. An explicit ?quality= override still wins.
   const softwareGL = detectSoftwareGL(renderer);
   if (softwareGL) {
-    window.__QA.softwareGL = true;
+    if (window.__QA) window.__QA.softwareGL = true;
     if (!qa.quality && QUALITY_ORDER.indexOf(tier) > QUALITY_ORDER.indexOf("medium")) {
       tier = "medium";
       preset = getQualityPreset(tier);
