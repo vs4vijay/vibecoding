@@ -1,8 +1,9 @@
-import { Worker } from '@/lib/queue/worker';
-import processItemTask from './process-item';
-import sendNotificationTask from './send-notification';
+import type { TaskRegistry } from '@/lib/queue/types';
+import processItem from './process-item';
+import sendNotification from './send-notification';
 
-export function registerAllTasks(worker: Worker): void {
-  worker.registerTask('process-item', processItemTask);
-  worker.registerTask('send-notification', sendNotificationTask);
-}
+/** Every task the worker can run, keyed by the name used when enqueueing. */
+export const tasks: TaskRegistry = {
+  'process-item': processItem,
+  'send-notification': sendNotification,
+};

@@ -16,6 +16,10 @@ export function getPool(): Pool {
       connectionString: getDatabaseUrl(),
       max: Number(process.env.DATABASE_POOL_SIZE || 5),
     });
+    // Idle connections drop when the database restarts; without a listener that crashes the process.
+    global.postgresPool.on('error', (error) => {
+      console.error('Idle database connection error:', error.message);
+    });
   }
 
   return global.postgresPool;

@@ -1,23 +1,20 @@
-import { JobPayload, Job } from '@/lib/queue/types';
+import { z } from 'zod';
+import type { JobPayload } from '@/lib/queue/types';
 
-interface NotificationPayload extends JobPayload {
-  type: 'email' | 'sms' | 'push' | 'webhook';
-  recipient: string;
-  message: string;
-  metadata?: Record<string, unknown>;
-}
+const payloadSchema = z.object({
+  type: z.enum(['email', 'sms', 'push', 'webhook']),
+  recipient: z.string().min(1),
+  message: z.string(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
 
-export default async function sendNotification(payload: JobPayload, _job: Job): Promise<void> {
-  const { type, recipient, message, metadata } = payload as NotificationPayload;
+export default async function sendNotification(payload: JobPayload): Promise<void> {
+  const notification = payloadSchema.parse(payload);
 
-  console.log(`Sending ${type} notification to: ${recipient}`);
+  console.log(`Sending ${notification.type} notification to: ${notification.recipient}`);
 
+  // Simulated delivery
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  console.log(`Notification sent successfully`, {
-    type,
-    recipient,
-    message,
-    metadata,
-  });
+  console.log('Notification sent successfully', notification);
 }

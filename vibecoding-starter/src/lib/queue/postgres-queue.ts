@@ -1,126 +1,125 @@
+import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { executeQuery, getDatabaseUrl } from '../db';
-import { IQueue, Job, JobOptions, JobPayload } from './types';
+import { IQueue, Job, JobFilters, JobOptions, JobPayload, JobStatus, JOB_STATUSES } from './types';
 
 const CHANNEL_NAME = 'job_queue';
+const MAX_RETRY_DELAY_SECONDS = 3600;
 
-function generateId(): string {
-  const timestamp = Date.now().toString(36);
-  const randomStr = Math.random().toString(36).substring(2, 15);
-  return `job_${timestamp}${randomStr}`;
+interface JobRow {
+  id: string;
+  task_identifier: string;
+  payload: JobPayload;
+  status: JobStatus;
+  priority: number;
+  run_at: Date;
+  attempts: number;
+  max_attempts: number;
+  last_error: string | null;
+  created_at: Date;
+  updated_at: Date;
+  locked_at: Date | null;
+  locked_by: string | null;
+  completed_at: Date | null;
+  key: string | null;
+  queue: string | null;
 }
 
-function rowToJob(row: Record<string, unknown>): Job {
+function rowToJob(row: JobRow): Job {
   return {
-    id: row.id as string,
-    taskIdentifier: row.task_identifier as string,
-    payload: (typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload) as JobPayload,
-    status: row.status as Job['status'],
-    priority: row.priority as number,
-    runAt: new Date(row.run_at as string),
-    attempts: row.attempts as number,
-    maxAttempts: row.max_attempts as number,
-    lastError: row.last_error as string | null,
-    createdAt: new Date(row.created_at as string),
-    updatedAt: new Date(row.updated_at as string),
-    lockedAt: row.locked_at ? new Date(row.locked_at as string) : null,
-    lockedBy: row.locked_by as string | null,
-    completedAt: row.completed_at ? new Date(row.completed_at as string) : null,
-    queue: row.queue as string | null,
+    id: row.id,
+    taskIdentifier: row.task_identifier,
+    payload: row.payload,
+    status: row.status,
+    priority: row.priority,
+    runAt: row.run_at,
+    attempts: row.attempts,
+    maxAttempts: row.max_attempts,
+    lastError: row.last_error,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    lockedAt: row.locked_at,
+    lockedBy: row.locked_by,
+    completedAt: row.completed_at,
+    key: row.key,
+    queue: row.queue,
   };
 }
 
+/** Job queue on plain Postgres: FOR UPDATE SKIP LOCKED to claim, LISTEN/NOTIFY to wake workers. */
 export class PostgresQueue implements IQueue {
-  async enqueue<T extends JobPayload = JobPayload>(
-    taskIdentifier: string,
-    payload: T,
-    options?: JobOptions
-  ): Promise<Job> {
-    const id = generateId();
-    const runAt = options?.runAt || new Date();
-    const maxAttempts = options?.maxAttempts || 25;
-    const priority = options?.priority || 0;
-    const queue = options?.queue || null;
-    const jobKey = options?.jobKey || null;
-
-    if (jobKey) {
-      const existing = await executeQuery<{ id: string }>(
-        `SELECT id FROM jobs WHERE key = $1 AND status IN ('pending', 'active')`,
-        [jobKey]
-      );
-      if (existing.length > 0) {
-        throw new Error(`Job with key ${jobKey} already exists`);
-      }
-    }
-
-    const result = await executeQuery(
-      `INSERT INTO jobs (
-        id, task_identifier, payload, status, priority, run_at,
-        max_attempts, key, queue
-      ) VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8)
-      RETURNING *`,
+  async enqueue(taskIdentifier: string, payload: JobPayload, options: JobOptions = {}): Promise<Job> {
+    const rows = await executeQuery<JobRow>(
+      `INSERT INTO jobs (id, task_identifier, payload, priority, run_at, max_attempts, key, queue)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (key) DO NOTHING
+       RETURNING *`,
       [
-        id,
+        `job_${randomUUID()}`,
         taskIdentifier,
         JSON.stringify(payload),
-        priority,
-        runAt.toISOString(),
-        maxAttempts,
-        jobKey,
-        queue,
+        options.priority ?? 0,
+        options.runAt ?? new Date(),
+        options.maxAttempts ?? 25,
+        options.jobKey ?? null,
+        options.queue ?? null,
       ]
     );
 
-    const job = rowToJob(result[0]);
+    if (rows.length === 0) {
+      throw new Error(`Job with key ${options.jobKey} already exists`);
+    }
 
-    await executeQuery(`SELECT pg_notify($1, $2)`, [
-      CHANNEL_NAME,
-      JSON.stringify({ jobId: job.id }),
-    ]);
+    await executeQuery(`SELECT pg_notify($1, $2)`, [CHANNEL_NAME, rows[0].id]);
 
-    return job;
+    return rowToJob(rows[0]);
   }
 
   async getJob(id: string): Promise<Job | null> {
-    const result = await executeQuery(
-      `SELECT * FROM jobs WHERE id = $1`,
-      [id]
-    );
-    return result.length > 0 ? rowToJob(result[0]) : null;
+    const rows = await executeQuery<JobRow>(`SELECT * FROM jobs WHERE id = $1`, [id]);
+    return rows.length > 0 ? rowToJob(rows[0]) : null;
   }
 
-  async getJobs(filters?: {
-    status?: string;
-    queue?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<Job[]> {
-    const limit = filters?.limit || 50;
-    const offset = filters?.offset || 0;
-
-    let query = 'SELECT * FROM jobs WHERE 1=1';
+  async getJobs(filters: JobFilters = {}): Promise<Job[]> {
+    const conditions: string[] = [];
     const params: unknown[] = [];
-    let paramIndex = 1;
 
-    if (filters?.status) {
-      query += ` AND status = $${paramIndex++}`;
+    if (filters.status) {
       params.push(filters.status);
+      conditions.push(`status = $${params.length}`);
     }
 
-    if (filters?.queue) {
-      query += ` AND queue = $${paramIndex++}`;
+    if (filters.queue) {
       params.push(filters.queue);
+      conditions.push(`queue = $${params.length}`);
     }
 
-    query += ` ORDER BY priority DESC, run_at ASC, created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex}`;
-    params.push(limit, offset);
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    params.push(filters.limit ?? 50, filters.offset ?? 0);
 
-    const result = await executeQuery(query, params);
-    return result.map(rowToJob);
+    const rows = await executeQuery<JobRow>(
+      `SELECT * FROM jobs ${where}
+       ORDER BY created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+    return rows.map(rowToJob);
+  }
+
+  async countJobs(): Promise<Record<JobStatus, number>> {
+    const rows = await executeQuery<{ status: JobStatus; count: number }>(
+      `SELECT status, COUNT(*)::int AS count FROM jobs GROUP BY status`
+    );
+
+    const counts = Object.fromEntries(JOB_STATUSES.map((status) => [status, 0])) as Record<JobStatus, number>;
+    for (const row of rows) {
+      counts[row.status] = row.count;
+    }
+    return counts;
   }
 
   async claimJob(workerId: string): Promise<Job | null> {
-    const result = await executeQuery(
+    const rows = await executeQuery<JobRow>(
       `UPDATE jobs
        SET status = 'active', locked_by = $1, locked_at = NOW(), attempts = attempts + 1, updated_at = NOW()
        WHERE id = (
@@ -133,30 +132,31 @@ export class PostgresQueue implements IQueue {
       [workerId]
     );
 
-    return result.length > 0 ? rowToJob(result[0]) : null;
+    return rows.length > 0 ? rowToJob(rows[0]) : null;
   }
 
+  // Finished jobs give up their key so the same key can be enqueued again.
   async completeJob(id: string): Promise<void> {
     await executeQuery(
-      `UPDATE jobs SET status = 'completed', completed_at = NOW(), updated_at = NOW() WHERE id = $1`,
+      `UPDATE jobs
+       SET status = 'completed', completed_at = NOW(), key = NULL,
+           locked_at = NULL, locked_by = NULL, updated_at = NOW()
+       WHERE id = $1`,
       [id]
     );
   }
 
+  // Retries back off exponentially (2s, 4s, 8s, ... capped at one hour).
   async failJob(id: string, error: string): Promise<void> {
     await executeQuery(
       `UPDATE jobs
        SET status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
+           run_at = CASE WHEN attempts >= max_attempts THEN run_at
+                         ELSE NOW() + LEAST(POWER(2, attempts), $3) * INTERVAL '1 second' END,
+           key = CASE WHEN attempts >= max_attempts THEN NULL ELSE key END,
            last_error = $1, locked_at = NULL, locked_by = NULL, updated_at = NOW()
        WHERE id = $2`,
-      [error, id]
-    );
-  }
-
-  async releaseJob(id: string): Promise<void> {
-    await executeQuery(
-      `UPDATE jobs SET status = 'pending', locked_at = NULL, locked_by = NULL, updated_at = NOW() WHERE id = $1`,
-      [id]
+      [error, id, MAX_RETRY_DELAY_SECONDS]
     );
   }
 
@@ -164,52 +164,22 @@ export class PostgresQueue implements IQueue {
     await executeQuery(`DELETE FROM jobs WHERE id = $1`, [id]);
   }
 
-  async getNextJob(): Promise<Job | null> {
-    const result = await executeQuery(
-      `SELECT * FROM jobs
-       WHERE status = 'pending' AND run_at <= NOW()
-       ORDER BY priority DESC, run_at ASC
-       LIMIT 1 FOR UPDATE SKIP LOCKED`
-    );
-
-    if (result.length === 0) {
-      return null;
-    }
-
-    await executeQuery(
-      `UPDATE jobs SET status = 'active', locked_at = NOW(), attempts = attempts + 1, updated_at = NOW() WHERE id = $1`,
-      [result[0].id]
-    );
-
-    const updated = await executeQuery(`SELECT * FROM jobs WHERE id = $1`, [result[0].id]);
-    return rowToJob(updated[0]);
-  }
-
-  async subscribe(callback: (jobId: string) => void): Promise<() => void> {
+  async subscribe(onJob: () => void): Promise<() => Promise<void>> {
+    // LISTEN needs a dedicated connection; pooled connections are handed back between queries.
     const client = new Client({ connectionString: getDatabaseUrl() });
+    client.on('error', (error) => {
+      console.warn('⚠️  Job notification listener lost; relying on polling:', error.message);
+    });
+    client.on('notification', () => onJob());
+
     try {
       await client.connect();
       await client.query(`LISTEN ${CHANNEL_NAME}`);
-      client.on('notification', (notification) => {
-        if (notification.channel === CHANNEL_NAME) {
-          try {
-            const data = JSON.parse(notification.payload || '{}');
-            callback(data.jobId);
-          } catch (e) {
-            console.error('Failed to parse notification:', e);
-          }
-        }
-      });
-    } catch (e) {
+    } catch (error) {
       await client.end().catch(() => undefined);
-      console.warn('⚠️  Could not subscribe to notifications:', e);
-      return () => {};
+      throw error;
     }
 
-    return () => {
-      void client.end();
-    };
+    return () => client.end();
   }
 }
-
-export const queue = new PostgresQueue();

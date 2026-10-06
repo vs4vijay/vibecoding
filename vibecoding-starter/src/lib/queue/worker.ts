@@ -1,149 +1,112 @@
-import { IWorker, TaskHandler, WorkerOptions, Job } from './types';
-import { queue, PostgresQueue } from './postgres-queue';
+import { randomUUID } from 'node:crypto';
+import { IQueue, Job, TaskRegistry, WorkerOptions } from './types';
 
-export class Worker implements IWorker {
-  private tasks: Record<string, TaskHandler> = {};
+export class Worker {
+  private readonly queue: IQueue;
+  private readonly tasks: TaskRegistry;
+  private readonly workerId = `worker_${randomUUID()}`;
+  private readonly pollInterval: number;
+  private readonly concurrency: number;
+  private readonly activeJobs = new Set<Promise<void>>();
+  private claiming = 0;
   private running = false;
-  private stopRequested = false;
-  private workerId: string;
-  private pollInterval: number;
-  private concurrency: number;
-  private activeJobs: Map<string, Job> = new Map();
-  private unsubscribe: (() => void) | null = null;
-  private postgresQueue: PostgresQueue;
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private unsubscribe: (() => Promise<void>) | null = null;
 
-  constructor(options?: WorkerOptions) {
-    this.workerId = `worker_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    this.pollInterval = options?.pollInterval || 1000;
-    this.concurrency = options?.concurrency || 5;
-    this.postgresQueue = queue as PostgresQueue;
-  }
-
-  registerTask(taskIdentifier: string, handler: TaskHandler): void {
-    this.tasks[taskIdentifier] = handler;
-    console.log(`📝 Registered task: ${taskIdentifier}`);
+  constructor(queue: IQueue, tasks: TaskRegistry, options: WorkerOptions = {}) {
+    this.queue = queue;
+    this.tasks = tasks;
+    this.pollInterval = options.pollInterval ?? 1000;
+    this.concurrency = options.concurrency ?? 5;
   }
 
   async start(): Promise<void> {
-    if (this.running) {
-      console.log('⚠️  Worker already running');
-      return;
-    }
-
+    if (this.running) return;
     this.running = true;
-    this.stopRequested = false;
 
-    console.log(`🚀 Starting Worker (${this.workerId})...`);
+    console.log(`🚀 Starting worker (${this.workerId})`);
     console.log(`   Concurrency: ${this.concurrency}`);
     console.log(`   Poll interval: ${this.pollInterval}ms`);
-
-    const taskNames = Object.keys(this.tasks);
-    if (taskNames.length === 0) {
-      console.warn('⚠️  No tasks registered!');
-    } else {
-      console.log(`   Tasks: ${taskNames.join(', ')}`);
-    }
+    console.log(`   Tasks: ${Object.keys(this.tasks).join(', ') || '(none registered)'}`);
 
     try {
-      this.unsubscribe = await this.postgresQueue.subscribe(async (jobId: string) => {
-        console.log(`📬 Received notification for job: ${jobId}`);
-        this.processNextJob();
-      });
-    } catch {
-      console.warn('⚠️  Could not subscribe to notifications, polling will be used instead');
-    }
-
-    this.pollLoop();
-    console.log('✅ Worker started successfully');
-  }
-
-  private pollLoop(): void {
-    if (this.stopRequested) return;
-
-    this.processNextJob();
-
-    setTimeout(() => this.pollLoop(), this.pollInterval);
-  }
-
-  private async processNextJob(): Promise<void> {
-    if (this.activeJobs.size >= this.concurrency) {
-      return;
-    }
-
-    if (this.stopRequested) return;
-
-    try {
-      const job = await this.postgresQueue.claimJob(this.workerId);
-
-      if (!job) return;
-
-      console.log(`🎯 Processing job: ${job.id} (${job.taskIdentifier})`);
-
-      this.activeJobs.set(job.id, job);
-
-      this.executeTask(job).catch((error) => {
-        console.error(`❌ Job ${job.id} failed:`, error);
-      });
+      this.unsubscribe = await this.queue.subscribe(() => void this.fill());
     } catch (error) {
-      console.error('Error fetching job:', error);
+      console.warn('⚠️  Could not subscribe to job notifications; polling only:', error);
     }
+
+    this.poll();
   }
 
-  private async executeTask(job: Job): Promise<void> {
-    const task = this.tasks[job.taskIdentifier];
-
-    if (!task) {
-      console.error(`❌ No handler registered for task: ${job.taskIdentifier}`);
-      await this.postgresQueue.failJob(job.id, `No handler for task: ${job.taskIdentifier}`);
-      this.activeJobs.delete(job.id);
-      return;
-    }
-
-    try {
-      await task(job.payload, job);
-      await this.postgresQueue.completeJob(job.id);
-      console.log(`✅ Job completed: ${job.id}`);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`❌ Job failed: ${job.id}`, message);
-
-      if (job.attempts >= job.maxAttempts) {
-        await this.postgresQueue.failJob(job.id, message);
-      } else {
-        await this.postgresQueue.releaseJob(job.id);
-      }
-    } finally {
-      this.activeJobs.delete(job.id);
-    }
-  }
-
+  /** Stop claiming new jobs and wait for the ones in flight to finish. */
   async stop(): Promise<void> {
-    console.log('🛑 Stopping worker...');
-    this.stopRequested = true;
+    if (!this.running) return;
+    this.running = false;
+
+    if (this.pollTimer) clearTimeout(this.pollTimer);
+    await this.unsubscribe?.().catch(() => undefined);
+    this.unsubscribe = null;
 
     if (this.activeJobs.size > 0) {
-      console.log(`   Waiting for ${this.activeJobs.size} active job(s) to finish...`);
+      console.log(`🛑 Waiting for ${this.activeJobs.size} active job(s) to finish...`);
+    }
+    while (this.claiming > 0 || this.activeJobs.size > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
-    const waitForActive = async () => {
-      while (this.activeJobs.size > 0 && !this.stopRequested) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    };
-    await waitForActive();
-
-    if (this.unsubscribe) {
-      this.unsubscribe();
-      this.unsubscribe = null;
-    }
-
-    this.running = false;
     console.log('✅ Worker stopped');
   }
 
   isRunning(): boolean {
     return this.running;
   }
-}
 
-export const worker = new Worker();
+  private poll(): void {
+    if (!this.running) return;
+    void this.fill();
+    this.pollTimer = setTimeout(() => this.poll(), this.pollInterval);
+  }
+
+  /** Claim jobs until the queue is drained or every concurrency slot is busy. */
+  private async fill(): Promise<void> {
+    while (this.running && this.activeJobs.size + this.claiming < this.concurrency) {
+      let job: Job | null;
+      this.claiming++;
+      try {
+        job = await this.queue.claimJob(this.workerId);
+      } catch (error) {
+        console.error('Failed to claim job:', error);
+        return;
+      } finally {
+        this.claiming--;
+      }
+
+      if (!job) return;
+
+      const run: Promise<void> = this.run(job).finally(() => {
+        this.activeJobs.delete(run);
+        void this.fill();
+      });
+      this.activeJobs.add(run);
+    }
+  }
+
+  private async run(job: Job): Promise<void> {
+    try {
+      if (!Object.hasOwn(this.tasks, job.taskIdentifier)) {
+        throw new Error(`No handler registered for task: ${job.taskIdentifier}`);
+      }
+
+      await this.tasks[job.taskIdentifier](job.payload, job);
+      await this.queue.completeJob(job.id);
+      console.log(`✅ Job completed: ${job.id} (${job.taskIdentifier})`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`❌ Job failed: ${job.id} (attempt ${job.attempts}/${job.maxAttempts}):`, message);
+
+      await this.queue.failJob(job.id, message).catch((failError) => {
+        console.error(`Failed to record failure for job ${job.id}:`, failError);
+      });
+    }
+  }
+}

@@ -1,34 +1,27 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Job } from '@/lib/queue/types';
+import type { Job, JobStatus } from '@/lib/queue/types';
 
 interface JobsTableProps {
   jobs: Job[];
 }
 
+const STATUS_STYLES: Record<JobStatus, string> = {
+  pending: 'bg-gray-100 text-gray-700',
+  active: 'bg-yellow-100 text-yellow-700',
+  completed: 'bg-green-100 text-green-700',
+  failed: 'bg-red-100 text-red-700',
+};
+
 export function JobsTable({ jobs }: JobsTableProps) {
   const router = useRouter();
 
-  const getStatusBadge = (status: string) => {
-    const styles = {
-      pending: 'bg-gray-100 text-gray-700',
-      active: 'bg-green-100 text-green-700',
-      scheduled: 'bg-yellow-100 text-yellow-700',
-      failed: 'bg-red-100 text-red-700',
-      completed: 'bg-blue-100 text-blue-700',
-    };
-
-    return (
-      <span
-        className={`px-2 py-1 rounded-full text-xs font-medium ${
-          styles[status as keyof typeof styles] || styles.pending
-        }`}
-      >
-        {status}
-      </span>
-    );
-  };
+  const getStatusBadge = (status: JobStatus) => (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[status]}`}>
+      {status}
+    </span>
+  );
 
   const formatDate = (date: Date | string) => {
     return new Date(date).toLocaleString();
@@ -48,7 +41,7 @@ export function JobsTable({ jobs }: JobsTableProps) {
 
       {jobs.length === 0 ? (
         <div className="p-8 text-center text-gray-500">
-          No jobs found. Create an item via the API to see jobs appear here.
+          No jobs yet. Create an item via the API or enqueue a test job to see jobs appear here.
         </div>
       ) : (
         <div className="overflow-x-auto">

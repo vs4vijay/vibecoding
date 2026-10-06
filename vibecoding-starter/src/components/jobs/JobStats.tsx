@@ -1,46 +1,44 @@
+import type { JobStatus } from '@/lib/queue/types';
+
 interface JobStatsProps {
-  stats: {
-    total: number;
-    pending: number;
-    active: number;
-    scheduled: number;
-    failed: number;
-  };
+  counts: Record<JobStatus, number>;
 }
 
-export function JobStats({ stats }: JobStatsProps) {
+export function JobStats({ counts }: JobStatsProps) {
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+
   const statCards = [
     {
       label: 'Total Jobs',
-      value: stats.total,
+      value: total,
       color: 'bg-blue-500',
       textColor: 'text-blue-600',
       bgColor: 'bg-blue-50',
     },
     {
       label: 'Pending',
-      value: stats.pending,
+      value: counts.pending,
       color: 'bg-gray-500',
       textColor: 'text-gray-600',
       bgColor: 'bg-gray-50',
     },
     {
       label: 'Active',
-      value: stats.active,
-      color: 'bg-green-500',
-      textColor: 'text-green-600',
-      bgColor: 'bg-green-50',
-    },
-    {
-      label: 'Scheduled',
-      value: stats.scheduled,
+      value: counts.active,
       color: 'bg-yellow-500',
       textColor: 'text-yellow-600',
       bgColor: 'bg-yellow-50',
     },
     {
+      label: 'Completed',
+      value: counts.completed,
+      color: 'bg-green-500',
+      textColor: 'text-green-600',
+      bgColor: 'bg-green-50',
+    },
+    {
       label: 'Failed',
-      value: stats.failed,
+      value: counts.failed,
       color: 'bg-red-500',
       textColor: 'text-red-600',
       bgColor: 'bg-red-50',

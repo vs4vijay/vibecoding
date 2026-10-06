@@ -1,23 +1,14 @@
 import { JobsTable } from '@/components/jobs/JobsTable';
 import { JobStats } from '@/components/jobs/JobStats';
 import { EnqueueJobButton } from '@/components/jobs/EnqueueJobButton';
-import { getJobs } from '@/lib/worker';
+import { queue } from '@/lib/queue';
+import { tasks } from '@/workers/tasks';
 
-// Force Node.js runtime for PGlite compatibility
-export const runtime = 'nodejs';
+// Always read live queue state instead of prerendering at build time.
 export const dynamic = 'force-dynamic';
 
 export default async function JobsPage() {
-  const jobs = await getJobs({ limit: 100 });
-
-  // Calculate stats
-  const stats = {
-    total: jobs.length,
-    pending: jobs.filter((j: any) => j.status === 'pending').length,
-    active: jobs.filter((j: any) => j.status === 'active').length,
-    scheduled: jobs.filter((j: any) => j.status === 'scheduled').length,
-    failed: jobs.filter((j: any) => j.status === 'failed').length,
-  };
+  const [jobs, counts] = await Promise.all([queue.getJobs({ limit: 100 }), queue.countJobs()]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -30,11 +21,11 @@ export default async function JobsPage() {
               Monitor and manage your background job queue powered by PostgreSQL
             </p>
           </div>
-          <EnqueueJobButton />
+          <EnqueueJobButton taskNames={Object.keys(tasks)} />
         </div>
 
         {/* Stats */}
-        <JobStats stats={stats} />
+        <JobStats counts={counts} />
 
         {/* Jobs Table */}
         <div className="mt-8">

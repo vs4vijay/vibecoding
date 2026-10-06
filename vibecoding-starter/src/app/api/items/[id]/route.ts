@@ -1,49 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeQuery } from '@/lib/db';
 import { z } from 'zod';
-
-// Force Node.js runtime for PGlite compatibility
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+import { errorResponse } from '@/lib/api';
+import { executeQuery } from '@/lib/db';
 
 const updateItemSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
 });
 
-type RouteContext = {
-  params: Promise<{ id: string }>;
-};
+type Context = RouteContext<'/api/items/[id]'>;
+
+function notFound() {
+  return NextResponse.json({ error: 'Item not found' }, { status: 404 });
+}
 
 /**
  * GET /api/items/[id]
  * Get a single item by ID
  */
-export async function GET(
-  request: NextRequest,
-  context: RouteContext
-) {
+export async function GET(_request: NextRequest, context: Context) {
   try {
     const { id } = await context.params;
-    const items = await executeQuery(
-      'SELECT * FROM items WHERE id = $1',
-      [id]
-    );
+    const items = await executeQuery('SELECT * FROM items WHERE id = $1', [id]);
 
-    if (items.length === 0) {
-      return NextResponse.json(
-        { error: 'Item not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ item: items[0] });
+    return items.length > 0 ? NextResponse.json({ item: items[0] }) : notFound();
   } catch (error) {
-    console.error('Failed to fetch item:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch item' },
-      { status: 500 }
-    );
+    return errorResponse(error, 'Failed to fetch item');
   }
 }
 
@@ -51,64 +33,37 @@ export async function GET(
  * PATCH /api/items/[id]
  * Update an item
  */
-export async function PATCH(
-  request: NextRequest,
-  context: RouteContext
-) {
+export async function PATCH(request: NextRequest, context: Context) {
   try {
     const { id } = await context.params;
-    const body = await request.json();
-    const data = updateItemSchema.parse(body);
+    const data = updateItemSchema.parse(await request.json());
 
     const updates: string[] = [];
-    const values: any[] = [];
-    let paramIndex = 1;
+    const values: unknown[] = [];
 
     if (data.name !== undefined) {
-      updates.push(`name = $${paramIndex++}`);
       values.push(data.name);
+      updates.push(`name = $${values.length}`);
     }
     if (data.description !== undefined) {
-      updates.push(`description = $${paramIndex++}`);
       values.push(data.description);
+      updates.push(`description = $${values.length}`);
     }
 
     if (updates.length === 0) {
-      return NextResponse.json(
-        { error: 'No fields to update' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
 
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
     values.push(id);
-
     const result = await executeQuery(
-      `UPDATE items SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      `UPDATE items SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $${values.length} RETURNING *`,
       values
     );
 
-    if (result.length === 0) {
-      return NextResponse.json(
-        { error: 'Item not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ item: result[0] });
+    return result.length > 0 ? NextResponse.json({ item: result[0] }) : notFound();
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: error.issues },
-        { status: 400 }
-      );
-    }
-
-    console.error('Failed to update item:', error);
-    return NextResponse.json(
-      { error: 'Failed to update item' },
-      { status: 500 }
-    );
+    return errorResponse(error, 'Failed to update item');
   }
 }
 
@@ -116,31 +71,13 @@ export async function PATCH(
  * DELETE /api/items/[id]
  * Delete an item
  */
-export async function DELETE(
-  request: NextRequest,
-  context: RouteContext
-) {
+export async function DELETE(_request: NextRequest, context: Context) {
   try {
     const { id } = await context.params;
+    const result = await executeQuery('DELETE FROM items WHERE id = $1 RETURNING id', [id]);
 
-    const result = await executeQuery(
-      'DELETE FROM items WHERE id = $1 RETURNING id',
-      [id]
-    );
-
-    if (result.length === 0) {
-      return NextResponse.json(
-        { error: 'Item not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
+    return result.length > 0 ? NextResponse.json({ success: true }) : notFound();
   } catch (error) {
-    console.error('Failed to delete item:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete item' },
-      { status: 500 }
-    );
+    return errorResponse(error, 'Failed to delete item');
   }
 }

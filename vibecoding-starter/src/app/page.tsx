@@ -1,13 +1,12 @@
 import Link from 'next/link';
 import { executeQuery } from '@/lib/db';
 
-// Force Node.js runtime for PGlite compatibility
-export const runtime = 'nodejs';
+// Always read the live item count instead of prerendering at build time.
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  const result = await executeQuery<{ count: number }>('SELECT COUNT(*) as count FROM items');
-  const itemCount = Number(result[0]?.count || 0);
+  const result = await executeQuery<{ count: number }>('SELECT COUNT(*)::int AS count FROM items');
+  const itemCount = result[0].count;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -18,8 +17,8 @@ export default async function Home() {
             Postgres-for-Everything Starter
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            A full-stack Next.js starter with Prisma, PGlite, and PostgreSQL-based Job Queue.
-            Everything runs on Postgres - no additional infrastructure needed.
+            A full-stack Next.js starter with raw SQL, PGlite, and a PostgreSQL-based job queue.
+            Everything runs on Postgres. No additional infrastructure needed.
           </p>
         </div>
 
@@ -30,7 +29,7 @@ export default async function Home() {
             <div>
               <h3 className="font-medium text-gray-900 mb-2">Frontend</h3>
               <ul className="text-gray-600 space-y-1">
-                <li>Next.js 15 (App Router)</li>
+                <li>Next.js 16 (App Router)</li>
                 <li>React 19</li>
                 <li>Tailwind CSS</li>
                 <li>TypeScript</li>
@@ -39,10 +38,10 @@ export default async function Home() {
             <div>
               <h3 className="font-medium text-gray-900 mb-2">Backend</h3>
               <ul className="text-gray-600 space-y-1">
-                <li>Next.js API Routes</li>
-                <li>Prisma ORM</li>
+                <li>Next.js Route Handlers</li>
+                <li>Raw SQL via executeQuery()</li>
                 <li>PostgreSQL / PGlite</li>
-                <li>PostgreSQL Queue (Job Queue)</li>
+                <li>Job queue on LISTEN/NOTIFY + SKIP LOCKED</li>
               </ul>
             </div>
           </div>
@@ -63,14 +62,14 @@ export default async function Home() {
               <div className="text-2xl mb-2">⚡</div>
               <h3 className="font-medium text-gray-900 mb-2">Job Queue</h3>
               <p className="text-sm text-gray-600">
-                Postgres-based background jobs with Graphile Worker. No Redis or additional services.
+                Postgres-based background jobs with retries and backoff. No Redis or additional services.
               </p>
             </div>
             <div className="border border-gray-200 rounded-lg p-4">
               <div className="text-2xl mb-2">📊</div>
               <h3 className="font-medium text-gray-900 mb-2">Job Dashboard</h3>
               <p className="text-sm text-gray-600">
-                Built-in UI to monitor job status, retries, and execution history.
+                Built-in UI to monitor job status, attempts, and errors.
               </p>
             </div>
           </div>
@@ -113,7 +112,7 @@ export default async function Home() {
             Try creating an item via the API to see background jobs in action
           </p>
           <code className="bg-gray-900 text-gray-100 px-4 py-2 rounded-lg inline-block text-sm">
-            {`curl -X POST http://localhost:3000/api/items -H "Content-Type: application/json" -d '{"name":"Test Item","description":"Created via API"}'`}
+            {`curl -X POST http://localhost:7070/api/items -H "Content-Type: application/json" -d '{"name":"Test Item","description":"Created via API"}'`}
           </code>
         </div>
       </div>

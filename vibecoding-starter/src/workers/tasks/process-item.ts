@@ -1,26 +1,17 @@
-import { JobPayload, Job } from '@/lib/queue/types';
+import { z } from 'zod';
 import { executeQuery } from '@/lib/db';
+import type { JobPayload } from '@/lib/queue/types';
 
-interface ProcessItemPayload extends JobPayload {
-  itemId: string;
-  action?: 'process' | 'notify' | 'cleanup';
-}
+const payloadSchema = z.object({
+  itemId: z.string().min(1),
+  action: z.enum(['process', 'notify', 'cleanup']).default('process'),
+});
 
-interface Item {
-  id: string;
-  name: string;
-  description: string | null;
-  created_at: Date;
-  updated_at: Date;
-}
+export default async function processItem(payload: JobPayload): Promise<void> {
+  const { itemId, action } = payloadSchema.parse(payload);
 
-export default async function processItem(payload: JobPayload, _job: Job): Promise<void> {
-  const { itemId, action = 'process' } = payload as ProcessItemPayload;
-
-  console.log(`Processing item ${itemId} with action: ${action}`);
-
-  const items = await executeQuery<Item>(
-    `SELECT * FROM items WHERE id = $1`,
+  const items = await executeQuery<{ name: string }>(
+    `SELECT name FROM items WHERE id = $1`,
     [itemId]
   );
   const item = items[0];
@@ -32,6 +23,7 @@ export default async function processItem(payload: JobPayload, _job: Job): Promi
 
   console.log(`Starting ${action} for: ${item.name}`);
 
+  // Simulated work
   await new Promise((resolve) => setTimeout(resolve, Math.random() * 2000 + 1000));
 
   await executeQuery(

@@ -11,8 +11,8 @@ model Item {
   id          String   @id @default(cuid())
   name        String
   description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("items")
 }
@@ -23,15 +23,15 @@ model Job {
   payload         Json      @default("{}")
   status          String    @default("pending")
   priority        Int       @default(0)
-  runAt           DateTime  @map("run_at")
+  runAt           DateTime  @default(now()) @map("run_at") @db.Timestamptz
   attempts        Int       @default(0)
   maxAttempts     Int       @default(25) @map("max_attempts")
   lastError       String?   @map("last_error")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @default(now()) @map("updated_at")
-  lockedAt        DateTime? @map("locked_at")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+  lockedAt        DateTime? @map("locked_at") @db.Timestamptz
   lockedBy        String?   @map("locked_by")
-  completedAt     DateTime? @map("completed_at")
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz
   key             String?   @unique
   queue           String?
 

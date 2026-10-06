@@ -1,10 +1,11 @@
+/** The single source of truth for the database schema. Idempotent: safe to run on every start. */
 export const schemaSql = `
   CREATE TABLE IF NOT EXISTS items (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
   CREATE TABLE IF NOT EXISTS jobs (
@@ -13,20 +14,19 @@ export const schemaSql = `
     payload JSON DEFAULT '{}'::JSON NOT NULL,
     status TEXT DEFAULT 'pending' NOT NULL,
     priority INTEGER DEFAULT 0 NOT NULL,
-    run_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    run_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     attempts INTEGER DEFAULT 0 NOT NULL,
     max_attempts INTEGER DEFAULT 25 NOT NULL,
     last_error TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    locked_at TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    locked_at TIMESTAMPTZ,
     locked_by TEXT,
-    completed_at TIMESTAMP,
+    completed_at TIMESTAMPTZ,
     key TEXT UNIQUE,
     queue TEXT
   );
 
   CREATE INDEX IF NOT EXISTS jobs_status_run_at_idx ON jobs (status, run_at);
   CREATE INDEX IF NOT EXISTS jobs_priority_run_at_idx ON jobs (priority, run_at);
-  CREATE INDEX IF NOT EXISTS jobs_key_idx ON jobs (key);
 `;
