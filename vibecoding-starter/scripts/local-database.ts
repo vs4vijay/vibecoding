@@ -1,6 +1,6 @@
 import { connect } from 'node:net';
 import { PGlite } from '@electric-sql/pglite';
-import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
+import { startWireServer } from './pglite-wire-server';
 import { getPool } from '../src/lib/db';
 import { schemaSql } from '../src/lib/schema';
 
@@ -18,7 +18,8 @@ export function isPortOpen(): Promise<boolean> {
 
 /**
  * Open the PGlite data directory, apply the schema, and serve it over the
- * Postgres wire protocol. Only one process may own the data directory at a time.
+ * Postgres wire protocol to any number of clients. Only one process may own
+ * the data directory at a time.
  * Returns a function that stops the server.
  */
 export async function startLocalDatabase(): Promise<() => Promise<void>> {
@@ -34,16 +35,11 @@ export async function startLocalDatabase(): Promise<() => Promise<void>> {
   const db = await PGlite.create(process.env.PGLITE_DATA_DIR || './dev.db');
   await db.exec(schemaSql);
 
-  const server = new PGLiteSocketServer({
-    db,
-    host,
-    port,
-    maxConnections: Number(process.env.PGLITE_MAX_CONNECTIONS || 20),
-  });
-  await server.start();
+  // Not @electric-sql/pglite-socket: see pglite-wire-server.ts for why.
+  const server = await startWireServer({ db, host, port });
 
   return async () => {
-    await server.stop();
+    await server.close();
     await db.close();
   };
 }

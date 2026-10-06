@@ -43,7 +43,8 @@ This is a **Postgres-for-Everything** full-stack starter that uses PostgreSQL fo
 - `src/workers/main.ts` - Worker process entrypoint (runs as a separate process)
 
 ### Scripts
-- `scripts/local-database.ts` - PGlite socket server helpers (`startLocalDatabase`, `withDatabase`)
+- `scripts/local-database.ts` - local database helpers (`startLocalDatabase`, `withDatabase`)
+- `scripts/pglite-wire-server.ts` - serves one PGlite session to many Postgres clients, one query cycle or transaction at a time, relaying NOTIFY. Do not swap it for `@electric-sql/pglite-socket`: that package serves one connection at a time, or with `maxConnections` interleaves concurrent clients' messages and returns wrong rows.
 - `scripts/start-database.ts` - `dev:db`: the single owner of `./dev.db`
 - `scripts/start-development.ts` - `dev`: runs database, Next.js, and worker together
 - `scripts/initialize-database.ts` - `db:init`: applies the schema through `executeQuery()`

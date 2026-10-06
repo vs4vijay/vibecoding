@@ -239,7 +239,6 @@ Deploying the web app does not start the worker; provision it as its own service
 | `PGLITE_DATA_DIR`        | `./dev.db`                                      | Local database directory                |
 | `PGLITE_HOST`            | `127.0.0.1`                                     | Local socket bind host                  |
 | `PGLITE_PORT`            | `5433`                                          | Local socket port                       |
-| `PGLITE_MAX_CONNECTIONS` | `20`                                            | Connection limit of the local socket    |
 
 ## Troubleshooting
 
